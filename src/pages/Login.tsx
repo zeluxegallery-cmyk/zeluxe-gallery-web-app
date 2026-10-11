@@ -25,8 +25,8 @@ export default function Login() {
     try {
       const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
 
-      const token = await user.getIdTokenResult(true);
-      if (token.claims.admin === true) {
+      const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+      if (adminDoc.exists()) {
         navigate('/admin-dashboard');
         return;
       }
