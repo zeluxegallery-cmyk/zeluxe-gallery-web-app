@@ -10,12 +10,14 @@ import CreateOrder from './pages/CreateOrder';
 import OrderDetails from './pages/OrderDetails';
 import AdminDashboard from './pages/AdminDashboard';
 import AdminMemberships from './pages/AdminMemberships';
+import Landing from './pages/Landing';
+import Earnings from './pages/Earnings';
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/membership" element={<Membership />} />
@@ -25,7 +27,7 @@ export default function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/orders/new" element={<CreateOrder />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
-        <Route path="/earnings" element={<div className="p-8">Earnings Coming Soon</div>} />
+        <Route path="/earnings" element={<Earnings />} />
         <Route path="/profile" element={<div className="p-8">Profile Coming Soon</div>} />
         <Route path="/admin-dashboard" element={<AdminDashboard />} />
         <Route path="/admin/memberships" element={<AdminMemberships />} />

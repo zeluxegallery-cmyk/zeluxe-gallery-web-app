@@ -51,12 +51,15 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center px-6 py-12">
+    <div className="min-h-screen bg-white flex items-center justify-center px-6 py-12 pb-24">
       <div className="max-w-md w-full animate-fade-in-up">
+        <Link to="/" className="text-sm text-zeluxe-gray hover:text-zeluxe-black mb-4 inline-block">
+          ← হোম
+        </Link>
         <img src={logo} alt="Zeluxe Gallery" className="h-32 mx-auto mb-6 object-contain" />
 
         <h1 className="text-2xl font-bold text-black text-center">Welcome Back</h1>
-        <p className="text-sm text-gray-500 text-center mt-2">Login to your reseller account</p>
+        <p className="text-sm text-gray-500 text-center mt-2">Login to your reseller account / আপনার রিসেলার অ্যাকাউন্টে লগইন করুন</p>
 
         {error && (
           <div className="mt-6 bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3 animate-fade-in">

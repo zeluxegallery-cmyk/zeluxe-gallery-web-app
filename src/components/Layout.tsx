@@ -12,6 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { auth } from '../firebase';
+import BottomNav from './BottomNav';
 import logo from '../assets/zeluxe-logo.png';
 
 type LayoutProps = {
@@ -117,8 +118,10 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
       </aside>
 
       <main className="min-h-screen md:ml-60">
-        <div className="mx-auto max-w-7xl p-5 md:p-8">{children}</div>
+        <div className="mx-auto max-w-7xl p-5 pb-20 md:p-8 md:pb-8">{children}</div>
       </main>
+
+      <BottomNav />
     </div>
   );
 }

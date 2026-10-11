@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Clock, IndianRupee, Loader2, ShoppingBag, TrendingUp } from 'lucide-react';
+import {
+  Clock,
+  IndianRupee,
+  Loader2,
+  Package,
+  Plus,
+  ShoppingBag,
+  TrendingUp,
+  User,
+} from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
@@ -24,6 +34,23 @@ const initialStats: Stats = {
   totalSales: 0,
   totalProfit: 0,
 };
+
+function getStatusBadgeClass(status: string) {
+  switch (status.toLowerCase()) {
+    case 'pending':
+      return 'bg-yellow-100 text-yellow-800';
+    case 'confirmed':
+      return 'bg-gray-200 text-gray-800';
+    case 'shipped':
+      return 'bg-gray-200 text-gray-800';
+    case 'delivered':
+      return 'bg-green-100 text-green-800';
+    case 'cancelled':
+      return 'bg-red-100 text-red-800';
+    default:
+      return 'bg-gray-100 text-gray-800';
+  }
+}
 
 export default function ResellerDashboard() {
   const [stats, setStats] = useState<Stats>(initialStats);
@@ -72,71 +99,99 @@ export default function ResellerDashboard() {
     .sort((first, second) => (second.createdAt?.seconds || 0) - (first.createdAt?.seconds || 0))
     .slice(0, 5);
 
+  const resellerName = auth.currentUser?.displayName || auth.currentUser?.email?.split('@')[0] || 'Reseller';
+
   const summaryCards = [
     { label: 'Total Orders', value: stats.totalOrders, icon: ShoppingBag },
-    { label: 'Pending Orders', value: stats.pendingOrders, icon: Clock },
+    { label: 'Pending', value: stats.pendingOrders, icon: Clock },
     { label: 'Total Sales', value: `৳${stats.totalSales.toLocaleString()}`, icon: TrendingUp },
-    { label: 'Estimated Profit', value: `৳${stats.totalProfit.toLocaleString()}`, icon: IndianRupee },
+    { label: 'Profit', value: `৳${stats.totalProfit.toLocaleString()}`, icon: IndianRupee },
   ];
 
-  return (
-    <Layout>
-      <h1 className="text-2xl font-bold text-zeluxe-black">Dashboard</h1>
-      <p className="mb-6 text-sm text-gray-700">Welcome back to your reseller business</p>
+  const quickActions = [
+    { label: 'প্রোডাক্ট', path: '/products', icon: Package },
+    { label: 'নতুন অর্ডার', path: '/orders/new', icon: Plus },
+    { label: 'আর্নিংস', path: '/earnings', icon: TrendingUp },
+    { label: 'প্রোফাইল', path: '/profile', icon: User },
+  ];
 
-      {loading ? (
+  if (loading) {
+    return (
+      <Layout>
         <div className="flex min-h-40 items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading dashboard" />
         </div>
-      ) : (
-        <>
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-            {summaryCards.map(({ label, value, icon: Icon }) => (
-              <div key={label} className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
-                <Icon className="h-5 w-5 text-zeluxe-gold" />
-                <p className="mt-3 text-xs uppercase font-semibold text-zeluxe-gray">{label}</p>
-                <p className="mt-1 text-2xl font-bold text-zeluxe-black">{value}</p>
-              </div>
+      </Layout>
+    );
+  }
+
+  return (
+    <Layout>
+      {/* GREETING */}
+      <div className="mb-6 rounded-2xl bg-gradient-to-br from-zeluxe-black to-gray-900 p-6 text-white">
+        <p className="text-xs text-gray-300">স্বাগতম,</p>
+        <h1 className="mt-1 text-2xl font-bold text-white">{resellerName}</h1>
+        <span className="mt-2 inline-block rounded-full bg-zeluxe-gold px-2 py-1 text-xs font-bold text-zeluxe-black">
+          ✓ অ্যাক্টিভ রিসেলার
+        </span>
+      </div>
+
+      {/* SUMMARY CARDS */}
+      <div className="mb-6 grid grid-cols-2 gap-3">
+        {summaryCards.map(({ label, value, icon: Icon }) => (
+          <div key={label} className="rounded-2xl border border-zeluxe-lightgray bg-white p-4">
+            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-gold/10">
+              <Icon className="text-zeluxe-gold" size={20} />
+            </span>
+            <p className="mt-3 text-2xl font-bold text-zeluxe-black">{value}</p>
+            <p className="mt-1 text-xs uppercase tracking-wide text-gray-500">{label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* QUICK ACTIONS */}
+      <div className="mb-6 grid grid-cols-4 gap-3">
+        {quickActions.map(({ label, path, icon: Icon }) => (
+          <Link
+            key={path}
+            to={path}
+            className="flex flex-col items-center gap-2 rounded-xl border border-zeluxe-lightgray bg-white p-3 transition hover:bg-zeluxe-fieldbg active:scale-[0.97]"
+          >
+            <Icon className="text-zeluxe-gold" size={20} />
+            <span className="text-xs font-medium text-zeluxe-black">{label}</span>
+          </Link>
+        ))}
+      </div>
+
+      {/* RECENT ORDERS */}
+      <section>
+        <h2 className="mb-4 text-lg font-bold text-zeluxe-black">Recent Orders</h2>
+        {recentOrders.length > 0 ? (
+          <div className="space-y-3">
+            {recentOrders.map((order) => (
+              <Link
+                key={order.id}
+                to={`/orders/${order.id}`}
+                className="flex items-center justify-between rounded-xl border border-zeluxe-lightgray bg-white p-4 transition hover:bg-zeluxe-fieldbg active:scale-[0.98]"
+              >
+                <div>
+                  <p className="text-sm font-bold text-zeluxe-black">Order #{order.id.slice(0, 8)}</p>
+                  <span
+                    className={`mt-1 inline-block rounded-full px-2 py-1 text-xs font-bold capitalize ${getStatusBadgeClass(order.status)}`}
+                  >
+                    {order.status}
+                  </span>
+                </div>
+                <p className="text-sm font-bold text-zeluxe-black">৳{order.total.toLocaleString()}</p>
+              </Link>
             ))}
           </div>
-
-          <section className="mt-8">
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">Recent Orders</h2>
-            {recentOrders.length > 0 ? (
-              <div className="space-y-3">
-                {recentOrders.map((order) => (
-                  <div key={order.id} className="flex items-center justify-between rounded-xl border border-zeluxe-lightgray bg-white p-4">
-                    <div>
-                      <p className="text-sm font-bold text-zeluxe-black">Order #{order.id.slice(0, 8)}</p>
-                      <p className="mt-1 text-xs capitalize text-zeluxe-gray">{order.status}</p>
-                    </div>
-                    <p className="text-sm font-bold text-zeluxe-black">৳{order.total.toLocaleString()}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl bg-zeluxe-fieldbg p-6 text-center text-gray-600">
-                No orders yet. Start by browsing products.
-              </div>
-            )}
-          </section>
-
-          <section className="mt-8">
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">Quick Actions</h2>
-            <div className="grid grid-cols-3 gap-3">
-              <a href="/products" className="rounded-xl bg-zeluxe-black py-3 text-center text-sm font-bold text-white transition hover:bg-[#2a2a2a]">
-                Browse Products
-              </a>
-              <a href="/orders" className="rounded-xl border border-zeluxe-black py-3 text-center text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-fieldbg">
-                My Orders
-              </a>
-              <a href="/earnings" className="rounded-xl border border-zeluxe-black py-3 text-center text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-fieldbg">
-                Earnings
-              </a>
-            </div>
-          </section>
-        </>
-      )}
+        ) : (
+          <div className="rounded-xl bg-zeluxe-fieldbg p-6 text-center text-gray-600">
+            No orders yet. Start by browsing products.
+          </div>
+        )}
+      </section>
     </Layout>
   );
 }
