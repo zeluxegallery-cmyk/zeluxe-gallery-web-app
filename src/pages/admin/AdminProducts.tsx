@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   addDoc,
   collection,
@@ -10,8 +10,9 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
-import { Loader2, Package, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
+import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
 
 type Product = {
@@ -69,6 +70,8 @@ export default function AdminProducts() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -181,6 +184,19 @@ export default function AdminProducts() {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Toggle failed.';
       alert(message);
+    }
+  };
+
+  const handleImageUpload = async (file: File) => {
+    setUploading(true);
+    try {
+      const url = await uploadImageToCloudinary(file);
+      setForm((prev) => ({ ...prev, imageUrl: url }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Upload failed.';
+      alert(message);
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -414,11 +430,62 @@ export default function AdminProducts() {
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-zeluxe-black">Image URL</label>
+                <label className="mb-1 block text-sm font-medium text-zeluxe-black">প্রোডাক্টের ছবি</label>
+                {form.imageUrl ? (
+                  <div className="relative inline-block">
+                    <img
+                      src={form.imageUrl}
+                      alt="Preview"
+                      className="h-32 w-32 rounded-xl object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setForm({ ...form, imageUrl: '' })}
+                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-md"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-zeluxe-lightgray p-4 text-center cursor-pointer transition hover:border-zeluxe-gold disabled:opacity-60"
+                  >
+                    {uploading ? (
+                      <>
+                        <Loader2 className="mx-auto h-6 w-6 animate-spin text-zeluxe-gold" />
+                        <p className="mt-2 text-xs text-zeluxe-gray">আপলোড হচ্ছে...</p>
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="mx-auto h-6 w-6 text-zeluxe-gold" />
+                        <p className="mt-2 text-sm font-medium text-zeluxe-black">ছবি আপলোড করুন</p>
+                        <p className="mt-1 text-xs text-zeluxe-gray">JPG, PNG (Max 5MB)</p>
+                      </>
+                    )}
+                  </button>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void handleImageUpload(file);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-zeluxe-gray">Image URL (manual)</label>
                 <input
                   value={form.imageUrl}
                   onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
                   className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
+                  placeholder="https://..."
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
