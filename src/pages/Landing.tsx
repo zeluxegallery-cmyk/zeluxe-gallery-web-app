@@ -45,7 +45,7 @@ export default function Landing() {
           প্রিমিয়াম রিসেলিং প্লাটফর্ম
         </span>
         <h1 className="text-3xl font-bold leading-tight text-zeluxe-black">
-          জেলুক্স গ্যালারিতে<br />
+          Zeluxe Gallery-তে<br />
           রিসেলার হয়ে<br />
           ব্যবসা শুরু করুন
         </h1>
@@ -88,7 +88,7 @@ export default function Landing() {
 
       {/* SECTION C — WHY ZELUXE */}
       <section className="px-5 py-10">
-        <h2 className="mb-6 text-center text-xl font-bold text-zeluxe-black">কেন জেলুক্স গ্যালারি?</h2>
+        <h2 className="mb-6 text-center text-xl font-bold text-zeluxe-black">কেন Zeluxe Gallery?</h2>
         <div className="grid grid-cols-2 gap-3">
           {whyCards.map(({ icon: Icon, title, desc }) => (
             <div
