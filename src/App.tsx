@@ -8,10 +8,16 @@ import Products from './pages/Products';
 import Orders from './pages/Orders';
 import CreateOrder from './pages/CreateOrder';
 import OrderDetails from './pages/OrderDetails';
-import AdminDashboard from './pages/AdminDashboard';
-import AdminMemberships from './pages/AdminMemberships';
-import Landing from './pages/Landing';
 import Earnings from './pages/Earnings';
+import Landing from './pages/Landing';
+import ForgotPassword from './pages/ForgotPassword';
+import AdminMemberships from './pages/AdminMemberships';
+import AdminOverview from './pages/admin/AdminOverview';
+import AdminProducts from './pages/admin/AdminProducts';
+import AdminCategories from './pages/admin/AdminCategories';
+import AdminOrders from './pages/admin/AdminOrders';
+import AdminResellers from './pages/admin/AdminResellers';
+import AdminNotifications from './pages/admin/AdminNotifications';
 
 export default function App() {
   return (
@@ -20,6 +26,7 @@ export default function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/membership" element={<Membership />} />
         <Route path="/pending" element={<Pending />} />
         <Route path="/reseller-dashboard" element={<ResellerDashboard />} />
@@ -29,8 +36,13 @@ export default function App() {
         <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="/earnings" element={<Earnings />} />
         <Route path="/profile" element={<div className="p-8">Profile Coming Soon</div>} />
-        <Route path="/admin-dashboard" element={<AdminDashboard />} />
+        <Route path="/admin-dashboard" element={<AdminOverview />} />
         <Route path="/admin/memberships" element={<AdminMemberships />} />
+        <Route path="/admin/products" element={<AdminProducts />} />
+        <Route path="/admin/categories" element={<AdminCategories />} />
+        <Route path="/admin/orders" element={<AdminOrders />} />
+        <Route path="/admin/resellers" element={<AdminResellers />} />
+        <Route path="/admin/notifications" element={<AdminNotifications />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

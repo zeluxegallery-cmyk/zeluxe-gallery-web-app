@@ -90,6 +90,12 @@ export default function Login() {
             />
           </div>
 
+          <div className="text-right">
+            <Link to="/forgot-password" className="text-xs text-zeluxe-gold hover:underline">
+              পাসওয়ার্ড ভুলে গেছেন?
+            </Link>
+          </div>
+
           <button
             type="submit"
             disabled={loading}
