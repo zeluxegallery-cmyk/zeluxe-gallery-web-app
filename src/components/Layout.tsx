@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { auth } from '../firebase';
 import BottomNav from './BottomNav';
+import LogoutModal from './LogoutModal';
 import logo from '../assets/zeluxe-logo.png';
 
 type LayoutProps = {
@@ -45,9 +46,11 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const navItems = isAdmin ? adminNav : resellerNav;
 
-  const handleLogout = async () => {
+  const confirmLogout = async () => {
+    setShowLogout(false);
     await signOut(auth);
     navigate('/login');
   };
@@ -110,7 +113,10 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
 
         <div className="border-t border-zeluxe-lightgray p-3">
           <button
-            onClick={handleLogout}
+            onClick={() => {
+              setIsOpen(false);
+              setShowLogout(true);
+            }}
             className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
           >
             <LogOut className="h-5 w-5" />
@@ -124,6 +130,13 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
       </main>
 
       <BottomNav />
+
+      {/* Custom Logout Modal */}
+      <LogoutModal
+        isOpen={showLogout}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogout(false)}
+      />
     </div>
   );
 }
