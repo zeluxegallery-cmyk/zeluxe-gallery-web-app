@@ -16,6 +16,7 @@ type Product = {
   id: string;
   name: string;
   suggestedPrice: number;
+  resellerPrice: number;
 };
 
 const DISTRICTS = ['Dhaka', 'Chattogram', 'Sylhet', 'Khulna', 'Rajshahi', 'Barishal', 'Rangpur', 'Mymensingh', 'Other'];
@@ -39,7 +40,7 @@ export default function CreateOrder() {
   const [productId, setProductId] = useState(presetProductId || '');
   const [quantity, setQuantity] = useState(1);
   const [sellingPrice, setSellingPrice] = useState(0);
-  const [deliveryCharge, setDeliveryCharge] = useState(60);
+  const [deliveryCharge, setDeliveryCharge] = useState(70);
   const [discount, setDiscount] = useState(0);
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
   const [note, setNote] = useState('');
@@ -57,6 +58,7 @@ export default function CreateOrder() {
             id: productDocument.id,
             name: typeof data.name === 'string' ? data.name : 'Unnamed Product',
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
+            resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
           };
         });
         setProducts(fetchedProducts);
@@ -83,6 +85,11 @@ export default function CreateOrder() {
       setSellingPrice(product.suggestedPrice);
     }
   };
+
+  const selectedProduct = products.find((p) => p.id === productId);
+  const profit = selectedProduct
+    ? (Number(sellingPrice) - Number(selectedProduct.resellerPrice)) * Number(quantity)
+    : 0;
 
   const itemTotal = quantity * sellingPrice;
   const total = itemTotal + deliveryCharge - discount;
@@ -253,13 +260,14 @@ export default function CreateOrder() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black">Delivery Charge (৳)</label>
-                  <input
-                    type="number"
-                    min={0}
+                  <select
                     value={deliveryCharge}
                     onChange={(e) => setDeliveryCharge(Number(e.target.value))}
                     className={`mt-1 ${inputClass}`}
-                  />
+                  >
+                    <option value={70}>ঢাকার ভিতরে (৭০ টাকা)</option>
+                    <option value={120}>ঢাকার বাইরে (১২০ টাকা)</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black">Discount (৳)</label>
@@ -272,6 +280,24 @@ export default function CreateOrder() {
                   />
                 </div>
               </div>
+              {selectedProduct && Number(sellingPrice) > 0 && (
+                <div className={`mt-3 flex items-center justify-between rounded-xl p-3 ${
+                  profit >= 0
+                    ? 'border border-green-200 bg-green-50'
+                    : 'border border-red-200 bg-red-50'
+                }`}>
+                  <span className={`text-sm font-medium ${
+                    profit >= 0 ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    {profit >= 0 ? 'আপনার লাভ:' : 'লস হচ্ছে:'}
+                  </span>
+                  <span className={`text-lg font-bold ${
+                    profit >= 0 ? 'text-green-700' : 'text-red-700'
+                  }`}>
+                    ৳{Math.abs(profit)}
+                  </span>
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-zeluxe-black">Payment Method</label>
                 <select
@@ -313,6 +339,13 @@ export default function CreateOrder() {
               <div className="flex justify-between text-zeluxe-black">
                 <span>Discount</span>
                 <span>-৳{discount.toLocaleString()}</span>
+              </div>
+              <div className="my-3 border-t border-zeluxe-lightgray" />
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">আপনার লাভ:</span>
+                <span className={profit >= 0 ? 'font-bold text-green-600' : 'font-bold text-red-600'}>
+                  ৳{profit}
+                </span>
               </div>
               <div className="my-3 border-t border-zeluxe-lightgray" />
               <div className="flex justify-between text-lg font-bold text-zeluxe-black">
