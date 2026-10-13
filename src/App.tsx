@@ -13,6 +13,7 @@ import Landing from './pages/Landing';
 import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
 import Legal from './pages/Legal';
+import Withdraw from './pages/Withdraw';
 import AdminMemberships from './pages/AdminMemberships';
 import AdminOverview from './pages/admin/AdminOverview';
 import AdminProducts from './pages/admin/AdminProducts';
@@ -20,6 +21,7 @@ import AdminCategories from './pages/admin/AdminCategories';
 import AdminOrders from './pages/admin/AdminOrders';
 import AdminResellers from './pages/admin/AdminResellers';
 import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminWithdrawals from './pages/admin/AdminWithdrawals';
 
 export default function App() {
   return (
@@ -39,6 +41,7 @@ export default function App() {
         <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="/earnings" element={<Earnings />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/withdraw" element={<Withdraw />} />
         <Route path="/admin-dashboard" element={<AdminOverview />} />
         <Route path="/admin/memberships" element={<AdminMemberships />} />
         <Route path="/admin/products" element={<AdminProducts />} />
@@ -46,6 +49,7 @@ export default function App() {
         <Route path="/admin/orders" element={<AdminOrders />} />
         <Route path="/admin/resellers" element={<AdminResellers />} />
         <Route path="/admin/notifications" element={<AdminNotifications />} />
+        <Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
