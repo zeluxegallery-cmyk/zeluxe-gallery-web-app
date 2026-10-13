@@ -11,6 +11,7 @@ import {
   ShoppingBag,
   UserCheck,
   Users,
+  Wallet,
   X,
 } from 'lucide-react';
 import { auth } from '../firebase';
@@ -29,6 +30,7 @@ const navItems: NavItem[] = [
   { label: 'Products', path: '/admin/products', icon: Package },
   { label: 'Categories', path: '/admin/categories', icon: FolderTree },
   { label: 'Orders', path: '/admin/orders', icon: ShoppingBag },
+  { label: 'Withdrawals', path: '/admin/withdrawals', icon: Wallet },
   { label: 'Notifications', path: '/admin/notifications', icon: Bell },
 ];
 
