@@ -9,6 +9,7 @@ import {
   ShoppingBag,
   TrendingUp,
   User,
+  Wallet,
   X,
 } from 'lucide-react';
 import { auth } from '../firebase';
@@ -31,6 +32,7 @@ const resellerNav: NavItem[] = [
   { label: 'Products', path: '/products', icon: Package },
   { label: 'My Orders', path: '/orders', icon: ShoppingBag },
   { label: 'Earnings', path: '/earnings', icon: TrendingUp },
+  { label: 'টাকা তুলুন', path: '/withdraw', icon: Wallet },
   { label: 'Profile', path: '/profile', icon: User },
 ];
 
