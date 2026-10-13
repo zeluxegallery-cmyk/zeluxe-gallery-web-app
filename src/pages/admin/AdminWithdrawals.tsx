@@ -3,7 +3,6 @@ import {
   collection,
   doc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
@@ -33,13 +32,22 @@ export default function AdminWithdrawals() {
 
   const loadData = async () => {
     try {
-      const snap = await getDocs(
-        query(collection(db, 'withdrawRequests'), orderBy('createdAt', 'desc'))
-      );
+      // NO orderBy — fetch all, sort in JavaScript to avoid index requirement
+      const snap = await getDocs(query(collection(db, 'withdrawRequests')));
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() })) as Withdrawal[];
+
+      // Sort by createdAt descending (client-side)
+      list.sort((a, b) => {
+        const aTime = a.createdAt?.seconds || 0;
+        const bTime = b.createdAt?.seconds || 0;
+        return bTime - aTime;
+      });
+
+      console.log('Withdrawals loaded:', list.length, list);
       setWithdrawals(list);
     } catch (err) {
       console.error('Load failed:', err);
+      alert('Withdraw load করতে সমস্যা: ' + (err instanceof Error ? err.message : 'Unknown'));
     } finally {
       setLoading(false);
     }
@@ -56,7 +64,7 @@ export default function AdminWithdrawals() {
       });
       await loadData();
     } catch (err) {
-      alert('Approve failed');
+      alert('Approve failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   };
 
@@ -71,7 +79,7 @@ export default function AdminWithdrawals() {
       });
       await loadData();
     } catch (err) {
-      alert('Reject failed');
+      alert('Reject failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   };
 
@@ -84,7 +92,7 @@ export default function AdminWithdrawals() {
       });
       await loadData();
     } catch (err) {
-      alert('Update failed');
+      alert('Update failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   };
 
@@ -202,7 +210,6 @@ export default function AdminWithdrawals() {
                 </div>
               </div>
 
-              {/* Actions */}
               {w.status === 'pending' && (
                 <div className="mt-3 flex gap-2">
                   <button
