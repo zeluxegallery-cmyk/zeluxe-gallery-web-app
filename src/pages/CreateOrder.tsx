@@ -11,6 +11,7 @@ import {
 import { Loader2 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
+import { generateOrderId } from '../lib/orderId';
 
 type Product = {
   id: string;
@@ -121,7 +122,7 @@ export default function CreateOrder() {
 
     setSubmitting(true);
     try {
-      const orderId = `ZEL-${Date.now().toString().slice(-6)}`;
+      const orderId = await generateOrderId();
       await addDoc(collection(db, 'orders'), {
         orderId,
         resellerId: user.uid,
