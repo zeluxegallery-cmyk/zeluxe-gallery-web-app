@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Crown,
   Gem,
@@ -10,10 +11,13 @@ import {
   Tag,
   TrendingUp,
   Truck,
+  FolderTree,
 } from 'lucide-react';
+import { collection, getDocs } from 'firebase/firestore';
+import { db } from '../firebase';
 import logo from '../assets/zeluxe-logo.png';
 
-const categories = [
+const staticCategories = [
   { title: 'শাড়ি', icon: Sparkles },
   { title: 'পুরুষদের', icon: Shirt },
   { title: 'মহিলাদের', icon: Crown },
@@ -36,6 +40,22 @@ const steps = [
 ];
 
 export default function Landing() {
+  const navigate = useNavigate();
+  const [categories, setCategories] = useState<any[]>([]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'categories'));
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setCategories(list);
+      } catch (err) {
+        console.error('Failed to load categories:', err);
+      }
+    };
+    loadCategories();
+  }, []);
+
   return (
     <div className="min-h-screen bg-white pb-20">
       {/* SECTION A — HERO */}
@@ -125,15 +145,43 @@ export default function Landing() {
       <section className="px-5 py-10">
         <h2 className="mb-4 text-xl font-bold text-zeluxe-black">জনপ্রিয় ক্যাটাগরি</h2>
         <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-2">
-          {categories.map(({ title, icon: Icon }) => (
-            <div
-              key={title}
-              className="min-w-[100px] rounded-2xl border border-zeluxe-lightgray bg-white p-4 text-center"
-            >
-              <Icon className="mx-auto text-zeluxe-gold" size={24} />
-              <p className="mt-2 text-xs font-medium text-zeluxe-black">{title}</p>
-            </div>
-          ))}
+          {categories.length > 0
+            ? categories.map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => navigate('/register')}
+                  className="flex min-w-[90px] flex-col items-center gap-2"
+                >
+                  <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-zeluxe-lightgray bg-zeluxe-fieldbg">
+                    {cat.imageUrl ? (
+                      <img
+                        src={cat.imageUrl}
+                        alt={cat.name}
+                        className="h-full w-full object-cover"
+                      />
+                    ) : (
+                      <FolderTree size={24} className="text-zeluxe-gold" />
+                    )}
+                  </div>
+                  <span className="text-center text-xs font-medium text-zeluxe-black">
+                    {cat.name}
+                  </span>
+                </button>
+              ))
+            : staticCategories.map(({ title, icon: Icon }) => (
+                <button
+                  key={title}
+                  onClick={() => navigate('/register')}
+                  className="flex min-w-[90px] flex-col items-center gap-2"
+                >
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full border-2 border-zeluxe-lightgray bg-zeluxe-fieldbg">
+                    <Icon className="text-zeluxe-gold" size={24} />
+                  </div>
+                  <span className="text-center text-xs font-medium text-zeluxe-black">
+                    {title}
+                  </span>
+                </button>
+              ))}
         </div>
       </section>
 
