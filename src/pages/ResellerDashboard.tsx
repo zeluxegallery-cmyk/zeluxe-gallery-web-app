@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import {
   Clock,
-  IndianRupee,
+  Wallet,
   Loader2,
   Package,
   Plus,
@@ -16,33 +16,40 @@ import { auth, db } from '../firebase';
 
 type Order = {
   id: string;
+  orderId: string;
   status: string;
   total: number;
+  quantity: number;
+  sellingPrice: number;
+  productId: string;
   createdAt?: { seconds?: number };
+  actualProfit: number;
 };
 
 type Stats = {
   totalOrders: number;
   pendingOrders: number;
   totalSales: number;
-  totalProfit: number;
+  actualProfit: number;
 };
 
 const initialStats: Stats = {
   totalOrders: 0,
   pendingOrders: 0,
   totalSales: 0,
-  totalProfit: 0,
+  actualProfit: 0,
 };
+
+const PENDING_STATUSES = ['pending', 'confirmed', 'shipped'];
 
 function getStatusBadgeClass(status: string) {
   switch (status.toLowerCase()) {
     case 'pending':
       return 'bg-yellow-100 text-yellow-800';
     case 'confirmed':
-      return 'bg-gray-200 text-gray-800';
+      return 'bg-blue-100 text-blue-800';
     case 'shipped':
-      return 'bg-gray-200 text-gray-800';
+      return 'bg-purple-100 text-purple-800';
     case 'delivered':
       return 'bg-green-100 text-green-800';
     case 'cancelled':
@@ -66,26 +73,54 @@ export default function ResellerDashboard() {
       }
 
       try {
+        // Fetch products for resellerPrice lookup
+        const productsSnap = await getDocs(collection(db, 'products'));
+        const productMap: Record<string, number> = {};
+        productsSnap.docs.forEach((p) => {
+          const data = p.data();
+          productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
+        });
+
+        // Fetch orders
         const ordersQuery = query(collection(db, 'orders'), where('resellerId', '==', uid));
         const snapshot = await getDocs(ordersQuery);
         const fetchedOrders: Order[] = snapshot.docs.map((orderDocument) => {
           const data = orderDocument.data();
+          const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
+          const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
+          const productId = typeof data.productId === 'string' ? data.productId : '';
+          const resellerPrice = productMap[productId] || 0;
+          const actualProfit = (sellingPrice - resellerPrice) * quantity;
+
           return {
             id: orderDocument.id,
+            orderId: typeof data.orderId === 'string' ? data.orderId : orderDocument.id,
             status: typeof data.status === 'string' ? data.status : 'pending',
             total: typeof data.total === 'number' ? data.total : 0,
+            quantity,
+            sellingPrice,
+            productId,
             createdAt: data.createdAt,
+            actualProfit,
           };
         });
+
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
-        const pendingOrders = fetchedOrders.filter((order) => order.status === 'pending').length;
+        const pendingOrders = fetchedOrders.filter((order) =>
+          PENDING_STATUSES.includes(order.status)
+        ).length;
+
+        // Actual profit from delivered orders only
+        const actualProfit = fetchedOrders
+          .filter((order) => order.status === 'delivered')
+          .reduce((sum, order) => sum + order.actualProfit, 0);
 
         setOrders(fetchedOrders);
         setStats({
           totalOrders: fetchedOrders.length,
           pendingOrders,
           totalSales,
-          totalProfit: totalSales * 0.2,
+          actualProfit,
         });
       } finally {
         setLoading(false);
@@ -104,8 +139,8 @@ export default function ResellerDashboard() {
   const summaryCards = [
     { label: 'Total Orders', value: stats.totalOrders, icon: ShoppingBag },
     { label: 'Pending', value: stats.pendingOrders, icon: Clock },
-    { label: 'Total Sales', value: `৳${stats.totalSales.toLocaleString()}`, icon: TrendingUp },
-    { label: 'Profit', value: `৳${stats.totalProfit.toLocaleString()}`, icon: IndianRupee },
+    { label: 'Total Sales', value: `Tk ${stats.totalSales.toLocaleString()}`, icon: TrendingUp },
+    { label: 'Actual Profit', value: `Tk ${stats.actualProfit.toLocaleString()}`, icon: Wallet },
   ];
 
   const quickActions = [
@@ -175,14 +210,18 @@ export default function ResellerDashboard() {
                 className="flex items-center justify-between rounded-xl border border-zeluxe-lightgray bg-white p-4 transition hover:bg-zeluxe-fieldbg active:scale-[0.98]"
               >
                 <div>
-                  <p className="text-sm font-bold text-zeluxe-black">Order #{order.id.slice(0, 8)}</p>
+                  <p className="font-mono text-sm font-bold text-zeluxe-black">
+                    {order.orderId}
+                  </p>
                   <span
                     className={`mt-1 inline-block rounded-full px-2 py-1 text-xs font-bold capitalize ${getStatusBadgeClass(order.status)}`}
                   >
                     {order.status}
                   </span>
                 </div>
-                <p className="text-sm font-bold text-zeluxe-black">৳{order.total.toLocaleString()}</p>
+                <p className="text-sm font-bold text-zeluxe-black">
+                  Tk {order.total.toLocaleString()}
+                </p>
               </Link>
             ))}
           </div>
