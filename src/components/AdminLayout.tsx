@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { signOut } from 'firebase/auth';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
+  BarChart3,
   Bell,
   FolderTree,
   LayoutDashboard,
@@ -31,6 +32,7 @@ const navItems: NavItem[] = [
   { label: 'Categories', path: '/admin/categories', icon: FolderTree },
   { label: 'Orders', path: '/admin/orders', icon: ShoppingBag },
   { label: 'Withdrawals', path: '/admin/withdrawals', icon: Wallet },
+  { label: 'Reports', path: '/admin/reports', icon: BarChart3 },
   { label: 'Notifications', path: '/admin/notifications', icon: Bell },
 ];
 
@@ -91,7 +93,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-2 px-3" aria-label="Admin navigation">
+        <nav className="flex-1 space-y-2 overflow-y-auto px-3" aria-label="Admin navigation">
           {navItems.map(({ label, path, icon: Icon }) => (
             <Link
               key={path}
