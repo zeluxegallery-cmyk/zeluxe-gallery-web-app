@@ -1,4 +1,4 @@
-const CLOUD_NAME = 'qtzrv8i';
+const CLOUD_NAME = 'q1zrv81l';
 const UPLOAD_PRESET = 'zeluxe_unsigned';
 
 export async function uploadImageToCloudinary(file: File): Promise<string> {
