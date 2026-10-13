@@ -22,6 +22,7 @@ import AdminOrders from './pages/admin/AdminOrders';
 import AdminResellers from './pages/admin/AdminResellers';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import AdminWithdrawals from './pages/admin/AdminWithdrawals';
+import AdminReports from './pages/admin/AdminReports';
 
 export default function App() {
   return (
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/admin/resellers" element={<AdminResellers />} />
         <Route path="/admin/notifications" element={<AdminNotifications />} />
         <Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
+        <Route path="/admin/reports" element={<AdminReports />} />
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>
