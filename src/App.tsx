@@ -11,6 +11,7 @@ import OrderDetails from './pages/OrderDetails';
 import Earnings from './pages/Earnings';
 import Landing from './pages/Landing';
 import ForgotPassword from './pages/ForgotPassword';
+import Profile from './pages/Profile';
 import AdminMemberships from './pages/AdminMemberships';
 import AdminOverview from './pages/admin/AdminOverview';
 import AdminProducts from './pages/admin/AdminProducts';
@@ -35,7 +36,7 @@ export default function App() {
         <Route path="/orders/new" element={<CreateOrder />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
         <Route path="/earnings" element={<Earnings />} />
-        <Route path="/profile" element={<div className="p-8">Profile Coming Soon</div>} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/admin-dashboard" element={<AdminOverview />} />
         <Route path="/admin/memberships" element={<AdminMemberships />} />
         <Route path="/admin/products" element={<AdminProducts />} />
