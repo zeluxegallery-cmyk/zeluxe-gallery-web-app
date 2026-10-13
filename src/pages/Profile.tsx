@@ -1,36 +1,57 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
-import { LogOut, Mail, Phone, Calendar, ShieldCheck, User as UserIcon, Pencil, Loader2 } from 'lucide-react';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { LogOut, Mail, Phone, Calendar, ShieldCheck, User as UserIcon, Loader2, Camera } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
+import { uploadImageToCloudinary } from '../lib/cloudinary';
 
 export default function Profile() {
   const navigate = useNavigate();
   const [userData, setUserData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadProfile = async () => {
+    const user = auth.currentUser;
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    try {
+      const userDoc = await getDoc(doc(db, 'users', user.uid));
+      if (userDoc.exists()) {
+        setUserData({ uid: user.uid, email: user.email, ...userDoc.data() });
+      }
+    } catch (err) {
+      console.error('Profile load failed:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadProfile = async () => {
-      const user = auth.currentUser;
-      if (!user) {
-        navigate('/login');
-        return;
-      }
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists()) {
-          setUserData({ uid: user.uid, email: user.email, ...userDoc.data() });
-        }
-      } catch (err) {
-        console.error('Profile load failed:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
     loadProfile();
   }, [navigate]);
+
+  const handleAvatarUpload = async (file: File) => {
+    if (!auth.currentUser) return;
+    setUploading(true);
+    try {
+      const url = await uploadImageToCloudinary(file);
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+        avatarUrl: url,
+      });
+      setUserData((prev: any) => ({ ...prev, avatarUrl: url }));
+      alert('✓ প্রোফাইল ছবি আপডেট হয়েছে!');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'ছবি আপলোড ব্যর্থ');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleLogout = async () => {
     if (!window.confirm('লগআউট করতে চান?')) return;
@@ -97,11 +118,47 @@ export default function Profile() {
   return (
     <Layout>
       <div className="mx-auto max-w-2xl">
-        {/* Header */}
+        {/* Avatar with upload */}
         <div className="mb-6 text-center">
-          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-zeluxe-gold text-3xl font-bold text-white">
-            {initial}
+          <div className="relative mx-auto inline-block">
+            {userData.avatarUrl ? (
+              <img
+                src={userData.avatarUrl}
+                alt={userData.name}
+                className="h-24 w-24 rounded-full object-cover"
+              />
+            ) : (
+              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-zeluxe-gold text-4xl font-bold text-white">
+                {initial}
+              </div>
+            )}
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploading}
+              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-zeluxe-black text-white shadow-lg transition hover:bg-zeluxe-gold disabled:opacity-60"
+              title="ছবি পরিবর্তন করুন"
+            >
+              {uploading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+            </button>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleAvatarUpload(file);
+                e.target.value = '';
+              }}
+            />
           </div>
+
           <h1 className="mt-4 text-2xl font-bold text-zeluxe-black">
             {userData.name || 'Reseller'}
           </h1>
