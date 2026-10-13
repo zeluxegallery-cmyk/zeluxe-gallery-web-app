@@ -44,7 +44,7 @@ export default function ForgotPassword() {
         <Link to="/" className="mb-4 inline-block text-sm text-zeluxe-gray hover:text-zeluxe-black">
           ← হোম
         </Link>
-        <img src={logo} alt="Zeluxe Gallery" className="mx-auto mb-6 h-20 object-contain" />
+        <img src={logo} alt="Zeluxe Gallery" className="mx-auto mb-6 h-32 object-contain" />
 
         <h1 className="text-center text-2xl font-bold text-zeluxe-black">পাসওয়ার্ড রিসেট করুন</h1>
         <p className="mt-2 text-center text-sm text-gray-600">

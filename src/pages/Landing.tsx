@@ -40,7 +40,7 @@ export default function Landing() {
     <div className="min-h-screen bg-white pb-20">
       {/* SECTION A — HERO */}
       <section className="bg-gradient-to-b from-zeluxe-gold/20 to-white px-5 py-12 text-center">
-        <img src={logo} alt="Zeluxe Gallery" className="mx-auto mb-6 h-16" />
+        <img src={logo} alt="Zeluxe Gallery" className="mx-auto mb-6 h-24" />
         <span className="mb-4 inline-block rounded-full bg-zeluxe-gold px-3 py-1 text-xs text-white">
           প্রিমিয়াম রিসেলিং প্লাটফর্ম
         </span>
