@@ -38,10 +38,10 @@ export default function CreateOrder() {
   const [district, setDistrict] = useState('Dhaka');
 
   const [productId, setProductId] = useState(presetProductId || '');
-  const [quantity, setQuantity] = useState(1);
-  const [sellingPrice, setSellingPrice] = useState(0);
-  const [deliveryCharge, setDeliveryCharge] = useState(70);
-  const [discount, setDiscount] = useState(0);
+  const [quantity, setQuantity] = useState('1');
+  const [sellingPrice, setSellingPrice] = useState('');
+  const [deliveryCharge, setDeliveryCharge] = useState('70');
+  const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
   const [note, setNote] = useState('');
 
@@ -67,7 +67,7 @@ export default function CreateOrder() {
           const preset = fetchedProducts.find((product) => product.id === presetProductId);
           if (preset) {
             setProductId(preset.id);
-            setSellingPrice(preset.suggestedPrice);
+            setSellingPrice(String(preset.suggestedPrice));
           }
         }
       } finally {
@@ -82,17 +82,22 @@ export default function CreateOrder() {
     setProductId(value);
     const product = products.find((item) => item.id === value);
     if (product) {
-      setSellingPrice(product.suggestedPrice);
+      setSellingPrice(String(product.suggestedPrice));
     }
   };
 
   const selectedProduct = products.find((p) => p.id === productId);
+  const numQuantity = Number(quantity) || 0;
+  const numSellingPrice = Number(sellingPrice) || 0;
+  const numDiscount = Number(discount) || 0;
+  const numDeliveryCharge = Number(deliveryCharge) || 0;
+
   const profit = selectedProduct
-    ? (Number(sellingPrice) - Number(selectedProduct.resellerPrice)) * Number(quantity)
+    ? (numSellingPrice - Number(selectedProduct.resellerPrice)) * numQuantity
     : 0;
 
-  const itemTotal = quantity * sellingPrice;
-  const total = itemTotal + deliveryCharge - discount;
+  const itemTotal = numQuantity * numSellingPrice;
+  const total = itemTotal + numDeliveryCharge - numDiscount;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,14 +108,14 @@ export default function CreateOrder() {
       return;
     }
 
-    if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !district || !productId || !sellingPrice) {
-      alert('Please fill in all required fields.');
+    if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !district || !productId || !sellingPrice || numSellingPrice <= 0) {
+      alert('সব প্রয়োজনীয় তথ্য দিন।');
       return;
     }
 
-    const selectedProduct = products.find((item) => item.id === productId);
-    if (!selectedProduct) {
-      alert('Please select a valid product.');
+    const selectedProductData = products.find((item) => item.id === productId);
+    if (!selectedProductData) {
+      alert('সঠিক প্রোডাক্ট সিলেক্ট করুন।');
       return;
     }
 
@@ -126,18 +131,18 @@ export default function CreateOrder() {
         address: address.trim(),
         district,
         productId,
-        productName: selectedProduct.name,
-        quantity: Number(quantity),
-        sellingPrice: Number(sellingPrice),
-        deliveryCharge: Number(deliveryCharge),
-        discount: Number(discount),
+        productName: selectedProductData.name,
+        quantity: numQuantity,
+        sellingPrice: numSellingPrice,
+        deliveryCharge: numDeliveryCharge,
+        discount: numDiscount,
         total: Number(total),
         paymentMethod,
         note: note.trim(),
         status: 'pending',
         createdAt: serverTimestamp(),
       });
-      alert('Order created successfully!');
+      alert('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
       navigate('/orders');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -242,9 +247,11 @@ export default function CreateOrder() {
                     type="number"
                     min={1}
                     value={quantity}
-                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    onChange={(e) => setQuantity(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     required
                     className={`mt-1 ${inputClass}`}
+                    placeholder="1"
                   />
                 </div>
                 <div>
@@ -253,20 +260,22 @@ export default function CreateOrder() {
                     type="number"
                     min={0}
                     value={sellingPrice}
-                    onChange={(e) => setSellingPrice(Number(e.target.value))}
+                    onChange={(e) => setSellingPrice(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     required
                     className={`mt-1 ${inputClass}`}
+                    placeholder="0"
                   />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black">Delivery Charge (৳)</label>
                   <select
                     value={deliveryCharge}
-                    onChange={(e) => setDeliveryCharge(Number(e.target.value))}
+                    onChange={(e) => setDeliveryCharge(e.target.value)}
                     className={`mt-1 ${inputClass}`}
                   >
-                    <option value={70}>ঢাকার ভিতরে (৭০ টাকা)</option>
-                    <option value={120}>ঢাকার বাইরে (১২০ টাকা)</option>
+                    <option value="70">ঢাকার ভিতরে (৭০ টাকা)</option>
+                    <option value="120">ঢাকার বাইরে (১২০ টাকা)</option>
                   </select>
                 </div>
                 <div>
@@ -275,12 +284,14 @@ export default function CreateOrder() {
                     type="number"
                     min={0}
                     value={discount}
-                    onChange={(e) => setDiscount(Number(e.target.value))}
+                    onChange={(e) => setDiscount(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className={`mt-1 ${inputClass}`}
+                    placeholder="0"
                   />
                 </div>
               </div>
-              {selectedProduct && Number(sellingPrice) > 0 && (
+              {selectedProduct && numSellingPrice > 0 && (
                 <div className={`mt-3 flex items-center justify-between rounded-xl p-3 ${
                   profit >= 0
                     ? 'border border-green-200 bg-green-50'
@@ -334,11 +345,11 @@ export default function CreateOrder() {
               </div>
               <div className="flex justify-between text-zeluxe-black">
                 <span>Delivery Charge</span>
-                <span>৳{deliveryCharge.toLocaleString()}</span>
+                <span>৳{numDeliveryCharge.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-zeluxe-black">
                 <span>Discount</span>
-                <span>-৳{discount.toLocaleString()}</span>
+                <span>-৳{numDiscount.toLocaleString()}</span>
               </div>
               <div className="my-3 border-t border-zeluxe-lightgray" />
               <div className="flex justify-between text-sm">
