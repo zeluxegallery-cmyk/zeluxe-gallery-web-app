@@ -30,6 +30,34 @@ const emptyForm: CategoryForm = {
   imageUrl: '',
 };
 
+const DEFAULT_CATEGORIES = [
+  'শার্ট',
+  'টি-শার্ট',
+  'পাঞ্জাবি',
+  'প্যান্ট & ট্রাউজার',
+  'হুডি & জ্যাকেট',
+  'শাড়ি',
+  'থ্রি-পিস',
+  'কুর্তি',
+  'বোরকা',
+  'হিজাব',
+  'বেবি ড্রেস',
+  'কিডস আইটেম',
+  'খেলনা',
+  'ঘড়ি',
+  'স্মার্ট ওয়াচ',
+  'হেডফোন',
+  'পাওয়ার ব্যাংক',
+  'কসমেটিক্স',
+  'স্কিন কেয়ার',
+  'পারফিউম',
+  'ব্যাগ',
+  'কাপল আইটেম',
+  'গিফট আইটেম',
+  'ওয়েস্টার্ন ড্রেস',
+  'ইন্টেরিয়র',
+];
+
 export default function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +74,32 @@ export default function AdminCategories() {
         getDocs(collection(db, 'categories')),
         getDocs(collection(db, 'products')),
       ]);
+
+      // Auto-seed if categories collection is empty
+      if (catSnap.empty) {
+        for (const name of DEFAULT_CATEGORIES) {
+          await addDoc(collection(db, 'categories'), {
+            name,
+            imageUrl: '',
+            createdAt: serverTimestamp(),
+          });
+        }
+
+        // Reload after seeding
+        const newCatSnap = await getDocs(collection(db, 'categories'));
+        const products = productSnap.docs.map((p) => p.data());
+        setCategories(
+          newCatSnap.docs.map((catDoc) => {
+            const data = catDoc.data();
+            const name = typeof data.name === 'string' ? data.name : 'Unnamed';
+            const imageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
+            const productCount = products.filter((p) => p.category === name).length;
+            return { id: catDoc.id, name, imageUrl, productCount };
+          }),
+        );
+        return;
+      }
+
       const products = productSnap.docs.map((p) => p.data());
       setCategories(
         catSnap.docs.map((catDoc) => {
