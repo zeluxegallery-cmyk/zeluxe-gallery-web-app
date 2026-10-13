@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { CheckCircle, Clock, IndianRupee, Loader2, TrendingUp } from 'lucide-react';
+import { CheckCircle, Clock, TrendingUp, Loader2, Wallet } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
@@ -9,22 +9,26 @@ type Order = {
   id: string;
   orderId: string;
   total: number;
+  quantity: number;
+  sellingPrice: number;
+  productId: string;
   status: string;
   createdAt?: { seconds?: number };
+  actualProfit: number;
 };
 
 type Stats = {
   totalSales: number;
   deliveredSales: number;
   pendingAmount: number;
-  estimatedProfit: number;
+  actualProfit: number;
 };
 
 const initialStats: Stats = {
   totalSales: 0,
   deliveredSales: 0,
   pendingAmount: 0,
-  estimatedProfit: 0,
+  actualProfit: 0,
 };
 
 type Breakdown = {
@@ -85,6 +89,15 @@ export default function Earnings() {
       }
 
       try {
+        // Fetch products to get resellerPrice lookup
+        const productsSnap = await getDocs(collection(db, 'products'));
+        const productMap: Record<string, number> = {};
+        productsSnap.docs.forEach((p) => {
+          const data = p.data();
+          productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
+        });
+
+        // Fetch orders
         const snapshot = await getDocs(
           query(collection(db, 'orders'), where('resellerId', '==', uid)),
         );
@@ -93,27 +106,41 @@ export default function Earnings() {
           const bTime = b.data().createdAt?.seconds || 0;
           return bTime - aTime;
         });
+
         const fetchedOrders: Order[] = sorted.map((orderDoc) => {
           const data = orderDoc.data();
+          const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
+          const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
+          const productId = typeof data.productId === 'string' ? data.productId : '';
+          const resellerPrice = productMap[productId] || 0;
+
+          // Actual profit = (selling price - reseller price) × quantity
+          const actualProfit = (sellingPrice - resellerPrice) * quantity;
+
           return {
             id: orderDoc.id,
             orderId: typeof data.orderId === 'string' ? data.orderId : orderDoc.id,
             total: typeof data.total === 'number' ? data.total : 0,
+            quantity,
+            sellingPrice,
+            productId,
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
+            actualProfit,
           };
         });
 
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
-        const deliveredSales = fetchedOrders
-          .filter((order) => order.status === 'delivered')
-          .reduce((sum, order) => sum + order.total, 0);
+        const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered');
+        const deliveredSales = deliveredOrders.reduce((sum, order) => sum + order.total, 0);
         const pendingAmount = fetchedOrders
           .filter((order) => PENDING_STATUSES.includes(order.status))
           .reduce((sum, order) => sum + order.total, 0);
-        const estimatedProfit = deliveredSales * 0.2;
+        
+        // Actual profit from delivered orders only
+        const actualProfit = deliveredOrders.reduce((sum, order) => sum + order.actualProfit, 0);
 
-        setStats({ totalSales, deliveredSales, pendingAmount, estimatedProfit });
+        setStats({ totalSales, deliveredSales, pendingAmount, actualProfit });
         setOrders(fetchedOrders);
       } catch (err) {
         const message = err instanceof Error ? err.message : 'Failed to load earnings.';
@@ -129,29 +156,29 @@ export default function Earnings() {
   const summaryCards = [
     {
       label: 'Total Sales',
-      value: `৳${stats.totalSales.toLocaleString()}`,
+      value: `Tk ${stats.totalSales.toLocaleString()}`,
       icon: TrendingUp,
       iconClass: 'text-zeluxe-gold',
       valueClass: 'text-zeluxe-black',
     },
     {
       label: 'Delivered Sales',
-      value: `৳${stats.deliveredSales.toLocaleString()}`,
+      value: `Tk ${stats.deliveredSales.toLocaleString()}`,
       icon: CheckCircle,
       iconClass: 'text-green-600',
       valueClass: 'text-green-600',
     },
     {
       label: 'Pending Amount',
-      value: `৳${stats.pendingAmount.toLocaleString()}`,
+      value: `Tk ${stats.pendingAmount.toLocaleString()}`,
       icon: Clock,
       iconClass: 'text-yellow-600',
       valueClass: 'text-yellow-600',
     },
     {
-      label: 'Est. Profit',
-      value: `৳${stats.estimatedProfit.toLocaleString()}`,
-      icon: IndianRupee,
+      label: 'Actual Profit',
+      value: `Tk ${stats.actualProfit.toLocaleString()}`,
+      icon: Wallet,
       iconClass: 'text-zeluxe-gold',
       valueClass: 'text-zeluxe-gold',
     },
@@ -234,7 +261,7 @@ export default function Earnings() {
           <li>Total Sales = Sum of all order totals</li>
           <li>Delivered Sales = Only orders with status 'delivered'</li>
           <li>Pending Amount = Orders not yet delivered</li>
-          <li>Est. Profit = Delivered Sales × 20% (approx)</li>
+          <li>Actual Profit = (Selling Price − Reseller Price) × Quantity (only delivered orders)</li>
         </ul>
       </div>
 
@@ -253,7 +280,7 @@ export default function Earnings() {
               <tr key={status} className="border-b last:border-0">
                 <td className="px-4 py-3 capitalize text-zeluxe-black">{status}</td>
                 <td className="px-4 py-3 text-zeluxe-black">{count}</td>
-                <td className={`px-4 py-3 font-bold ${textClass}`}>৳{amount.toLocaleString()}</td>
+                <td className={`px-4 py-3 font-bold ${textClass}`}>Tk {amount.toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
@@ -272,7 +299,7 @@ export default function Earnings() {
               <p className="mt-1 text-xs text-gray-400">{formatDate(order.createdAt?.seconds)}</p>
             </div>
             <div className="text-right">
-              <p className="font-bold text-zeluxe-black">৳{order.total.toLocaleString()}</p>
+              <p className="font-bold text-zeluxe-black">Tk {order.total.toLocaleString()}</p>
               <span
                 className={`mt-1 inline-block rounded-full px-2 py-1 text-xs font-bold capitalize ${getStatusBadgeClass(order.status)}`}
               >
