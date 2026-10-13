@@ -201,7 +201,7 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Agree checkbox */}
+          {/* Agree checkbox with Legal link */}
           <label className="flex cursor-pointer items-start gap-2">
             <input
               type="checkbox"
@@ -211,7 +211,15 @@ export default function Register() {
               className="mt-0.5 h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
             />
             <span className="text-sm text-zeluxe-black">
-              আমি শর্তাবলী ও প্রাইভেসি পলিসিতে সম্মত আছি
+              আমি{' '}
+              <Link
+                to="/legal"
+                target="_blank"
+                className="font-medium text-zeluxe-gold underline hover:text-yellow-600"
+              >
+                শর্তাবলী ও প্রাইভেসি পলিসি
+              </Link>
+              -তে সম্মত আছি
             </span>
           </label>
 
