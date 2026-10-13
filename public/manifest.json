@@ -9,16 +9,16 @@
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://res.cloudinary.com/q1zrv81l/image/upload/e_trim,w_192,h_192,c_pad,b_white/zeluxe-logo.png.png",
+      "src": "https://res.cloudinary.com/q1zrv81l/image/upload/e_trim,w_192,h_192,c_fit,b_white/zeluxe-logo.png.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     },
     {
-      "src": "https://res.cloudinary.com/q1zrv81l/image/upload/e_trim,w_512,h_512,c_pad,b_white/zeluxe-logo.png.png",
+      "src": "https://res.cloudinary.com/q1zrv81l/image/upload/e_trim,w_512,h_512,c_fit,b_white/zeluxe-logo.png.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
