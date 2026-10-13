@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
+import { Loader2 } from 'lucide-react';
 import { auth } from '../firebase';
 import logo from '../assets/zeluxe-logo.png';
 
@@ -10,9 +11,27 @@ export default function ForgotPassword() {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
+  const getBengaliError = (err: any): string => {
+    const code = err?.code || '';
+    if (code === 'auth/user-not-found') {
+      return 'এই ইমেইলে কোনো অ্যাকাউন্ট নেই। রেজিস্ট্রেশন করুন।';
+    }
+    if (code === 'auth/invalid-email') {
+      return 'সঠিক ইমেইল ঠিকানা দিন।';
+    }
+    if (code === 'auth/network-request-failed') {
+      return 'ইন্টারনেট সংযোগ চেক করুন।';
+    }
+    if (code === 'auth/too-many-requests') {
+      return 'অনেকবার চেষ্টা করেছেন। কিছুক্ষণ পরে আবার চেষ্টা করুন।';
+    }
+    return 'রিসেট লিংক পাঠানো যায়নি। আবার চেষ্টা করুন।';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccess(false);
 
     if (!email.trim()) {
       setError('ইমেইল দিন।');
@@ -23,16 +42,8 @@ export default function ForgotPassword() {
     try {
       await sendPasswordResetEmail(auth, email.trim());
       setSuccess(true);
-    } catch (err) {
-      const code = (err as { code?: string }).code;
-      if (code === 'auth/user-not-found') {
-        setError('এই ইমেইলে কোনো অ্যাকাউন্ট নেই।');
-      } else if (code === 'auth/invalid-email') {
-        setError('সঠিক ইমেইল দিন।');
-      } else {
-        const message = err instanceof Error ? err.message : 'Failed to send reset email.';
-        setError(message);
-      }
+    } catch (err: any) {
+      setError(getBengaliError(err));
     } finally {
       setLoading(false);
     }
@@ -40,20 +51,21 @@ export default function ForgotPassword() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-white px-6 py-12 pb-24">
-      <div className="w-full max-w-md animate-fade-in-up">
+      <div className="w-full max-w-md">
         <Link to="/" className="mb-4 inline-block text-sm text-zeluxe-gray hover:text-zeluxe-black">
           ← হোম
         </Link>
-        <img src={logo} alt="Zeluxe Gallery" className="mx-auto mb-6 h-32 object-contain" />
 
-        <h1 className="text-center text-2xl font-bold text-zeluxe-black">পাসওয়ার্ড রিসেট করুন</h1>
+        <img src={logo} alt="Zeluxe Gallery" className="mx-auto mb-6 h-28 object-contain" />
+
+        <h1 className="text-center text-2xl font-bold text-zeluxe-black">Zeluxe Gallery</h1>
         <p className="mt-2 text-center text-sm text-gray-600">
-          আপনার ইমেইল দিন, আমরা রিসেট লিংক পাঠাব
+          পাসওয়ার্ড রিসেট করুন — আপনার ইমেইল দিন, আমরা রিসেট লিংক পাঠাব
         </p>
 
         {success && (
           <div className="mt-6 rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-            ✓ রিসেট লিংক পাঠানো হয়েছে। আপনার ইমেইল চেক করুন।
+            ✓ রিসেট লিংক পাঠানো হয়েছে। আপনার ইমেইল চেক করুন (Spam folder-ও দেখুন)।
           </div>
         )}
 
@@ -70,17 +82,26 @@ export default function ForgotPassword() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold"
+              disabled={loading || success}
+              className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold transition-colors"
               placeholder="you@example.com"
+              autoComplete="email"
             />
           </div>
 
           <button
             type="submit"
-            disabled={loading}
-            className="mt-4 w-full rounded-xl bg-zeluxe-black py-3 font-bold text-white transition hover:bg-[#2a2a2a] active:scale-[0.98] disabled:opacity-60"
+            disabled={loading || success}
+            className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-zeluxe-black py-3 font-bold text-white transition hover:bg-[#2a2a2a] active:scale-[0.98] disabled:opacity-60"
           >
-            {loading ? 'পাঠানো হচ্ছে...' : 'রিসেট লিংক পাঠান'}
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin" size={18} />
+                পাঠানো হচ্ছে...
+              </>
+            ) : (
+              'রিসেট লিংক পাঠান'
+            )}
           </button>
         </form>
 
