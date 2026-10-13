@@ -21,6 +21,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import Layout from '../components/Layout';
+import LogoutModal from '../components/LogoutModal';
 import { auth, db } from '../firebase';
 import { uploadImageToCloudinary } from '../lib/cloudinary';
 
@@ -32,6 +33,7 @@ export default function Profile() {
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [logoUploading, setLogoUploading] = useState(false);
+  const [showLogout, setShowLogout] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
 
@@ -128,8 +130,8 @@ export default function Profile() {
     }
   };
 
-  const handleLogout = async () => {
-    if (!window.confirm('লগআউট করতে চান?')) return;
+  const confirmLogout = async () => {
+    setShowLogout(false);
     await signOut(auth);
     navigate('/login');
   };
@@ -370,7 +372,7 @@ export default function Profile() {
             ড্যাশবোর্ড
           </button>
           <button
-            onClick={handleLogout}
+            onClick={() => setShowLogout(true)}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700"
           >
             <LogOut className="h-4 w-4" />
@@ -401,7 +403,6 @@ export default function Profile() {
             </div>
 
             <div className="space-y-4">
-              {/* Business Logo */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">
                   ব্যবসার লোগো
@@ -456,7 +457,6 @@ export default function Profile() {
                 />
               </div>
 
-              {/* Business Name */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">
                   ব্যবসার নাম
@@ -469,7 +469,6 @@ export default function Profile() {
                 />
               </div>
 
-              {/* Business Type */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">
                   ব্যবসার ধরন
@@ -488,7 +487,6 @@ export default function Profile() {
                 </select>
               </div>
 
-              {/* Business Address */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">
                   ব্যবসার ঠিকানা
@@ -501,7 +499,6 @@ export default function Profile() {
                 />
               </div>
 
-              {/* Facebook URL */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">
                   Facebook পেজ (URL)
@@ -514,7 +511,6 @@ export default function Profile() {
                 />
               </div>
 
-              {/* WhatsApp Number */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">
                   WhatsApp নম্বর
@@ -532,7 +528,6 @@ export default function Profile() {
                 />
               </div>
 
-              {/* Bio */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">
                   পরিচিতি (Bio)
@@ -565,6 +560,13 @@ export default function Profile() {
           </div>
         </div>
       )}
+
+      {/* Custom Logout Modal */}
+      <LogoutModal
+        isOpen={showLogout}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogout(false)}
+      />
     </Layout>
   );
 }
