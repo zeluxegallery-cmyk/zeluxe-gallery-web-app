@@ -18,6 +18,7 @@ import {
   X,
   Upload,
   MapPin,
+  Wallet,
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
@@ -350,6 +351,15 @@ export default function Profile() {
             isLast
           />
         </div>
+
+        {/* Withdraw Button */}
+        <button
+          onClick={() => navigate('/withdraw')}
+          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-zeluxe-gold py-3 font-bold text-zeluxe-black transition hover:brightness-110 active:scale-[0.98]"
+        >
+          <Wallet className="h-5 w-5" />
+          টাকা তুলুন
+        </button>
 
         {/* Actions */}
         <div className="flex gap-3">
