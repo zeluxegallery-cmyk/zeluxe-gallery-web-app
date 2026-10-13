@@ -12,6 +12,7 @@ import Earnings from './pages/Earnings';
 import Landing from './pages/Landing';
 import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
+import Legal from './pages/Legal';
 import AdminMemberships from './pages/AdminMemberships';
 import AdminOverview from './pages/admin/AdminOverview';
 import AdminProducts from './pages/admin/AdminProducts';
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/legal" element={<Legal />} />
         <Route path="/membership" element={<Membership />} />
         <Route path="/pending" element={<Pending />} />
         <Route path="/reseller-dashboard" element={<ResellerDashboard />} />
