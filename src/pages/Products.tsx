@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Copy, Download, Loader2, Package, Search, Share2, X } from 'lucide-react';
+import { Copy, Download, Loader2, Package, Search, ChevronDown, Check } from 'lucide-react';
 import Layout from '../components/Layout';
 import { db } from '../firebase';
 
@@ -12,18 +12,22 @@ type Product = {
   category: string;
   description?: string;
   imageUrl?: string;
+  imageUrls: string[];
   resellerPrice: number;
   suggestedPrice: number;
   stock: number;
 };
 
+const PER_PAGE_OPTIONS = [12, 24, 36, 48];
+
 export default function Products() {
-  const navigate = useNavigate();
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All Categories');
+  const [selectedCategory, setSelectedCategory] = useState('সব ক্যাটাগরি');
+  const [perPage, setPerPage] = useState(24);
   const [loading, setLoading] = useState(true);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     const loadProducts = async () => {
@@ -32,13 +36,21 @@ export default function Products() {
         const snapshot = await getDocs(productsQuery);
         const fetchedProducts: Product[] = snapshot.docs.map((productDocument) => {
           const data = productDocument.data();
+          const imgUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
+          let urls: string[] = [];
+          if (Array.isArray(data.imageUrls)) {
+            urls = data.imageUrls.filter((u: any) => typeof u === 'string');
+          }
+          if (urls.length === 0 && imgUrl) urls = [imgUrl];
+
           return {
             id: productDocument.id,
             name: typeof data.name === 'string' ? data.name : 'Unnamed Product',
             sku: typeof data.sku === 'string' ? data.sku : '',
             category: typeof data.category === 'string' ? data.category : 'Uncategorized',
             description: typeof data.description === 'string' ? data.description : '',
-            imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : undefined,
+            imageUrl: imgUrl,
+            imageUrls: urls,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
             stock: typeof data.stock === 'number' ? data.stock : 0,
@@ -55,258 +67,267 @@ export default function Products() {
 
   const categories = useMemo(() => {
     const unique = Array.from(new Set(products.map((product) => product.category)));
-    return ['All Categories', ...unique];
+    return ['সব ক্যাটাগরি', ...unique];
   }, [products]);
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return products.filter((product) => {
-      const matchesSearch =
-        !term || product.name.toLowerCase().includes(term) || product.sku.toLowerCase().includes(term);
-      const matchesCategory =
-        selectedCategory === 'All Categories' || product.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [products, searchTerm, selectedCategory]);
+    return products
+      .filter((product) => {
+        const matchesSearch =
+          !term ||
+          product.name.toLowerCase().includes(term) ||
+          product.sku.toLowerCase().includes(term);
+        const matchesCategory =
+          selectedCategory === 'সব ক্যাটাগরি' || product.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+      })
+      .slice(0, perPage);
+  }, [products, searchTerm, selectedCategory, perPage]);
 
-  const handleCreateOrder = (product: Product) => {
-    navigate(`/orders/new?productId=${product.id}`);
-  };
-
-  const handleCopyDescription = (product: Product) => {
-    const text = `${product.name}\n\n${product.description || ''}\n\nদাম: ৳${product.suggestedPrice}\n\nZeluxe Gallery`;
-    void navigator.clipboard.writeText(text);
-    alert('✓ কপি হয়েছে!');
-  };
-
-  const handleDownloadImage = async (product: Product) => {
-    if (!product.imageUrl) return;
+  const handleCopy = async (e: React.MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const text = `${product.name}\n${product.sku}\n\n${product.description || ''}\n\nদাম: Tk ${product.suggestedPrice}\n\nZeluxe Gallery`;
     try {
-      const response = await fetch(product.imageUrl);
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${product.sku}.jpg`;
-      a.click();
-      window.URL.revokeObjectURL(url);
+      await navigator.clipboard.writeText(text);
+      setCopiedId(product.id);
+      setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      alert('ছবি ডাউনলোড ব্যর্থ হয়েছে');
+      alert('কপি করা যায়নি');
     }
   };
 
-  const handleShare = async (product: Product) => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: product.name,
-          text: `${product.name}\n\n${product.description || ''}\n\nদাম: ৳${product.suggestedPrice}`,
-        });
-      } catch {
-        // User cancelled share — no action needed
+  const handleDownloadAll = async (e: React.MouseEvent, product: Product) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (product.imageUrls.length === 0) return;
+
+    setDownloadingId(product.id);
+    try {
+      for (let i = 0; i < product.imageUrls.length; i++) {
+        const url = product.imageUrls[i];
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const blobUrl = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = `${product.sku || 'product'}-${i + 1}.jpg`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(blobUrl);
+        await new Promise((r) => setTimeout(r, 300));
       }
-    } else {
-      alert('আপনার ব্রাউজার শেয়ার সাপোর্ট করে না');
+    } catch (err) {
+      console.error('Download failed:', err);
+    } finally {
+      setDownloadingId(null);
     }
   };
 
   return (
     <Layout>
-      <h1 className="text-2xl font-bold text-zeluxe-black">Product Catalog</h1>
-      <p className="mb-6 text-sm text-gray-600">Browse products and create orders for your customers</p>
-
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zeluxe-gray" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search by name or SKU..."
-            className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg py-3 pl-10 pr-4 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold"
-          />
+      <div className="mx-auto max-w-6xl">
+        {/* Header */}
+        <div className="mb-5">
+          <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
+            প্রোডাক্ট ক্যাটালগ
+          </h1>
+          <p className="mt-1 text-xs text-gray-500 md:text-sm">
+            সব প্রোডাক্ট দেখুন এবং কাস্টমারের জন্য অর্ডার তৈরি করুন
+          </p>
         </div>
-        <select
-          value={selectedCategory}
-          onChange={(e) => setSelectedCategory(e.target.value)}
-          className="rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold"
-        >
-          {categories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
-      </div>
 
-      {loading ? (
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading products" />
-        </div>
-      ) : filteredProducts.length > 0 ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredProducts.map((product) => (
-            <div key={product.id} className="overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white">
-              <button
-                onClick={() => setSelectedProduct(product)}
-                className="flex aspect-square w-full items-center justify-center bg-zeluxe-fieldbg"
-              >
-                {product.imageUrl ? (
-                  <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
-                ) : (
-                  <Package className="h-12 w-12 text-zeluxe-gray" />
-                )}
-              </button>
-              <div className="p-4">
-                <h3 className="line-clamp-2 text-base font-bold text-zeluxe-black">{product.name}</h3>
-                <p className="mt-1 font-mono text-xs text-zeluxe-gray">{product.sku}</p>
-                <div className="mt-3 flex items-center justify-between">
-                  <p className="text-lg font-bold text-zeluxe-gold">৳{product.resellerPrice.toLocaleString()}</p>
-                  {product.stock > 0 ? (
-                    <span className="rounded bg-green-100 px-2 py-1 text-xs font-bold text-green-700">
-                      In Stock
-                    </span>
-                  ) : (
-                    <span className="rounded bg-red-100 px-2 py-1 text-xs font-bold text-red-700">
-                      Out of Stock
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-zeluxe-gray">MRP: ৳{product.suggestedPrice.toLocaleString()}</p>
-                <button
-                  onClick={() => handleCreateOrder(product)}
-                  disabled={product.stock === 0}
-                  className="mt-4 w-full rounded-lg bg-zeluxe-black py-2.5 text-sm font-bold text-white transition hover:bg-[#2a2a2a] disabled:bg-gray-300"
-                >
-                  Create Order
-                </button>
-                <button
-                  onClick={() => setSelectedProduct(product)}
-                  className="mt-2 w-full rounded-lg border border-zeluxe-gold py-2.5 text-sm font-bold text-zeluxe-gold transition hover:bg-zeluxe-gold/10"
-                >
-                  বিস্তারিত
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="rounded-xl bg-zeluxe-fieldbg p-12 text-center">
-          <Package className="mx-auto h-12 w-12 text-zeluxe-gray" />
-          <p className="mt-4 text-gray-600">No products available yet.</p>
-        </div>
-      )}
-
-      {/* Product Details Modal */}
-      {selectedProduct && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setSelectedProduct(null)}
-        >
-          <div
-            className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-zeluxe-black">{selectedProduct.name}</h2>
-              <button
-                onClick={() => setSelectedProduct(null)}
-                className="rounded-lg p-1.5 text-zeluxe-gray transition hover:bg-zeluxe-fieldbg"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {selectedProduct.imageUrl ? (
-              <img
-                src={selectedProduct.imageUrl}
-                alt={selectedProduct.name}
-                className="mb-4 h-64 w-full rounded-xl object-cover"
+        {/* Filters */}
+        <div className="mb-5 space-y-3">
+          {/* Search row */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="প্রোডাক্ট কোড বা নাম দিয়ে খুঁজুন..."
+                className="w-full rounded-md border border-zeluxe-lightgray bg-white py-3 pl-10 pr-4 text-sm text-zeluxe-black placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none"
               />
-            ) : (
-              <div className="mb-4 flex h-64 w-full items-center justify-center rounded-xl bg-zeluxe-fieldbg">
-                <Package className="h-12 w-12 text-zeluxe-gray" />
-              </div>
-            )}
-
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-zeluxe-gray">SKU</span>
-                <span className="font-mono text-zeluxe-black">{selectedProduct.sku}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-zeluxe-gray">Category</span>
-                <span className="text-zeluxe-black">{selectedProduct.category}</span>
-              </div>
-              {selectedProduct.description && (
-                <p className="pt-2 text-zeluxe-black">{selectedProduct.description}</p>
-              )}
-              <div className="grid grid-cols-3 gap-2 pt-3">
-                <div className="rounded-xl bg-zeluxe-fieldbg p-3 text-center">
-                  <p className="text-xs text-zeluxe-gray">Reseller</p>
-                  <p className="mt-1 font-bold text-zeluxe-black">৳{selectedProduct.resellerPrice.toLocaleString()}</p>
-                </div>
-                <div className="rounded-xl bg-zeluxe-fieldbg p-3 text-center">
-                  <p className="text-xs text-zeluxe-gray">Suggested</p>
-                  <p className="mt-1 font-bold text-zeluxe-black">৳{selectedProduct.suggestedPrice.toLocaleString()}</p>
-                </div>
-                <div className="rounded-xl bg-zeluxe-fieldbg p-3 text-center">
-                  <p className="text-xs text-zeluxe-gray">Profit</p>
-                  <p className="mt-1 font-bold text-green-600">৳{(selectedProduct.suggestedPrice - selectedProduct.resellerPrice).toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between pt-3">
-                <span className="text-zeluxe-gray">Stock</span>
-                {selectedProduct.stock > 0 ? (
-                  <span className="rounded-full bg-green-100 px-3 py-1 text-xs font-bold text-green-700">
-                    {selectedProduct.stock} in stock
-                  </span>
-                ) : (
-                  <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-bold text-red-700">
-                    Out of stock
-                  </span>
-                )}
-              </div>
             </div>
+            <div className="relative sm:w-40">
+              <select
+                value={perPage}
+                onChange={(e) => setPerPage(Number(e.target.value))}
+                className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 pr-10 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+              >
+                {PER_PAGE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n} per page
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
+            </div>
+          </div>
 
-            <button
-              onClick={() => {
-                handleCreateOrder(selectedProduct);
-                setSelectedProduct(null);
-              }}
-              disabled={selectedProduct.stock === 0}
-              className="mt-4 w-full rounded-xl bg-zeluxe-black py-3 font-bold text-white transition hover:bg-[#2a2a2a] disabled:bg-gray-300"
-            >
-              Create Order
-            </button>
-
-            <div className="mt-2 grid grid-cols-3 gap-2">
-              <button
-                onClick={() => handleCopyDescription(selectedProduct)}
-                className="flex flex-col items-center gap-1 rounded-xl border border-zeluxe-lightgray py-3 text-xs font-medium text-zeluxe-black transition hover:bg-zeluxe-fieldbg"
+          {/* Category row */}
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="relative flex-1">
+              <select
+                value={selectedCategory}
+                onChange={(e) => setSelectedCategory(e.target.value)}
+                className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 pr-10 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
               >
-                <Copy className="h-5 w-5 text-zeluxe-gold" />
-                কপি
-              </button>
-              <button
-                onClick={() => void handleDownloadImage(selectedProduct)}
-                disabled={!selectedProduct.imageUrl}
-                className="flex flex-col items-center gap-1 rounded-xl border border-zeluxe-lightgray py-3 text-xs font-medium text-zeluxe-black transition hover:bg-zeluxe-fieldbg disabled:opacity-40"
-              >
-                <Download className="h-5 w-5 text-zeluxe-gold" />
-                ডাউনলোড
-              </button>
-              <button
-                onClick={() => void handleShare(selectedProduct)}
-                className="flex flex-col items-center gap-1 rounded-xl border border-zeluxe-lightgray py-3 text-xs font-medium text-zeluxe-black transition hover:bg-zeluxe-fieldbg"
-              >
-                <Share2 className="h-5 w-5 text-zeluxe-gold" />
-                শেয়ার
-              </button>
+                {categories.map((category) => (
+                  <option key={category} value={category}>
+                    {category}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                size={14}
+                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+              />
             </div>
           </div>
         </div>
-      )}
+
+        {/* Products Grid */}
+        {loading ? (
+          <div className="flex min-h-40 items-center justify-center">
+            <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+          </div>
+        ) : filteredProducts.length > 0 ? (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+            {filteredProducts.map((product) => (
+              <Link
+                key={product.id}
+                to={`/products/${product.id}`}
+                className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold hover:shadow-sm"
+              >
+                {/* Image */}
+                <div className="relative aspect-square overflow-hidden bg-zeluxe-cream">
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                    />
+                  ) : (
+                    <div className="flex h-full items-center justify-center">
+                      <Package className="h-12 w-12 text-gray-300" />
+                    </div>
+                  )}
+
+                  {/* Image count badge */}
+                  {product.imageUrls.length > 1 && (
+                    <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      {product.imageUrls.length} ছবি
+                    </span>
+                  )}
+
+                  {/* Stock badge */}
+                  {product.stock === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <span className="rounded bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
+                        স্টক নেই
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Content */}
+                <div className="p-3">
+                  <h3 className="line-clamp-2 text-sm font-bold text-zeluxe-black">
+                    {product.name}
+                  </h3>
+                  <p className="mt-0.5 font-mono text-[10px] text-gray-500">
+                    {product.sku}
+                  </p>
+
+                  <div className="mt-2.5 space-y-0.5">
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-gray-500">Price:</span>
+                      <span className="text-sm font-bold text-zeluxe-black">
+                        Tk {product.resellerPrice.toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between">
+                      <span className="text-[11px] text-gray-500">
+                        Customer / Retail Price:
+                      </span>
+                      <span className="text-xs font-bold text-zeluxe-gold">
+                        Tk {product.suggestedPrice.toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <button
+                      onClick={(e) => handleDownloadAll(e, product)}
+                      disabled={downloadingId === product.id || product.imageUrls.length === 0}
+                      className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-40"
+                      title="সব ছবি ডাউনলোড"
+                    >
+                      {downloadingId === product.id ? (
+                        <Loader2 size={13} className="animate-spin" />
+                      ) : (
+                        <Download size={13} />
+                      )}
+                      ছবি
+                    </button>
+                    <button
+                      onClick={(e) => handleCopy(e, product)}
+                      className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110"
+                      title="তথ্য কপি করুন"
+                    >
+                      {copiedId === product.id ? (
+                        <>
+                          <Check size={13} />
+                          কপি হয়েছে
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} />
+                          কপি
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-12 text-center">
+            <Package className="mx-auto h-12 w-12 text-gray-300" />
+            <p className="mt-4 text-sm text-gray-600">
+              কোনো প্রোডাক্ট পাওয়া যায়নি
+            </p>
+            {searchTerm || selectedCategory !== 'সব ক্যাটাগরি' ? (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setSelectedCategory('সব ক্যাটাগরি');
+                }}
+                className="mt-3 text-xs font-medium text-zeluxe-gold hover:underline"
+              >
+                ফিল্টার রিসেট করুন
+              </button>
+            ) : null}
+          </div>
+        )}
+
+        {/* Results count */}
+        {!loading && filteredProducts.length > 0 && (
+          <p className="mt-6 text-center text-xs text-gray-400">
+            {filteredProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে
+          </p>
+        )}
+      </div>
     </Layout>
   );
 }
