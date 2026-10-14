@@ -16,9 +16,14 @@ import {
   Sparkles,
   BarChart3,
   Calendar,
+  Copy,
+  Check,
+  Share2,
+  Users,
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
+import { getReferralStats, buildReferralLink, REFERRAL_BONUS_AMOUNT } from '../lib/referral';
 
 type Order = {
   id: string;
@@ -49,6 +54,12 @@ type Stats = {
   availableBalance: number;
   todayOrders: number;
   todaySales: number;
+};
+
+type ReferralInfo = {
+  referralCode: string;
+  referralCount: number;
+  referralBonusEarned: number;
 };
 
 const initialStats: Stats = {
@@ -128,11 +139,13 @@ export default function ResellerDashboard() {
   const [stats, setStats] = useState<Stats>(initialStats);
   const [orders, setOrders] = useState<Order[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [bonusProgress, setBonusProgress] = useState(0);
   const [bonusAchieved, setBonusAchieved] = useState(false);
   const [bonusDaysLeft, setBonusDaysLeft] = useState(0);
   const [bonusStartDate, setBonusStartDate] = useState<number>(0);
+  const [codeCopied, setCodeCopied] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -147,6 +160,10 @@ export default function ResellerDashboard() {
         const userDoc = await getDoc(doc(db, 'users', uid));
         const userInfo = userDoc.exists() ? userDoc.data() : null;
 
+        // Referral stats
+        const refStats = await getReferralStats(uid);
+        if (refStats) setReferralInfo(refStats);
+
         // Products
         const productsSnap = await getDocs(collection(db, 'products'));
         const productMap: Record<string, number> = {};
@@ -159,7 +176,11 @@ export default function ResellerDashboard() {
         const activeProducts: Product[] = productsSnap.docs
           .filter((d) => {
             const data = d.data();
-            return data.active === true && typeof data.imageUrl === 'string' && data.imageUrl.length > 0;
+            return (
+              data.active === true &&
+              typeof data.imageUrl === 'string' &&
+              data.imageUrl.length > 0
+            );
           })
           .slice(0, 6)
           .map((d) => {
@@ -219,7 +240,7 @@ export default function ResellerDashboard() {
           .reduce((sum, order) => sum + order.actualProfit, 0);
         const availableBalance = actualProfit - totalWithdrawn;
 
-        // Today's stats
+        // Today
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
         const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
@@ -265,6 +286,34 @@ export default function ResellerDashboard() {
 
   const bonusPercent = Math.round((bonusProgress / WELCOME_BONUS_TARGET) * 100);
 
+  // ═══ REFERRAL HANDLERS ═══
+  const handleCopyCode = async () => {
+    if (!referralInfo?.referralCode) return;
+    try {
+      await navigator.clipboard.writeText(referralInfo.referralCode);
+      setCodeCopied(true);
+      setTimeout(() => setCodeCopied(false), 2000);
+    } catch {
+      alert('কপি করা যায়নি');
+    }
+  };
+
+  const handleShareWhatsApp = () => {
+    if (!referralInfo?.referralCode) return;
+    const link = buildReferralLink(referralInfo.referralCode);
+    const message = `🎁 Zeluxe Gallery-তে রিসেলার হয়ে নিজের ব্যবসা শুরু করুন!\n\nশূন্য ইনভেস্টমেন্টে, মাত্র ৳99 এককালীন মেম্বারশিপ ফি।\n\nআমার রেফারেল লিংক:\n${link}`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
+  };
+
+  const handleShareFacebook = () => {
+    if (!referralInfo?.referralCode) return;
+    const link = buildReferralLink(referralInfo.referralCode);
+    window.open(
+      `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`,
+      '_blank'
+    );
+  };
+
   if (loading) {
     return (
       <Layout>
@@ -303,9 +352,7 @@ export default function ResellerDashboard() {
                 </span>
               </div>
               <div className="flex items-center gap-4 text-xs">
-                <span className="text-gray-600">
-                  {stats.todayOrders}টি অর্ডার
-                </span>
+                <span className="text-gray-600">{stats.todayOrders}টি অর্ডার</span>
                 <span className="font-bold text-zeluxe-black">
                   Tk {stats.todaySales.toLocaleString()}
                 </span>
@@ -383,7 +430,7 @@ export default function ResellerDashboard() {
           </div>
         ) : null}
 
-        {/* ═══ BALANCE (MONEY FIRST) ═══ */}
+        {/* ═══ BALANCE ═══ */}
         <div className="mb-5 rounded-lg border border-zeluxe-lightgray bg-white p-4">
           <div className="flex items-start justify-between">
             <div>
@@ -412,7 +459,7 @@ export default function ResellerDashboard() {
           </div>
         </div>
 
-        {/* ═══ QUICK ACTIONS (BRAND CONSISTENT) ═══ */}
+        {/* ═══ QUICK ACTIONS ═══ */}
         <div className="mb-5">
           <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
             Quick Actions
@@ -535,25 +582,92 @@ export default function ResellerDashboard() {
           </div>
         )}
 
-        {/* ═══ REFER & EARN (GOLD THEME) ═══ */}
-        <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4">
-          <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold">
-              <Sparkles className="text-zeluxe-black" size={20} />
-            </span>
-            <div className="flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
-                Refer & Earn
-              </p>
-              <p className="mt-1 text-sm font-bold text-zeluxe-black">
-                বন্ধুকে রিসেলার বানান, বোনাস পান
-              </p>
-              <p className="mt-1 text-[11px] text-gray-600">
-                শীঘ্রই আসছে — প্রতিটি সফল referral-এ Tk 30 বোনাস
-              </p>
+        {/* ═══ REFER & EARN (FUNCTIONAL) ═══ */}
+        {referralInfo && referralInfo.referralCode && (
+          <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4">
+            <div className="flex items-start gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold">
+                <Users className="text-zeluxe-black" size={20} />
+              </span>
+              <div className="flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
+                  Refer & Earn
+                </p>
+                <p className="mt-1 text-sm font-bold text-zeluxe-black">
+                  বন্ধুকে রিসেলার বানান, Tk {REFERRAL_BONUS_AMOUNT} বোনাস পান
+                </p>
+
+                {/* Referral Stats */}
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <div className="rounded-md border border-zeluxe-lightgray bg-white p-2.5">
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500">
+                      Total Referrals
+                    </p>
+                    <p className="mt-0.5 text-lg font-bold text-zeluxe-black">
+                      {referralInfo.referralCount}
+                    </p>
+                  </div>
+                  <div className="rounded-md border border-zeluxe-lightgray bg-white p-2.5">
+                    <p className="text-[10px] uppercase tracking-wider text-gray-500">
+                      Earned
+                    </p>
+                    <p className="mt-0.5 text-lg font-bold text-green-600">
+                      Tk {referralInfo.referralBonusEarned.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Referral Code */}
+                <div className="mt-3">
+                  <p className="mb-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                    আপনার Referral Code
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 rounded-md border-2 border-dashed border-zeluxe-gold/40 bg-white px-3 py-2.5">
+                      <p className="font-mono text-sm font-bold tracking-widest text-zeluxe-black">
+                        {referralInfo.referralCode}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleCopyCode}
+                      className="flex h-[42px] w-[42px] items-center justify-center rounded-md bg-zeluxe-black text-white transition hover:bg-gray-800"
+                      title="কপি করুন"
+                    >
+                      {codeCopied ? (
+                        <Check size={16} className="text-green-400" />
+                      ) : (
+                        <Copy size={16} />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Share Buttons */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <button
+                    onClick={handleShareWhatsApp}
+                    className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 py-2.5 text-[11px] font-bold text-white transition hover:bg-green-700"
+                  >
+                    <Share2 size={13} />
+                    WhatsApp
+                  </button>
+                  <button
+                    onClick={handleShareFacebook}
+                    className="flex items-center justify-center gap-1.5 rounded-md bg-blue-600 py-2.5 text-[11px] font-bold text-white transition hover:bg-blue-700"
+                  >
+                    <Share2 size={13} />
+                    Facebook
+                  </button>
+                </div>
+
+                <p className="mt-2.5 text-[10px] text-gray-500">
+                  💡 বন্ধু আপনার লিংক দিয়ে রেজিস্ট্রেশন করলে এবং অ্যাডমিন approve করলে আপনি Tk{' '}
+                  {REFERRAL_BONUS_AMOUNT} বোনাস পাবেন।
+                </p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* ═══ RECENT ORDERS ═══ */}
         <section>
