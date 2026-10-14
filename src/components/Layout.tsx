@@ -16,7 +16,10 @@ import {
 import { auth } from '../firebase';
 import BottomNav from './BottomNav';
 import LogoutModal from './LogoutModal';
-import logo from '../assets/zeluxe-logo.png';
+
+// ═══ Horizontal Logo (Cloudinary) ═══
+const LOGO_URL =
+  'https://res.cloudinary.com/q1zrv81l/image/upload/e_trim,h_100,c_fit/v1792001963/file_00000000537882099a4733703efdbdd1.png';
 
 type LayoutProps = {
   children: ReactNode;
@@ -61,17 +64,24 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-zeluxe-cream">
+      {/* ═══ MOBILE HEADER ═══ */}
       <header className="flex h-16 items-center justify-between border-b border-zeluxe-lightgray bg-white px-4 md:hidden">
         <button
           onClick={() => setIsOpen(true)}
-          className="rounded-lg p-2 text-zeluxe-black transition-colors hover:bg-zeluxe-fieldbg"
+          className="rounded-md p-2 text-zeluxe-black transition-colors hover:bg-zeluxe-cream"
           aria-label="Open navigation"
         >
           <Menu className="h-6 w-6" />
         </button>
-        <img src={logo} alt="Zeluxe Gallery Reseller" className="h-12 object-contain" />
+        <img
+          src={LOGO_URL}
+          alt="Zeluxe Gallery"
+          className="h-8 w-auto object-contain"
+        />
         <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zeluxe-black text-sm font-bold text-zeluxe-gold">
-          {auth.currentUser?.displayName?.charAt(0).toUpperCase() || auth.currentUser?.email?.charAt(0).toUpperCase() || 'U'}
+          {auth.currentUser?.displayName?.charAt(0).toUpperCase() ||
+            auth.currentUser?.email?.charAt(0).toUpperCase() ||
+            'U'}
         </div>
       </header>
 
@@ -83,31 +93,42 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
         />
       )}
 
-      <aside className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-zeluxe-lightgray bg-white transition-transform duration-200 md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      {/* ═══ SIDEBAR (Desktop + Mobile Drawer) ═══ */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-zeluxe-lightgray bg-white transition-transform duration-200 md:translate-x-0 ${
+          isOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
         <div className="flex items-center justify-between md:block">
-          <img src={logo} alt="Zeluxe Gallery Reseller" className="h-20 mx-auto my-4 object-contain" />
+          <img
+            src={LOGO_URL}
+            alt="Zeluxe Gallery"
+            className="mx-auto my-4 h-10 w-auto object-contain px-3"
+          />
           <button
             onClick={() => setIsOpen(false)}
-            className="mr-4 rounded-lg p-2 text-zeluxe-gray hover:bg-zeluxe-fieldbg md:hidden"
+            className="mr-4 rounded-md p-2 text-gray-500 hover:bg-zeluxe-cream md:hidden"
             aria-label="Close navigation"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <nav className="flex-1 space-y-2 px-3" aria-label="Main navigation">
+        <nav className="flex-1 space-y-1 px-3" aria-label="Main navigation">
           {navItems.map(({ label, path, icon: Icon }) => (
             <Link
               key={path}
               to={path}
               onClick={() => setIsOpen(false)}
-              className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium transition ${
+              className={`flex items-center gap-3 rounded-md px-4 py-3 text-sm font-medium transition ${
                 isActive(path)
                   ? 'bg-zeluxe-black text-white'
-                  : 'text-zeluxe-gray hover:bg-zeluxe-fieldbg hover:text-zeluxe-black'
+                  : 'text-gray-600 hover:bg-zeluxe-cream hover:text-zeluxe-black'
               }`}
             >
-              <Icon className={`h-5 w-5 ${isActive(path) ? 'text-zeluxe-gold' : ''}`} />
+              <Icon
+                className={`h-5 w-5 ${isActive(path) ? 'text-zeluxe-gold' : ''}`}
+              />
               {label}
             </Link>
           ))}
@@ -119,7 +140,7 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
               setIsOpen(false);
               setShowLogout(true);
             }}
-            className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
+            className="flex w-full items-center gap-3 rounded-md px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
           >
             <LogOut className="h-5 w-5" />
             Logout
@@ -128,7 +149,9 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
       </aside>
 
       <main className="min-h-screen md:ml-60">
-        <div className="mx-auto max-w-7xl p-5 pb-20 md:p-8 md:pb-8">{children}</div>
+        <div className="mx-auto max-w-7xl p-5 pb-20 md:p-8 md:pb-8">
+          {children}
+        </div>
       </main>
 
       <BottomNav />
