@@ -15,6 +15,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
 import Legal from './pages/Legal';
 import FAQ from './pages/FAQ';
+import Support from './pages/Support';
 import Withdraw from './pages/Withdraw';
 import AdminMemberships from './pages/AdminMemberships';
 import AdminOverview from './pages/admin/AdminOverview';
@@ -36,6 +37,7 @@ export default function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/legal" element={<Legal />} />
         <Route path="/faq" element={<FAQ />} />
+        <Route path="/support" element={<Support />} />
         <Route path="/membership" element={<Membership />} />
         <Route path="/pending" element={<Pending />} />
         <Route path="/reseller-dashboard" element={<ResellerDashboard />} />
