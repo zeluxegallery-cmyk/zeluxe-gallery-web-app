@@ -13,6 +13,7 @@ import Landing from './pages/Landing';
 import ForgotPassword from './pages/ForgotPassword';
 import Profile from './pages/Profile';
 import Legal from './pages/Legal';
+import FAQ from './pages/FAQ';
 import Withdraw from './pages/Withdraw';
 import AdminMemberships from './pages/AdminMemberships';
 import AdminOverview from './pages/admin/AdminOverview';
@@ -33,6 +34,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/legal" element={<Legal />} />
+        <Route path="/faq" element={<FAQ />} />
         <Route path="/membership" element={<Membership />} />
         <Route path="/pending" element={<Pending />} />
         <Route path="/reseller-dashboard" element={<ResellerDashboard />} />
