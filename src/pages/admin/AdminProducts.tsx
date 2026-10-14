@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
-import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X } from 'lucide-react';
+import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
@@ -60,6 +60,35 @@ const emptyForm: ProductForm = {
   active: true,
 };
 
+// Category short codes for SKU generation
+const CATEGORY_CODES: Record<string, string> = {
+  'শার্ট': 'SHT',
+  'টি-শার্ট': 'TSH',
+  'পাঞ্জাবি': 'PNJ',
+  'প্যান্ট & ট্রাউজার': 'PNT',
+  'হুডি & জ্যাকেট': 'HDJ',
+  'শাড়ি': 'SAR',
+  'থ্রি-পিস': 'TPS',
+  'কুর্তি': 'KRT',
+  'বোরকা': 'BRK',
+  'হিজাব': 'HJB',
+  'বেবি ড্রেস': 'BBD',
+  'কিডস আইটেম': 'KID',
+  'খেলনা': 'TOY',
+  'ঘড়ি': 'WAT',
+  'স্মার্ট ওয়াচ': 'SWT',
+  'হেডফোন': 'HDP',
+  'পাওয়ার ব্যাংক': 'PWB',
+  'কসমেটিক্স': 'CSM',
+  'স্কিন কেয়ার': 'SKC',
+  'পারফিউম': 'PRF',
+  'ব্যাগ': 'BAG',
+  'কাপল আইটেম': 'CPL',
+  'গিফট আইটেম': 'GFT',
+  'ওয়েস্টার্ন ড্রেস': 'WDR',
+  'ইন্টেরিয়র': 'INT',
+};
+
 export default function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -71,6 +100,7 @@ export default function AdminProducts() {
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [skuLoading, setSkuLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadData = useCallback(async () => {
@@ -112,6 +142,67 @@ export default function AdminProducts() {
     void loadData();
   }, [loadData]);
 
+  // ═══ AUTO SKU GENERATION ═══
+  const generateSKU = useCallback(async (categoryName: string): Promise<string> => {
+    if (!categoryName) return '';
+
+    const code = CATEGORY_CODES[categoryName] || 'GEN';
+
+    try {
+      const q = query(collection(db, 'products'));
+      const snap = await getDocs(q);
+
+      // Find max sequence for this category
+      let maxSeq = 0;
+      snap.docs.forEach((d) => {
+        const sku = d.data().sku;
+        if (typeof sku === 'string' && sku.startsWith(`ZEL-${code}-`)) {
+          const parts = sku.split('-');
+          const seq = parseInt(parts[2], 10);
+          if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
+        }
+      });
+
+      const nextSeq = maxSeq + 1;
+      const seqStr = nextSeq.toString().padStart(4, '0');
+      return `ZEL-${code}-${seqStr}`;
+    } catch (err) {
+      console.error('SKU generation failed:', err);
+      return `ZEL-${code}-0001`;
+    }
+  }, []);
+
+  const handleCategoryChange = async (categoryName: string) => {
+    setForm((prev) => ({ ...prev, category: categoryName, sku: '' }));
+
+    if (!categoryName) return;
+
+    // Only auto-generate for new products, not when editing
+    if (editingId) return;
+
+    setSkuLoading(true);
+    try {
+      const newSku = await generateSKU(categoryName);
+      setForm((prev) => ({ ...prev, sku: newSku }));
+    } finally {
+      setSkuLoading(false);
+    }
+  };
+
+  const handleRegenerateSku = async () => {
+    if (!form.category) {
+      alert('প্রথমে ক্যাটাগরি সিলেক্ট করুন');
+      return;
+    }
+    setSkuLoading(true);
+    try {
+      const newSku = await generateSKU(form.category);
+      setForm((prev) => ({ ...prev, sku: newSku }));
+    } finally {
+      setSkuLoading(false);
+    }
+  };
+
   const openAdd = () => {
     setForm(emptyForm);
     setEditingId(null);
@@ -136,7 +227,10 @@ export default function AdminProducts() {
   };
 
   const handleSave = async () => {
-    if (!form.name.trim() || !form.sku.trim()) return;
+    if (!form.name.trim() || !form.sku.trim()) {
+      alert('নাম এবং SKU অবশ্যই দিতে হবে');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -167,7 +261,7 @@ export default function AdminProducts() {
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    if (!window.confirm(`"${name}" ডিলিট করবেন? এটা ফেরত আনা যাবে না।`)) return;
     try {
       await deleteDoc(doc(db, 'products', id));
       await loadData();
@@ -218,35 +312,38 @@ export default function AdminProducts() {
     );
   }
 
+  const inputClass =
+    'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none';
+
   return (
     <AdminLayout>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-zeluxe-black">প্রোডাক্ট ম্যানেজমেন্ট</h1>
+        <h1 className="text-xl font-bold text-zeluxe-black">প্রোডাক্ট ম্যানেজমেন্ট</h1>
         <button
           onClick={openAdd}
-          className="rounded-xl bg-zeluxe-black px-4 py-2 font-bold text-white transition hover:bg-[#2a2a2a] active:scale-[0.98]"
+          className="rounded-md bg-zeluxe-black px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800 active:scale-[0.98]"
         >
-          + নতুন প্রোডাক্ট
+          + নতুন
         </button>
       </div>
 
       {/* Filters */}
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zeluxe-gray" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or SKU..."
-            className="w-full rounded-xl border border-zeluxe-lightgray bg-white py-2.5 pl-10 pr-4 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+            placeholder="নাম বা SKU দিয়ে খুঁজুন..."
+            className="w-full rounded-md border border-zeluxe-lightgray bg-white py-2.5 pl-10 pr-4 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
           />
         </div>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-xl border border-zeluxe-lightgray bg-white px-4 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+          className="rounded-md border border-zeluxe-lightgray bg-white px-4 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
         >
-          <option value="">All Categories</option>
+          <option value="">সব ক্যাটাগরি</option>
           {categories.map((cat) => (
             <option key={cat.id} value={cat.name}>
               {cat.name}
@@ -256,18 +353,18 @@ export default function AdminProducts() {
       </div>
 
       {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white md:block">
+      <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
         <table className="w-full text-left text-sm">
-          <thead className="bg-zeluxe-fieldbg">
+          <thead className="bg-zeluxe-cream">
             <tr>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Image</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Name</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">SKU</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Category</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Stock</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Reseller Price</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Active</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Actions</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Image</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Name</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">SKU</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Category</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Stock</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Price</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Active</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500"></th>
             </tr>
           </thead>
           <tbody>
@@ -278,19 +375,21 @@ export default function AdminProducts() {
                     <img
                       src={product.imageUrl}
                       alt={product.name}
-                      className="h-10 w-10 rounded-lg object-cover"
+                      className="h-10 w-10 rounded-md object-cover"
                     />
                   ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-zeluxe-fieldbg">
-                      <Package className="h-5 w-5 text-zeluxe-gray" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zeluxe-cream">
+                      <Package className="h-5 w-5 text-gray-400" />
                     </div>
                   )}
                 </td>
                 <td className="px-4 py-3 font-medium text-zeluxe-black">{product.name}</td>
-                <td className="px-4 py-3 font-mono text-xs text-zeluxe-gray">{product.sku}</td>
-                <td className="px-4 py-3 text-zeluxe-gray">{product.category}</td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{product.category}</td>
                 <td className="px-4 py-3 text-zeluxe-black">{product.stock}</td>
-                <td className="px-4 py-3 font-bold text-zeluxe-gold">৳{product.resellerPrice.toLocaleString()}</td>
+                <td className="px-4 py-3 font-bold text-zeluxe-gold">
+                  Tk {product.resellerPrice.toLocaleString()}
+                </td>
                 <td className="px-4 py-3">
                   <input
                     type="checkbox"
@@ -303,13 +402,13 @@ export default function AdminProducts() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => openEdit(product)}
-                      className="rounded-lg p-1.5 text-zeluxe-gold transition hover:bg-zeluxe-fieldbg"
+                      className="rounded-md p-1.5 text-zeluxe-gold transition hover:bg-zeluxe-cream"
                     >
                       <Pencil className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => handleDelete(product.id, product.name)}
-                      className="rounded-lg p-1.5 text-red-600 transition hover:bg-red-50"
+                      className="rounded-md p-1.5 text-red-600 transition hover:bg-red-50"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -324,95 +423,87 @@ export default function AdminProducts() {
       {/* Mobile cards */}
       <div className="space-y-3 md:hidden">
         {filtered.map((product) => (
-          <div key={product.id} className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
+          <div key={product.id} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
             <div className="flex items-start justify-between">
               <div className="flex gap-3">
                 {product.imageUrl ? (
                   <img
                     src={product.imageUrl}
                     alt={product.name}
-                    className="h-12 w-12 rounded-lg object-cover"
+                    className="h-12 w-12 rounded-md object-cover"
                   />
                 ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-zeluxe-fieldbg">
-                    <Package className="h-6 w-6 text-zeluxe-gray" />
+                  <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zeluxe-cream">
+                    <Package className="h-6 w-6 text-gray-400" />
                   </div>
                 )}
                 <div>
                   <p className="font-medium text-zeluxe-black">{product.name}</p>
-                  <p className="text-xs text-zeluxe-gray">{product.sku}</p>
+                  <p className="font-mono text-[10px] text-gray-500">{product.sku}</p>
                 </div>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => openEdit(product)}
-                  className="rounded-lg p-1.5 text-zeluxe-gold"
+                  className="rounded-md p-1.5 text-zeluxe-gold"
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(product.id, product.name)}
-                  className="rounded-lg p-1.5 text-red-600"
+                  className="rounded-md p-1.5 text-red-600"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="text-zeluxe-gray">{product.category} · Stock: {product.stock}</span>
-              <span className="font-bold text-zeluxe-gold">৳{product.resellerPrice.toLocaleString()}</span>
+              <span className="text-gray-500">
+                {product.category} · Stock: {product.stock}
+              </span>
+              <span className="font-bold text-zeluxe-gold">
+                Tk {product.resellerPrice.toLocaleString()}
+              </span>
             </div>
           </div>
         ))}
       </div>
 
       {filtered.length === 0 && (
-        <div className="mt-6 rounded-xl bg-zeluxe-fieldbg p-8 text-center text-zeluxe-gray">
-          No products found.
+        <div className="mt-6 rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-8 text-center">
+          <Package className="mx-auto h-10 w-10 text-gray-300" />
+          <p className="mt-3 text-sm text-gray-500">কোনো প্রোডাক্ট নেই</p>
         </div>
       )}
 
       {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6">
+          <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-zeluxe-black">
                 {editingId ? 'প্রোডাক্ট এডিট' : 'নতুন প্রোডাক্ট'}
               </h2>
               <button
                 onClick={() => setModalOpen(false)}
-                className="rounded-lg p-1.5 text-zeluxe-gray hover:bg-zeluxe-fieldbg"
+                className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="space-y-4">
+              {/* Category FIRST — so SKU auto-generates */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-zeluxe-black">Name *</label>
-                <input
-                  value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
-                  className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zeluxe-black">SKU *</label>
-                <input
-                  value={form.sku}
-                  onChange={(e) => setForm({ ...form, sku: e.target.value })}
-                  className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zeluxe-black">Category</label>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                  ক্যাটাগরি *
+                </label>
                 <select
                   value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
+                  onChange={(e) => handleCategoryChange(e.target.value)}
+                  className={inputClass}
                 >
-                  <option value="">Select category</option>
+                  <option value="">ক্যাটাগরি সিলেক্ট করুন</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.name}>
                       {cat.name}
@@ -420,23 +511,77 @@ export default function AdminProducts() {
                   ))}
                 </select>
               </div>
+
+              {/* SKU — auto-generated, readonly */}
               <div>
-                <label className="mb-1 block text-sm font-medium text-zeluxe-black">Description</label>
+                <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
+                  <span>SKU *</span>
+                  <button
+                    type="button"
+                    onClick={handleRegenerateSku}
+                    disabled={!form.category || skuLoading}
+                    className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline disabled:opacity-40"
+                  >
+                    <Wand2 size={12} />
+                    Auto Generate
+                  </button>
+                </label>
+                <div className="relative">
+                  <input
+                    value={skuLoading ? 'তৈরি হচ্ছে...' : form.sku}
+                    readOnly
+                    placeholder="ক্যাটাগরি সিলেক্ট করলে অটো তৈরি হবে"
+                    className={`${inputClass} bg-zeluxe-cream font-mono text-gray-600 ${
+                      skuLoading ? 'animate-pulse' : ''
+                    }`}
+                  />
+                  {skuLoading && (
+                    <Loader2
+                      size={16}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zeluxe-gold"
+                    />
+                  )}
+                </div>
+                <p className="mt-1 text-[11px] text-gray-400">
+                  ফরম্যাট: ZEL-XXX-NNNN (একটি ক্যাটাগরিতে অটো নাম্বার বাড়বে)
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                  প্রোডাক্টের নাম *
+                </label>
+                <input
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  placeholder="যেমন: Premium Silk Saree"
+                  className={inputClass}
+                />
+              </div>
+
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                  বিবরণ
+                </label>
                 <textarea
                   rows={3}
                   value={form.description}
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
-                  className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
+                  placeholder="প্রোডাক্টের বিবরণ..."
+                  className={inputClass}
                 />
               </div>
+
               <div>
-                <label className="mb-1 block text-sm font-medium text-zeluxe-black">প্রোডাক্টের ছবি</label>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                  প্রোডাক্টের ছবি
+                </label>
                 {form.imageUrl ? (
                   <div className="relative inline-block">
                     <img
                       src={form.imageUrl}
                       alt="Preview"
-                      className="h-32 w-32 rounded-xl object-cover"
+                      className="h-32 w-32 rounded-md object-cover"
                     />
                     <button
                       type="button"
@@ -451,18 +596,22 @@ export default function AdminProducts() {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-zeluxe-lightgray p-4 text-center cursor-pointer transition hover:border-zeluxe-gold disabled:opacity-60"
+                    className="flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed border-zeluxe-lightgray p-4 text-center transition hover:border-zeluxe-gold disabled:opacity-60"
                   >
                     {uploading ? (
                       <>
                         <Loader2 className="mx-auto h-6 w-6 animate-spin text-zeluxe-gold" />
-                        <p className="mt-2 text-xs text-zeluxe-gray">আপলোড হচ্ছে...</p>
+                        <p className="mt-2 text-xs text-gray-500">আপলোড হচ্ছে...</p>
                       </>
                     ) : (
                       <>
                         <Upload className="mx-auto h-6 w-6 text-zeluxe-gold" />
-                        <p className="mt-2 text-sm font-medium text-zeluxe-black">ছবি আপলোড করুন</p>
-                        <p className="mt-1 text-xs text-zeluxe-gray">JPG, PNG (Max 5MB)</p>
+                        <p className="mt-2 text-sm font-medium text-zeluxe-black">
+                          ছবি আপলোড করুন
+                        </p>
+                        <p className="mt-1 text-[11px] text-gray-400">
+                          JPG, PNG (Max 5MB)
+                        </p>
                       </>
                     )}
                   </button>
@@ -479,53 +628,54 @@ export default function AdminProducts() {
                   className="hidden"
                 />
               </div>
-              <div>
-                <label className="mb-1 block text-sm font-medium text-zeluxe-gray">Image URL (manual)</label>
-                <input
-                  value={form.imageUrl}
-                  onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
-                  className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
-                  placeholder="https://..."
-                />
-              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-zeluxe-black">Stock</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    স্টক
+                  </label>
                   <input
                     type="number"
                     value={form.stock}
                     onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                    className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
+                    className={inputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-zeluxe-black">Purchase Cost</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    ক্রয় মূল্য (Tk)
+                  </label>
                   <input
                     type="number"
                     value={form.purchaseCost}
                     onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })}
-                    className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
+                    className={inputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-zeluxe-black">Reseller Price</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    রিসেলার মূল্য (Tk)
+                  </label>
                   <input
                     type="number"
                     value={form.resellerPrice}
                     onChange={(e) => setForm({ ...form, resellerPrice: e.target.value })}
-                    className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
+                    className={inputClass}
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-zeluxe-black">Suggested Price</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    সাজেস্টেড মূল্য (Tk)
+                  </label>
                   <input
                     type="number"
                     value={form.suggestedPrice}
                     onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value })}
-                    className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
+                    className={inputClass}
                   />
                 </div>
               </div>
+
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -533,23 +683,25 @@ export default function AdminProducts() {
                   onChange={(e) => setForm({ ...form, active: e.target.checked })}
                   className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
                 />
-                <span className="text-sm text-zeluxe-black">Active</span>
+                <span className="text-sm text-zeluxe-black">
+                  Active (রিসেলাররা দেখতে পাবে)
+                </span>
               </label>
             </div>
 
             <div className="mt-6 flex gap-3">
               <button
                 onClick={() => setModalOpen(false)}
-                className="flex-1 rounded-xl border border-zeluxe-lightgray py-3 font-bold text-zeluxe-black transition hover:bg-zeluxe-fieldbg"
+                className="flex-1 rounded-md border border-zeluxe-lightgray py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-cream"
               >
-                Cancel
+                বাতিল
               </button>
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 rounded-xl bg-zeluxe-black py-3 font-bold text-white transition hover:bg-[#2a2a2a] disabled:opacity-60"
+                className="flex-1 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-60"
               >
-                {saving ? 'Saving...' : 'Save'}
+                {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
               </button>
             </div>
           </div>
