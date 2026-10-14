@@ -5,6 +5,7 @@ import Membership from './pages/Membership';
 import Pending from './pages/Pending';
 import ResellerDashboard from './pages/ResellerDashboard';
 import Products from './pages/Products';
+import ProductDetail from './pages/ProductDetail';
 import Orders from './pages/Orders';
 import CreateOrder from './pages/CreateOrder';
 import OrderDetails from './pages/OrderDetails';
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/pending" element={<Pending />} />
         <Route path="/reseller-dashboard" element={<ResellerDashboard />} />
         <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/orders" element={<Orders />} />
         <Route path="/orders/new" element={<CreateOrder />} />
         <Route path="/orders/:id" element={<OrderDetails />} />
