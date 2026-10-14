@@ -58,7 +58,7 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-zeluxe-fieldbg">
+    <div className="min-h-screen bg-zeluxe-cream">
       <header className="flex h-16 items-center justify-between border-b border-zeluxe-lightgray bg-white px-4 md:hidden">
         <button
           onClick={() => setIsOpen(true)}
