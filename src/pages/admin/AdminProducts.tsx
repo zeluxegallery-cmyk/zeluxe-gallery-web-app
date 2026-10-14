@@ -22,6 +22,7 @@ type Product = {
   category: string;
   description: string;
   imageUrl: string;
+  imageUrls: string[];
   stock: number;
   purchaseCost: number;
   resellerPrice: number;
@@ -39,7 +40,7 @@ type ProductForm = {
   sku: string;
   category: string;
   description: string;
-  imageUrl: string;
+  imageUrls: string[];
   stock: string;
   purchaseCost: string;
   resellerPrice: string;
@@ -52,13 +53,15 @@ const emptyForm: ProductForm = {
   sku: '',
   category: '',
   description: '',
-  imageUrl: '',
+  imageUrls: [],
   stock: '0',
   purchaseCost: '0',
   resellerPrice: '0',
   suggestedPrice: '0',
   active: true,
 };
+
+const MAX_IMAGES = 5;
 
 // Category short codes for SKU generation
 const CATEGORY_CODES: Record<string, string> = {
@@ -112,13 +115,22 @@ export default function AdminProducts() {
       setProducts(
         productSnap.docs.map((productDoc) => {
           const data = productDoc.data();
+          const imgUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
+          let urls: string[] = [];
+          if (Array.isArray(data.imageUrls)) {
+            urls = data.imageUrls.filter((u: any) => typeof u === 'string');
+          }
+          // Backward compat: if no imageUrls array but imageUrl exists
+          if (urls.length === 0 && imgUrl) urls = [imgUrl];
+
           return {
             id: productDoc.id,
             name: typeof data.name === 'string' ? data.name : '—',
             sku: typeof data.sku === 'string' ? data.sku : '—',
             category: typeof data.category === 'string' ? data.category : '—',
             description: typeof data.description === 'string' ? data.description : '',
-            imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
+            imageUrl: imgUrl,
+            imageUrls: urls,
             stock: typeof data.stock === 'number' ? data.stock : 0,
             purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
@@ -142,17 +154,14 @@ export default function AdminProducts() {
     void loadData();
   }, [loadData]);
 
-  // ═══ AUTO SKU GENERATION ═══
   const generateSKU = useCallback(async (categoryName: string): Promise<string> => {
     if (!categoryName) return '';
-
     const code = CATEGORY_CODES[categoryName] || 'GEN';
 
     try {
       const q = query(collection(db, 'products'));
       const snap = await getDocs(q);
 
-      // Find max sequence for this category
       let maxSeq = 0;
       snap.docs.forEach((d) => {
         const sku = d.data().sku;
@@ -174,10 +183,7 @@ export default function AdminProducts() {
 
   const handleCategoryChange = async (categoryName: string) => {
     setForm((prev) => ({ ...prev, category: categoryName, sku: '' }));
-
     if (!categoryName) return;
-
-    // Only auto-generate for new products, not when editing
     if (editingId) return;
 
     setSkuLoading(true);
@@ -215,7 +221,7 @@ export default function AdminProducts() {
       sku: product.sku,
       category: product.category,
       description: product.description,
-      imageUrl: product.imageUrl,
+      imageUrls: product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : []),
       stock: String(product.stock),
       purchaseCost: String(product.purchaseCost),
       resellerPrice: String(product.resellerPrice),
@@ -238,7 +244,8 @@ export default function AdminProducts() {
         sku: form.sku.trim(),
         category: form.category,
         description: form.description.trim(),
-        imageUrl: form.imageUrl.trim(),
+        imageUrl: form.imageUrls[0] || '',
+        imageUrls: form.imageUrls,
         stock: Number(form.stock) || 0,
         purchaseCost: Number(form.purchaseCost) || 0,
         resellerPrice: Number(form.resellerPrice) || 0,
@@ -281,17 +288,42 @@ export default function AdminProducts() {
     }
   };
 
-  const handleImageUpload = async (file: File) => {
+  const handleMultipleImageUpload = async (files: FileList) => {
+    const remaining = MAX_IMAGES - form.imageUrls.length;
+    if (remaining <= 0) {
+      alert(`সর্বোচ্চ ${MAX_IMAGES}টি ছবি আপলোড করা যাবে`);
+      return;
+    }
+
+    const filesToUpload = Array.from(files).slice(0, remaining);
     setUploading(true);
+
     try {
-      const url = await uploadImageToCloudinary(file);
-      setForm((prev) => ({ ...prev, imageUrl: url }));
+      const uploadPromises = filesToUpload.map((file) => uploadImageToCloudinary(file));
+      const urls = await Promise.all(uploadPromises);
+      setForm((prev) => ({ ...prev, imageUrls: [...prev.imageUrls, ...urls] }));
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed.';
       alert(message);
     } finally {
       setUploading(false);
     }
+  };
+
+  const removeImage = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, i) => i !== index),
+    }));
+  };
+
+  const setPrimaryImage = (index: number) => {
+    setForm((prev) => {
+      const newUrls = [...prev.imageUrls];
+      const [selected] = newUrls.splice(index, 1);
+      newUrls.unshift(selected);
+      return { ...prev, imageUrls: newUrls };
+    });
   };
 
   const filtered = products.filter((product) => {
@@ -372,11 +404,18 @@ export default function AdminProducts() {
               <tr key={product.id} className="border-b border-zeluxe-lightgray last:border-0">
                 <td className="px-4 py-3">
                   {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="h-10 w-10 rounded-md object-cover"
-                    />
+                    <div className="relative">
+                      <img
+                        src={product.imageUrl}
+                        alt={product.name}
+                        className="h-10 w-10 rounded-md object-cover"
+                      />
+                      {product.imageUrls.length > 1 && (
+                        <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
+                          {product.imageUrls.length}
+                        </span>
+                      )}
+                    </div>
                   ) : (
                     <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zeluxe-cream">
                       <Package className="h-5 w-5 text-gray-400" />
@@ -427,11 +466,18 @@ export default function AdminProducts() {
             <div className="flex items-start justify-between">
               <div className="flex gap-3">
                 {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="h-12 w-12 rounded-md object-cover"
-                  />
+                  <div className="relative">
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="h-12 w-12 rounded-md object-cover"
+                    />
+                    {product.imageUrls.length > 1 && (
+                      <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
+                        {product.imageUrls.length}
+                      </span>
+                    )}
+                  </div>
                 ) : (
                   <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zeluxe-cream">
                     <Package className="h-6 w-6 text-gray-400" />
@@ -543,7 +589,7 @@ export default function AdminProducts() {
                   )}
                 </div>
                 <p className="mt-1 text-[11px] text-gray-400">
-                  ফরম্যাট: ZEL-XXX-NNNN (একটি ক্যাটাগরিতে অটো নাম্বার বাড়বে)
+                  ফরম্যাট: ZEL-XXX-NNNN
                 </p>
               </div>
 
@@ -572,26 +618,64 @@ export default function AdminProducts() {
                 />
               </div>
 
+              {/* ═══ MULTIPLE IMAGES ═══ */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  প্রোডাক্টের ছবি
+                <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
+                  <span>প্রোডাক্টের ছবি</span>
+                  <span className="text-[11px] font-normal text-gray-500">
+                    {form.imageUrls.length}/{MAX_IMAGES}
+                  </span>
                 </label>
-                {form.imageUrl ? (
-                  <div className="relative inline-block">
-                    <img
-                      src={form.imageUrl}
-                      alt="Preview"
-                      className="h-32 w-32 rounded-md object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setForm({ ...form, imageUrl: '' })}
-                      className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white shadow-md"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
+
+                {/* Image Grid */}
+                {form.imageUrls.length > 0 && (
+                  <div className="mb-3 grid grid-cols-3 gap-2">
+                    {form.imageUrls.map((url, idx) => (
+                      <div
+                        key={idx}
+                        className={`group relative aspect-square overflow-hidden rounded-md border-2 ${
+                          idx === 0 ? 'border-zeluxe-gold' : 'border-zeluxe-lightgray'
+                        }`}
+                      >
+                        <img
+                          src={url}
+                          alt={`Product ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+
+                        {/* Primary badge */}
+                        {idx === 0 && (
+                          <span className="absolute left-1 top-1 rounded bg-zeluxe-gold px-1.5 py-0.5 text-[9px] font-bold text-zeluxe-black">
+                            Primary
+                          </span>
+                        )}
+
+                        {/* Remove button */}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-md transition hover:bg-red-700"
+                        >
+                          <X size={11} />
+                        </button>
+
+                        {/* Set as primary button */}
+                        {idx > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setPrimaryImage(idx)}
+                            className="absolute bottom-1 left-1 right-1 rounded bg-black/70 px-2 py-1 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100"
+                          >
+                            Primary করুন
+                          </button>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ) : (
+                )}
+
+                {/* Upload button */}
+                {form.imageUrls.length < MAX_IMAGES && (
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
@@ -607,26 +691,32 @@ export default function AdminProducts() {
                       <>
                         <Upload className="mx-auto h-6 w-6 text-zeluxe-gold" />
                         <p className="mt-2 text-sm font-medium text-zeluxe-black">
-                          ছবি আপলোড করুন
+                          {form.imageUrls.length === 0 ? 'ছবি আপলোড করুন' : 'আরো ছবি যোগ করুন'}
                         </p>
                         <p className="mt-1 text-[11px] text-gray-400">
-                          JPG, PNG (Max 5MB)
+                          একসাথে {MAX_IMAGES - form.imageUrls.length}টি পর্যন্ত (JPG, PNG)
                         </p>
                       </>
                     )}
                   </button>
                 )}
+
                 <input
                   ref={fileInputRef}
                   type="file"
                   accept="image/*"
+                  multiple
                   onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) void handleImageUpload(file);
+                    const files = e.target.files;
+                    if (files && files.length > 0) void handleMultipleImageUpload(files);
                     e.target.value = '';
                   }}
                   className="hidden"
                 />
+
+                <p className="mt-2 text-[11px] text-gray-400">
+                  💡 প্রথম ছবিটাই Primary — products page-এ সেটাই দেখাবে
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
