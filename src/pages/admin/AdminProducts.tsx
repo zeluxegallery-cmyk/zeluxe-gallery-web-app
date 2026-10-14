@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
-import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2 } from 'lucide-react';
+import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2, Palette } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
@@ -23,6 +23,7 @@ type Product = {
   description: string;
   imageUrl: string;
   imageUrls: string[];
+  colors: string[];
   stock: number;
   purchaseCost: number;
   resellerPrice: number;
@@ -41,6 +42,7 @@ type ProductForm = {
   category: string;
   description: string;
   imageUrls: string[];
+  colorsInput: string;
   stock: string;
   purchaseCost: string;
   resellerPrice: string;
@@ -54,6 +56,7 @@ const emptyForm: ProductForm = {
   category: '',
   description: '',
   imageUrls: [],
+  colorsInput: '',
   stock: '0',
   purchaseCost: '0',
   resellerPrice: '0',
@@ -63,33 +66,16 @@ const emptyForm: ProductForm = {
 
 const MAX_IMAGES = 5;
 
-// Category short codes for SKU generation
 const CATEGORY_CODES: Record<string, string> = {
-  'শার্ট': 'SHT',
-  'টি-শার্ট': 'TSH',
-  'পাঞ্জাবি': 'PNJ',
-  'প্যান্ট & ট্রাউজার': 'PNT',
-  'হুডি & জ্যাকেট': 'HDJ',
-  'শাড়ি': 'SAR',
-  'থ্রি-পিস': 'TPS',
-  'কুর্তি': 'KRT',
-  'বোরকা': 'BRK',
-  'হিজাব': 'HJB',
-  'বেবি ড্রেস': 'BBD',
-  'কিডস আইটেম': 'KID',
-  'খেলনা': 'TOY',
-  'ঘড়ি': 'WAT',
-  'স্মার্ট ওয়াচ': 'SWT',
-  'হেডফোন': 'HDP',
-  'পাওয়ার ব্যাংক': 'PWB',
-  'কসমেটিক্স': 'CSM',
-  'স্কিন কেয়ার': 'SKC',
-  'পারফিউম': 'PRF',
-  'ব্যাগ': 'BAG',
-  'কাপল আইটেম': 'CPL',
-  'গিফট আইটেম': 'GFT',
-  'ওয়েস্টার্ন ড্রেস': 'WDR',
-  'ইন্টেরিয়র': 'INT',
+  'শার্ট': 'SHT', 'টি-শার্ট': 'TSH', 'পাঞ্জাবি': 'PNJ',
+  'প্যান্ট & ট্রাউজার': 'PNT', 'হুডি & জ্যাকেট': 'HDJ',
+  'শাড়ি': 'SAR', 'থ্রি-পিস': 'TPS', 'কুর্তি': 'KRT',
+  'বোরকা': 'BRK', 'হিজাব': 'HJB', 'বেবি ড্রেস': 'BBD',
+  'কিডস আইটেম': 'KID', 'খেলনা': 'TOY', 'ঘড়ি': 'WAT',
+  'স্মার্ট ওয়াচ': 'SWT', 'হেডফোন': 'HDP', 'পাওয়ার ব্যাংক': 'PWB',
+  'কসমেটিক্স': 'CSM', 'স্কিন কেয়ার': 'SKC', 'পারফিউম': 'PRF',
+  'ব্যাগ': 'BAG', 'কাপল আইটেম': 'CPL', 'গিফট আইটেম': 'GFT',
+  'ওয়েস্টার্ন ড্রেস': 'WDR', 'ইন্টেরিয়র': 'INT',
 };
 
 export default function AdminProducts() {
@@ -120,8 +106,12 @@ export default function AdminProducts() {
           if (Array.isArray(data.imageUrls)) {
             urls = data.imageUrls.filter((u: any) => typeof u === 'string');
           }
-          // Backward compat: if no imageUrls array but imageUrl exists
           if (urls.length === 0 && imgUrl) urls = [imgUrl];
+
+          let colors: string[] = [];
+          if (Array.isArray(data.colors)) {
+            colors = data.colors.filter((c: any) => typeof c === 'string');
+          }
 
           return {
             id: productDoc.id,
@@ -131,6 +121,7 @@ export default function AdminProducts() {
             description: typeof data.description === 'string' ? data.description : '',
             imageUrl: imgUrl,
             imageUrls: urls,
+            colors,
             stock: typeof data.stock === 'number' ? data.stock : 0,
             purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
@@ -157,11 +148,9 @@ export default function AdminProducts() {
   const generateSKU = useCallback(async (categoryName: string): Promise<string> => {
     if (!categoryName) return '';
     const code = CATEGORY_CODES[categoryName] || 'GEN';
-
     try {
       const q = query(collection(db, 'products'));
       const snap = await getDocs(q);
-
       let maxSeq = 0;
       snap.docs.forEach((d) => {
         const sku = d.data().sku;
@@ -171,10 +160,8 @@ export default function AdminProducts() {
           if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
         }
       });
-
       const nextSeq = maxSeq + 1;
-      const seqStr = nextSeq.toString().padStart(4, '0');
-      return `ZEL-${code}-${seqStr}`;
+      return `ZEL-${code}-${nextSeq.toString().padStart(4, '0')}`;
     } catch (err) {
       console.error('SKU generation failed:', err);
       return `ZEL-${code}-0001`;
@@ -183,9 +170,7 @@ export default function AdminProducts() {
 
   const handleCategoryChange = async (categoryName: string) => {
     setForm((prev) => ({ ...prev, category: categoryName, sku: '' }));
-    if (!categoryName) return;
-    if (editingId) return;
-
+    if (!categoryName || editingId) return;
     setSkuLoading(true);
     try {
       const newSku = await generateSKU(categoryName);
@@ -222,6 +207,7 @@ export default function AdminProducts() {
       category: product.category,
       description: product.description,
       imageUrls: product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : []),
+      colorsInput: product.colors.join(', '),
       stock: String(product.stock),
       purchaseCost: String(product.purchaseCost),
       resellerPrice: String(product.resellerPrice),
@@ -239,6 +225,12 @@ export default function AdminProducts() {
     }
     setSaving(true);
     try {
+      // Parse colors from comma-separated input
+      const colors = form.colorsInput
+        .split(',')
+        .map((c) => c.trim())
+        .filter((c) => c.length > 0);
+
       const payload = {
         name: form.name.trim(),
         sku: form.sku.trim(),
@@ -246,6 +238,7 @@ export default function AdminProducts() {
         description: form.description.trim(),
         imageUrl: form.imageUrls[0] || '',
         imageUrls: form.imageUrls,
+        colors,
         stock: Number(form.stock) || 0,
         purchaseCost: Number(form.purchaseCost) || 0,
         resellerPrice: Number(form.resellerPrice) || 0,
@@ -273,8 +266,7 @@ export default function AdminProducts() {
       await deleteDoc(doc(db, 'products', id));
       await loadData();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Delete failed.';
-      alert(message);
+      alert(err instanceof Error ? err.message : 'Delete failed.');
     }
   };
 
@@ -283,8 +275,7 @@ export default function AdminProducts() {
       await updateDoc(doc(db, 'products', product.id), { active: !product.active });
       await loadData();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Toggle failed.';
-      alert(message);
+      alert(err instanceof Error ? err.message : 'Toggle failed.');
     }
   };
 
@@ -294,27 +285,21 @@ export default function AdminProducts() {
       alert(`সর্বোচ্চ ${MAX_IMAGES}টি ছবি আপলোড করা যাবে`);
       return;
     }
-
     const filesToUpload = Array.from(files).slice(0, remaining);
     setUploading(true);
-
     try {
       const uploadPromises = filesToUpload.map((file) => uploadImageToCloudinary(file));
       const urls = await Promise.all(uploadPromises);
       setForm((prev) => ({ ...prev, imageUrls: [...prev.imageUrls, ...urls] }));
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Upload failed.';
-      alert(message);
+      alert(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       setUploading(false);
     }
   };
 
   const removeImage = (index: number) => {
-    setForm((prev) => ({
-      ...prev,
-      imageUrls: prev.imageUrls.filter((_, i) => i !== index),
-    }));
+    setForm((prev) => ({ ...prev, imageUrls: prev.imageUrls.filter((_, i) => i !== index) }));
   };
 
   const setPrimaryImage = (index: number) => {
@@ -338,7 +323,7 @@ export default function AdminProducts() {
     return (
       <AdminLayout>
         <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
+          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
         </div>
       </AdminLayout>
     );
@@ -353,13 +338,12 @@ export default function AdminProducts() {
         <h1 className="text-xl font-bold text-zeluxe-black">প্রোডাক্ট ম্যানেজমেন্ট</h1>
         <button
           onClick={openAdd}
-          className="rounded-md bg-zeluxe-black px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800 active:scale-[0.98]"
+          className="rounded-md bg-zeluxe-black px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800"
         >
           + নতুন
         </button>
       </div>
 
-      {/* Filters */}
       <div className="mb-5 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zeluxe-gray" />
@@ -367,19 +351,17 @@ export default function AdminProducts() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="নাম বা SKU দিয়ে খুঁজুন..."
-            className="w-full rounded-md border border-zeluxe-lightgray bg-white py-2.5 pl-10 pr-4 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+            className="w-full rounded-md border border-zeluxe-lightgray bg-white py-2.5 pl-10 pr-4 text-sm focus:border-zeluxe-gold focus:outline-none"
           />
         </div>
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-zeluxe-lightgray bg-white px-4 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+          className="rounded-md border border-zeluxe-lightgray bg-white px-4 py-2.5 text-sm focus:border-zeluxe-gold focus:outline-none"
         >
           <option value="">সব ক্যাটাগরি</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.name}>
-              {cat.name}
-            </option>
+            <option key={cat.id} value={cat.name}>{cat.name}</option>
           ))}
         </select>
       </div>
@@ -396,7 +378,7 @@ export default function AdminProducts() {
               <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Stock</th>
               <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Price</th>
               <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Active</th>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500"></th>
+              <th className="px-4 py-3"></th>
             </tr>
           </thead>
           <tbody>
@@ -405,11 +387,7 @@ export default function AdminProducts() {
                 <td className="px-4 py-3">
                   {product.imageUrl ? (
                     <div className="relative">
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="h-10 w-10 rounded-md object-cover"
-                      />
+                      <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-md object-cover" />
                       {product.imageUrls.length > 1 && (
                         <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
                           {product.imageUrls.length}
@@ -426,9 +404,7 @@ export default function AdminProducts() {
                 <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
                 <td className="px-4 py-3 text-xs text-gray-500">{product.category}</td>
                 <td className="px-4 py-3 text-zeluxe-black">{product.stock}</td>
-                <td className="px-4 py-3 font-bold text-zeluxe-gold">
-                  Tk {product.resellerPrice.toLocaleString()}
-                </td>
+                <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</td>
                 <td className="px-4 py-3">
                   <input
                     type="checkbox"
@@ -439,16 +415,10 @@ export default function AdminProducts() {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex gap-2">
-                    <button
-                      onClick={() => openEdit(product)}
-                      className="rounded-md p-1.5 text-zeluxe-gold transition hover:bg-zeluxe-cream"
-                    >
+                    <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold hover:bg-zeluxe-cream">
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button
-                      onClick={() => handleDelete(product.id, product.name)}
-                      className="rounded-md p-1.5 text-red-600 transition hover:bg-red-50"
-                    >
+                    <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600 hover:bg-red-50">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
@@ -466,18 +436,7 @@ export default function AdminProducts() {
             <div className="flex items-start justify-between">
               <div className="flex gap-3">
                 {product.imageUrl ? (
-                  <div className="relative">
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="h-12 w-12 rounded-md object-cover"
-                    />
-                    {product.imageUrls.length > 1 && (
-                      <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
-                        {product.imageUrls.length}
-                      </span>
-                    )}
-                  </div>
+                  <img src={product.imageUrl} alt={product.name} className="h-12 w-12 rounded-md object-cover" />
                 ) : (
                   <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zeluxe-cream">
                     <Package className="h-6 w-6 text-gray-400" />
@@ -489,27 +448,17 @@ export default function AdminProducts() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() => openEdit(product)}
-                  className="rounded-md p-1.5 text-zeluxe-gold"
-                >
+                <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold">
                   <Pencil className="h-4 w-4" />
                 </button>
-                <button
-                  onClick={() => handleDelete(product.id, product.name)}
-                  className="rounded-md p-1.5 text-red-600"
-                >
+                <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600">
                   <Trash2 className="h-4 w-4" />
                 </button>
               </div>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="text-gray-500">
-                {product.category} · Stock: {product.stock}
-              </span>
-              <span className="font-bold text-zeluxe-gold">
-                Tk {product.resellerPrice.toLocaleString()}
-              </span>
+              <span className="text-gray-500">{product.category} · Stock: {product.stock}</span>
+              <span className="font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</span>
             </div>
           </div>
         ))}
@@ -530,35 +479,22 @@ export default function AdminProducts() {
               <h2 className="text-lg font-bold text-zeluxe-black">
                 {editingId ? 'প্রোডাক্ট এডিট' : 'নতুন প্রোডাক্ট'}
               </h2>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream"
-              >
+              <button onClick={() => setModalOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream">
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="space-y-4">
-              {/* Category FIRST — so SKU auto-generates */}
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  ক্যাটাগরি *
-                </label>
-                <select
-                  value={form.category}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  className={inputClass}
-                >
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ক্যাটাগরি *</label>
+                <select value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} className={inputClass}>
                   <option value="">ক্যাটাগরি সিলেক্ট করুন</option>
                   {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name}>
-                      {cat.name}
-                    </option>
+                    <option key={cat.id} value={cat.name}>{cat.name}</option>
                   ))}
                 </select>
               </div>
 
-              {/* SKU — auto-generated, readonly */}
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
                   <span>SKU *</span>
@@ -568,8 +504,7 @@ export default function AdminProducts() {
                     disabled={!form.category || skuLoading}
                     className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline disabled:opacity-40"
                   >
-                    <Wand2 size={12} />
-                    Auto Generate
+                    <Wand2 size={12} /> Auto Generate
                   </button>
                 </label>
                 <div className="relative">
@@ -577,26 +512,16 @@ export default function AdminProducts() {
                     value={skuLoading ? 'তৈরি হচ্ছে...' : form.sku}
                     readOnly
                     placeholder="ক্যাটাগরি সিলেক্ট করলে অটো তৈরি হবে"
-                    className={`${inputClass} bg-zeluxe-cream font-mono text-gray-600 ${
-                      skuLoading ? 'animate-pulse' : ''
-                    }`}
+                    className={`${inputClass} bg-zeluxe-cream font-mono text-gray-600 ${skuLoading ? 'animate-pulse' : ''}`}
                   />
                   {skuLoading && (
-                    <Loader2
-                      size={16}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zeluxe-gold"
-                    />
+                    <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zeluxe-gold" />
                   )}
                 </div>
-                <p className="mt-1 text-[11px] text-gray-400">
-                  ফরম্যাট: ZEL-XXX-NNNN
-                </p>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  প্রোডাক্টের নাম *
-                </label>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">প্রোডাক্টের নাম *</label>
                 <input
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -606,9 +531,7 @@ export default function AdminProducts() {
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  বিবরণ
-                </label>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">বিবরণ</label>
                 <textarea
                   rows={3}
                   value={form.description}
@@ -618,16 +541,43 @@ export default function AdminProducts() {
                 />
               </div>
 
+              {/* ═══ COLORS ═══ */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
+                  <Palette size={14} className="text-zeluxe-gold" />
+                  <span>উপলব্ধ কালার</span>
+                </label>
+                <input
+                  value={form.colorsInput}
+                  onChange={(e) => setForm({ ...form, colorsInput: e.target.value })}
+                  placeholder="যেমন: Red, Blue, Green, Black"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  কমা (,) দিয়ে একাধিক কালার আলাদা করুন। খালি রাখলে কোনো কালার অপশন দেখাবে না।
+                </p>
+                {form.colorsInput.trim() && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {form.colorsInput
+                      .split(',')
+                      .map((c) => c.trim())
+                      .filter((c) => c)
+                      .map((color, i) => (
+                        <span key={i} className="rounded-md border border-zeluxe-lightgray bg-zeluxe-cream px-2 py-0.5 text-[11px] text-zeluxe-black">
+                          {color}
+                        </span>
+                      ))}
+                  </div>
+                )}
+              </div>
+
               {/* ═══ MULTIPLE IMAGES ═══ */}
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
                   <span>প্রোডাক্টের ছবি</span>
-                  <span className="text-[11px] font-normal text-gray-500">
-                    {form.imageUrls.length}/{MAX_IMAGES}
-                  </span>
+                  <span className="text-[11px] font-normal text-gray-500">{form.imageUrls.length}/{MAX_IMAGES}</span>
                 </label>
 
-                {/* Image Grid */}
                 {form.imageUrls.length > 0 && (
                   <div className="mb-3 grid grid-cols-3 gap-2">
                     {form.imageUrls.map((url, idx) => (
@@ -637,29 +587,19 @@ export default function AdminProducts() {
                           idx === 0 ? 'border-zeluxe-gold' : 'border-zeluxe-lightgray'
                         }`}
                       >
-                        <img
-                          src={url}
-                          alt={`Product ${idx + 1}`}
-                          className="h-full w-full object-cover"
-                        />
-
-                        {/* Primary badge */}
+                        <img src={url} alt={`Product ${idx + 1}`} className="h-full w-full object-cover" />
                         {idx === 0 && (
                           <span className="absolute left-1 top-1 rounded bg-zeluxe-gold px-1.5 py-0.5 text-[9px] font-bold text-zeluxe-black">
                             Primary
                           </span>
                         )}
-
-                        {/* Remove button */}
                         <button
                           type="button"
                           onClick={() => removeImage(idx)}
-                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-md transition hover:bg-red-700"
+                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-md"
                         >
                           <X size={11} />
                         </button>
-
-                        {/* Set as primary button */}
                         {idx > 0 && (
                           <button
                             type="button"
@@ -674,7 +614,6 @@ export default function AdminProducts() {
                   </div>
                 )}
 
-                {/* Upload button */}
                 {form.imageUrls.length < MAX_IMAGES && (
                   <button
                     type="button"
@@ -694,7 +633,7 @@ export default function AdminProducts() {
                           {form.imageUrls.length === 0 ? 'ছবি আপলোড করুন' : 'আরো ছবি যোগ করুন'}
                         </p>
                         <p className="mt-1 text-[11px] text-gray-400">
-                          একসাথে {MAX_IMAGES - form.imageUrls.length}টি পর্যন্ত (JPG, PNG)
+                          একসাথে {MAX_IMAGES - form.imageUrls.length}টি পর্যন্ত
                         </p>
                       </>
                     )}
@@ -713,56 +652,27 @@ export default function AdminProducts() {
                   }}
                   className="hidden"
                 />
-
                 <p className="mt-2 text-[11px] text-gray-400">
-                  💡 প্রথম ছবিটাই Primary — products page-এ সেটাই দেখাবে
+                  💡 প্রথম ছবিটাই Primary
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    স্টক
-                  </label>
-                  <input
-                    type="number"
-                    value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                    className={inputClass}
-                  />
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">স্টক</label>
+                  <input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className={inputClass} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    ক্রয় মূল্য (Tk)
-                  </label>
-                  <input
-                    type="number"
-                    value={form.purchaseCost}
-                    onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })}
-                    className={inputClass}
-                  />
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ক্রয় মূল্য (Tk)</label>
+                  <input type="number" value={form.purchaseCost} onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })} className={inputClass} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    রিসেলার মূল্য (Tk)
-                  </label>
-                  <input
-                    type="number"
-                    value={form.resellerPrice}
-                    onChange={(e) => setForm({ ...form, resellerPrice: e.target.value })}
-                    className={inputClass}
-                  />
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">রিসেলার মূল্য (Tk)</label>
+                  <input type="number" value={form.resellerPrice} onChange={(e) => setForm({ ...form, resellerPrice: e.target.value })} className={inputClass} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    সাজেস্টেড মূল্য (Tk)
-                  </label>
-                  <input
-                    type="number"
-                    value={form.suggestedPrice}
-                    onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value })}
-                    className={inputClass}
-                  />
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">সাজেস্টেড মূল্য (Tk)</label>
+                  <input type="number" value={form.suggestedPrice} onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value })} className={inputClass} />
                 </div>
               </div>
 
@@ -773,24 +683,15 @@ export default function AdminProducts() {
                   onChange={(e) => setForm({ ...form, active: e.target.checked })}
                   className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
                 />
-                <span className="text-sm text-zeluxe-black">
-                  Active (রিসেলাররা দেখতে পাবে)
-                </span>
+                <span className="text-sm text-zeluxe-black">Active (রিসেলাররা দেখতে পাবে)</span>
               </label>
             </div>
 
             <div className="mt-6 flex gap-3">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="flex-1 rounded-md border border-zeluxe-lightgray py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-cream"
-              >
+              <button onClick={() => setModalOpen(false)} className="flex-1 rounded-md border border-zeluxe-lightgray py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-cream">
                 বাতিল
               </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="flex-1 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-60"
-              >
+              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-60">
                 {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
               </button>
             </div>
