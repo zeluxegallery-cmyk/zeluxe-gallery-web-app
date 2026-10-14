@@ -1,23 +1,21 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import {
-  Clock,
-  Wallet,
   Loader2,
   Package,
   Plus,
   ShoppingBag,
   TrendingUp,
-  User,
+  Wallet,
   ArrowRight,
   Gift,
-  Users,
-  Sparkles,
   Headphones,
-  Target,
-  CheckCircle,
   ChevronRight,
+  CheckCircle,
+  Sparkles,
+  BarChart3,
+  Calendar,
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
@@ -49,6 +47,8 @@ type Stats = {
   totalSales: number;
   actualProfit: number;
   availableBalance: number;
+  todayOrders: number;
+  todaySales: number;
 };
 
 const initialStats: Stats = {
@@ -58,11 +58,13 @@ const initialStats: Stats = {
   totalSales: 0,
   actualProfit: 0,
   availableBalance: 0,
+  todayOrders: 0,
+  todaySales: 0,
 };
 
 const PENDING_STATUSES = ['pending', 'confirmed', 'shipped'];
-const WELCOME_BONUS_TARGET = 5; // 5 orders
-const WELCOME_BONUS_AMOUNT = 100; // Tk 100
+const WELCOME_BONUS_TARGET = 5;
+const WELCOME_BONUS_AMOUNT = 100;
 const WELCOME_BONUS_DAYS = 30;
 
 function getStatusBadgeClass(status: string) {
@@ -82,10 +84,44 @@ function getStatusBadgeClass(status: string) {
   }
 }
 
+function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: 'অপেক্ষমাণ',
+    confirmed: 'কনফার্মড',
+    shipped: 'শিপড',
+    delivered: 'ডেলিভারড',
+    cancelled: 'বাতিল',
+    returned: 'ফেরত',
+  };
+  return labels[status.toLowerCase()] || status;
+}
+
 function formatDate(seconds?: number) {
   if (!seconds) return '—';
   const d = new Date(seconds * 1000);
-  return d.toLocaleDateString('bn-BD', { day: '2-digit', month: 'short' });
+  const months = [
+    'জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে',
+  ];
+  return `${d.getDate()} ${months[d.getMonth()]}`;
+}
+
+function getGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'শুভ সকাল';
+  if (hour < 17) return 'শুভ অপরাহ্ন';
+  if (hour < 20) return 'শুভ সন্ধ্যা';
+  return 'শুভ রাত্রি';
+}
+
+function getTodayFormatted() {
+  const d = new Date();
+  const months = [
+    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
+    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর',
+  ];
+  const days = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
+  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
 }
 
 export default function ResellerDashboard() {
@@ -93,12 +129,10 @@ export default function ResellerDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState<any>(null);
-
-  // Welcome bonus calculation
   const [bonusProgress, setBonusProgress] = useState(0);
   const [bonusAchieved, setBonusAchieved] = useState(false);
   const [bonusDaysLeft, setBonusDaysLeft] = useState(0);
+  const [bonusStartDate, setBonusStartDate] = useState<number>(0);
 
   useEffect(() => {
     const loadData = async () => {
@@ -109,13 +143,11 @@ export default function ResellerDashboard() {
       }
 
       try {
-        // Fetch user data
-        const { doc, getDoc } = await import('firebase/firestore');
+        // User data
         const userDoc = await getDoc(doc(db, 'users', uid));
         const userInfo = userDoc.exists() ? userDoc.data() : null;
-        setUserData(userInfo);
 
-        // Fetch products (for resellerPrice map)
+        // Products
         const productsSnap = await getDocs(collection(db, 'products'));
         const productMap: Record<string, number> = {};
         productsSnap.docs.forEach((p) => {
@@ -123,9 +155,12 @@ export default function ResellerDashboard() {
           productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
         });
 
-        // Featured products (first 6)
+        // Featured products — ONLY with image
         const activeProducts: Product[] = productsSnap.docs
-          .filter((d) => d.data().active === true)
+          .filter((d) => {
+            const data = d.data();
+            return data.active === true && typeof data.imageUrl === 'string' && data.imageUrl.length > 0;
+          })
           .slice(0, 6)
           .map((d) => {
             const data = d.data();
@@ -138,7 +173,7 @@ export default function ResellerDashboard() {
           });
         setFeaturedProducts(activeProducts);
 
-        // Fetch orders
+        // Orders
         const ordersQuery = query(collection(db, 'orders'), where('resellerId', '==', uid));
         const snapshot = await getDocs(ordersQuery);
         const fetchedOrders: Order[] = snapshot.docs.map((orderDocument) => {
@@ -163,7 +198,7 @@ export default function ResellerDashboard() {
           };
         });
 
-        // Fetch withdraws
+        // Withdraws
         const withdrawQuery = query(
           collection(db, 'withdrawRequests'),
           where('resellerId', '==', uid)
@@ -184,6 +219,12 @@ export default function ResellerDashboard() {
           .reduce((sum, order) => sum + order.actualProfit, 0);
         const availableBalance = actualProfit - totalWithdrawn;
 
+        // Today's stats
+        const now = new Date();
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+        const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
+        const todaySales = todayOrders.reduce((sum, o) => sum + o.total, 0);
+
         setOrders(fetchedOrders);
         setStats({
           totalOrders: fetchedOrders.length,
@@ -192,18 +233,19 @@ export default function ResellerDashboard() {
           totalSales,
           actualProfit,
           availableBalance: availableBalance > 0 ? availableBalance : 0,
+          todayOrders: todayOrders.length,
+          todaySales,
         });
 
-        // Calculate welcome bonus progress
+        // Welcome Bonus calc
         const userCreatedAt = userInfo?.createdAt?.seconds || 0;
-        const now = Math.floor(Date.now() / 1000);
+        setBonusStartDate(userCreatedAt);
+        const nowSec = Math.floor(Date.now() / 1000);
         const bonusDeadline = userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
-        const daysLeft = Math.max(0, Math.ceil((bonusDeadline - now) / (24 * 60 * 60)));
+        const daysLeft = Math.max(0, Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)));
         setBonusDaysLeft(daysLeft);
-
-        const deliveredCount = deliveredOrders;
-        setBonusProgress(Math.min(deliveredCount, WELCOME_BONUS_TARGET));
-        setBonusAchieved(deliveredCount >= WELCOME_BONUS_TARGET);
+        setBonusProgress(Math.min(deliveredOrders, WELCOME_BONUS_TARGET));
+        setBonusAchieved(deliveredOrders >= WELCOME_BONUS_TARGET);
       } finally {
         setLoading(false);
       }
@@ -237,65 +279,90 @@ export default function ResellerDashboard() {
     <Layout>
       <div className="mx-auto max-w-2xl">
         {/* ═══ GREETING ═══ */}
-        <div className="mb-4">
-          <p className="text-xs text-gray-500">স্বাগতম,</p>
-          <h1 className="mt-0.5 text-xl font-bold capitalize text-zeluxe-black">
-            {resellerName}
+        <div className="mb-5">
+          <div className="flex items-center gap-2 text-xs text-gray-500">
+            <Calendar size={12} />
+            <span>{getTodayFormatted()}</span>
+          </div>
+          <h1 className="mt-2 text-xl font-bold capitalize text-zeluxe-black">
+            {getGreeting()}, {resellerName}
           </h1>
+          <p className="mt-0.5 text-xs text-gray-500">
+            আজ আপনার ব্যবসার অবস্থা দেখে নিন
+          </p>
         </div>
 
-        {/* ═══ WELCOME BONUS TRACKER ═══ */}
+        {/* ═══ TODAY'S SNAPSHOT ═══ */}
+        {(stats.todayOrders > 0 || stats.todaySales > 0) && (
+          <div className="mb-4 rounded-lg border border-zeluxe-gold/30 bg-gradient-to-r from-zeluxe-gold/5 to-transparent p-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles size={14} className="text-zeluxe-gold" />
+                <span className="text-xs font-bold uppercase tracking-widest text-zeluxe-gold">
+                  আজকের হিসাব
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-gray-600">
+                  {stats.todayOrders}টি অর্ডার
+                </span>
+                <span className="font-bold text-zeluxe-black">
+                  Tk {stats.todaySales.toLocaleString()}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ═══ WELCOME BONUS ═══ */}
         {bonusAchieved ? (
-          <div className="mb-4 overflow-hidden rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-5">
+          <div className="mb-4 overflow-hidden rounded-lg border border-green-200 bg-gradient-to-br from-green-50 to-emerald-50 p-4">
             <div className="flex items-start gap-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500">
-                <CheckCircle className="text-white" size={24} />
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-500">
+                <CheckCircle className="text-white" size={22} />
               </span>
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-green-700">
-                    🎉 Welcome Bonus Unlocked
-                  </p>
-                </div>
-                <p className="mt-1 text-lg font-bold text-green-900">
-                  Tk {WELCOME_BONUS_AMOUNT} Bonus পেয়েছেন!
+                <p className="text-[10px] font-bold uppercase tracking-widest text-green-700">
+                  Welcome Bonus Unlocked
                 </p>
-                <p className="mt-1 text-xs text-green-700">
-                  আপনার প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার Delivered হয়েছে — ধন্যবাদ!
+                <p className="mt-1 text-base font-bold text-green-900">
+                  Tk {WELCOME_BONUS_AMOUNT} বোনাস পেয়েছেন
+                </p>
+                <p className="mt-0.5 text-[11px] text-green-700">
+                  প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার সফলভাবে ডেলিভার হয়েছে
                 </p>
               </div>
             </div>
           </div>
-        ) : (
-          <div className="mb-4 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-black to-gray-900 p-5 text-white">
+        ) : bonusDaysLeft > 0 && bonusStartDate > 0 ? (
+          <div className="mb-4 overflow-hidden rounded-lg bg-zeluxe-black p-4 text-white">
             <div className="flex items-start gap-3">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold/20">
-                <Gift className="text-zeluxe-gold" size={22} />
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold/20">
+                <Gift className="text-zeluxe-gold" size={20} />
               </span>
               <div className="flex-1">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
-                    Welcome Bonus
-                  </p>
-                  <p className="text-lg font-bold text-zeluxe-gold">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
+                      Welcome Bonus
+                    </p>
+                    <p className="mt-1 text-sm font-medium text-white">
+                      প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার ডেলিভার করলেই বোনাস
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-lg font-bold text-zeluxe-gold">
                     Tk {WELCOME_BONUS_AMOUNT}
                   </p>
                 </div>
-                <p className="mt-1.5 text-sm font-medium text-white">
-                  {WELCOME_BONUS_TARGET}টি অর্ডার Delivered করলেই Bonus!
-                </p>
 
-                {/* Progress bar */}
                 <div className="mt-3">
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-gray-300">
-                      {bonusProgress}/{WELCOME_BONUS_TARGET} Verified
+                      {bonusProgress}/{WELCOME_BONUS_TARGET} সম্পন্ন
                     </span>
-                    <span className="font-bold text-zeluxe-gold">
-                      {bonusPercent}%
-                    </span>
+                    <span className="font-bold text-zeluxe-gold">{bonusPercent}%</span>
                   </div>
-                  <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-white/10">
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                     <div
                       className="h-full bg-zeluxe-gold transition-all duration-500"
                       style={{ width: `${bonusPercent}%` }}
@@ -303,88 +370,41 @@ export default function ResellerDashboard() {
                   </div>
                 </div>
 
-                {bonusDaysLeft > 0 ? (
-                  <p className="mt-3 text-[11px] text-gray-400">
-                    ⏰ আর <strong className="text-zeluxe-gold">{bonusDaysLeft} দিন</strong> বাকি
-                  </p>
-                ) : (
-                  <p className="mt-3 text-[11px] text-red-400">
-                    সময় শেষ — এই অফার আর নেই
-                  </p>
-                )}
+                <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-2.5 text-[11px]">
+                  <span className="text-gray-400">
+                    শুরু: {formatDate(bonusStartDate)}
+                  </span>
+                  <span className="text-zeluxe-gold">
+                    বাকি <strong>{bonusDaysLeft} দিন</strong>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
-        )}
+        ) : null}
 
-        {/* ═══ QUICK ACTIONS ═══ */}
-        <div className="mb-4 grid grid-cols-4 gap-2">
-          <Link
-            to="/products"
-            className="flex flex-col items-center gap-1.5 rounded-lg border border-zeluxe-lightgray bg-white p-3 transition hover:border-zeluxe-gold"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
-              <Package className="text-blue-600" size={18} />
-            </span>
-            <span className="text-[10px] font-medium text-zeluxe-black">
-              প্রোডাক্ট
-            </span>
-          </Link>
-
-          <Link
-            to="/orders/new"
-            className="flex flex-col items-center gap-1.5 rounded-lg border border-zeluxe-lightgray bg-white p-3 transition hover:border-zeluxe-gold"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-green-50">
-              <Plus className="text-green-600" size={18} />
-            </span>
-            <span className="text-[10px] font-medium text-zeluxe-black">
-              নতুন অর্ডার
-            </span>
-          </Link>
-
-          <Link
-            to="/withdraw"
-            className="flex flex-col items-center gap-1.5 rounded-lg border border-zeluxe-lightgray bg-white p-3 transition hover:border-zeluxe-gold"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-gold/10">
-              <Wallet className="text-zeluxe-gold" size={18} />
-            </span>
-            <span className="text-[10px] font-medium text-zeluxe-black">
-              টাকা তুলুন
-            </span>
-          </Link>
-
-          <Link
-            to="/support"
-            className="flex flex-col items-center gap-1.5 rounded-lg border border-zeluxe-lightgray bg-white p-3 transition hover:border-zeluxe-gold"
-          >
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-purple-50">
-              <Headphones className="text-purple-600" size={18} />
-            </span>
-            <span className="text-[10px] font-medium text-zeluxe-black">
-              সাপোর্ট
-            </span>
-          </Link>
-        </div>
-
-        {/* ═══ BALANCE CARD ═══ */}
-        <div className="mb-4 rounded-lg border-2 border-zeluxe-gold bg-white p-4">
-          <div className="flex items-center justify-between">
+        {/* ═══ BALANCE (MONEY FIRST) ═══ */}
+        <div className="mb-5 rounded-lg border border-zeluxe-lightgray bg-white p-4">
+          <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-1.5">
-                <Wallet size={14} className="text-zeluxe-gold" />
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-zeluxe-gold/10">
+                  <Wallet size={12} className="text-zeluxe-gold" />
+                </span>
                 <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                   Available Balance
                 </p>
               </div>
-              <p className="mt-1.5 text-2xl font-bold text-zeluxe-black">
+              <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black">
                 Tk {stats.availableBalance.toLocaleString()}
+              </p>
+              <p className="mt-1 text-[11px] text-gray-500">
+                মোট আয় Tk {stats.actualProfit.toLocaleString()} থেকে
               </p>
             </div>
             <Link
               to="/withdraw"
-              className="flex items-center gap-1 rounded-md bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
+              className="flex items-center gap-1 rounded-md bg-zeluxe-black px-3.5 py-2.5 text-[11px] font-bold text-white transition hover:bg-gray-800"
             >
               Withdraw
               <ArrowRight size={12} />
@@ -392,10 +412,40 @@ export default function ResellerDashboard() {
           </div>
         </div>
 
+        {/* ═══ QUICK ACTIONS (BRAND CONSISTENT) ═══ */}
+        <div className="mb-5">
+          <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            Quick Actions
+          </p>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: 'প্রোডাক্ট', path: '/products', icon: Package },
+              { label: 'নতুন অর্ডার', path: '/orders/new', icon: Plus },
+              { label: 'আর্নিংস', path: '/earnings', icon: BarChart3 },
+              { label: 'সাপোর্ট', path: '/support', icon: Headphones },
+            ].map(({ label, path, icon: Icon }) => (
+              <Link
+                key={path}
+                to={path}
+                className="group flex flex-col items-center gap-1.5 rounded-lg border border-zeluxe-lightgray bg-white p-3 transition hover:border-zeluxe-gold"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-zeluxe-cream transition group-hover:bg-zeluxe-gold/20">
+                  <Icon className="text-zeluxe-gold" size={17} />
+                </span>
+                <span className="text-center text-[10px] font-medium text-zeluxe-black">
+                  {label}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+
         {/* ═══ MY PROGRESS ═══ */}
-        <div className="mb-4">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-zeluxe-black">My Progress</h2>
+        <div className="mb-5">
+          <div className="mb-2.5 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              My Progress
+            </p>
             <Link
               to="/earnings"
               className="flex items-center gap-0.5 text-[11px] font-medium text-zeluxe-gold hover:underline"
@@ -406,19 +456,22 @@ export default function ResellerDashboard() {
           </div>
 
           <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-lg border border-zeluxe-lightgray bg-white p-3">
+            <Link
+              to="/orders"
+              className="rounded-lg border border-zeluxe-lightgray bg-white p-3 transition hover:border-zeluxe-gold"
+            >
               <ShoppingBag className="text-zeluxe-gold" size={16} />
-              <p className="mt-2 text-lg font-bold text-zeluxe-black">
+              <p className="mt-2 text-xl font-bold tracking-tight text-zeluxe-black">
                 {stats.totalOrders}
               </p>
               <p className="text-[10px] uppercase tracking-wider text-gray-500">
                 Orders
               </p>
-            </div>
+            </Link>
 
             <div className="rounded-lg border border-zeluxe-lightgray bg-white p-3">
-              <TrendingUp className="text-green-600" size={16} />
-              <p className="mt-2 text-lg font-bold text-zeluxe-black">
+              <TrendingUp className="text-zeluxe-gold" size={16} />
+              <p className="mt-2 text-xl font-bold tracking-tight text-zeluxe-black">
                 Tk {stats.totalSales.toLocaleString()}
               </p>
               <p className="text-[10px] uppercase tracking-wider text-gray-500">
@@ -428,7 +481,7 @@ export default function ResellerDashboard() {
 
             <div className="rounded-lg border border-zeluxe-lightgray bg-white p-3">
               <Wallet className="text-zeluxe-gold" size={16} />
-              <p className="mt-2 text-lg font-bold text-zeluxe-black">
+              <p className="mt-2 text-xl font-bold tracking-tight text-zeluxe-black">
                 Tk {stats.actualProfit.toLocaleString()}
               </p>
               <p className="text-[10px] uppercase tracking-wider text-gray-500">
@@ -440,11 +493,11 @@ export default function ResellerDashboard() {
 
         {/* ═══ FEATURED PRODUCTS ═══ */}
         {featuredProducts.length > 0 && (
-          <div className="mb-4">
-            <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-zeluxe-black">
+          <div className="mb-5">
+            <div className="mb-2.5 flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                 Featured Products
-              </h2>
+              </p>
               <Link
                 to="/products"
                 className="flex items-center gap-0.5 text-[11px] font-medium text-zeluxe-gold hover:underline"
@@ -454,27 +507,21 @@ export default function ResellerDashboard() {
               </Link>
             </div>
 
-            <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-2">
+            <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-2">
               {featuredProducts.map((product) => (
                 <Link
                   key={product.id}
                   to={`/products/${product.id}`}
-                  className="min-w-[120px] overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold"
+                  className="min-w-[130px] overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold"
                 >
                   <div className="aspect-square bg-zeluxe-cream">
-                    {product.imageUrl ? (
-                      <img
-                        src={product.imageUrl}
-                        alt={product.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Package className="h-8 w-8 text-gray-300" />
-                      </div>
-                    )}
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
-                  <div className="p-2">
+                  <div className="p-2.5">
                     <p className="line-clamp-2 text-[11px] font-bold text-zeluxe-black">
                       {product.name}
                     </p>
@@ -488,21 +535,21 @@ export default function ResellerDashboard() {
           </div>
         )}
 
-        {/* ═══ REFER & EARN ═══ */}
-        <div className="mb-4 overflow-hidden rounded-lg border border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50 p-4">
+        {/* ═══ REFER & EARN (GOLD THEME) ═══ */}
+        <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4">
           <div className="flex items-start gap-3">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-purple-500">
-              <Users className="text-white" size={20} />
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold">
+              <Sparkles className="text-zeluxe-black" size={20} />
             </span>
             <div className="flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-purple-700">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
                 Refer & Earn
               </p>
-              <p className="mt-1 text-sm font-bold text-purple-900">
-                বন্ধুকে রিসেলার বানান, Bonus পান
+              <p className="mt-1 text-sm font-bold text-zeluxe-black">
+                বন্ধুকে রিসেলার বানান, বোনাস পান
               </p>
-              <p className="mt-1 text-[11px] text-purple-700">
-                শীঘ্রই আসছে — প্রতিটি successful referral-এ Tk 30 Bonus
+              <p className="mt-1 text-[11px] text-gray-600">
+                শীঘ্রই আসছে — প্রতিটি সফল referral-এ Tk 30 বোনাস
               </p>
             </div>
           </div>
@@ -510,8 +557,10 @@ export default function ResellerDashboard() {
 
         {/* ═══ RECENT ORDERS ═══ */}
         <section>
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-sm font-bold text-zeluxe-black">Recent Orders</h2>
+          <div className="mb-2.5 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              Recent Orders
+            </p>
             <Link
               to="/orders"
               className="flex items-center gap-0.5 text-[11px] font-medium text-zeluxe-gold hover:underline"
@@ -539,9 +588,9 @@ export default function ResellerDashboard() {
                       </p>
                       <div className="mt-1.5 flex items-center gap-2">
                         <span
-                          className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold capitalize ${getStatusBadgeClass(order.status)}`}
+                          className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(order.status)}`}
                         >
-                          {order.status}
+                          {getStatusLabel(order.status)}
                         </span>
                         <span className="text-[9px] text-gray-400">
                           {formatDate(order.createdAt?.seconds)}
@@ -557,15 +606,21 @@ export default function ResellerDashboard() {
             </div>
           ) : (
             <div className="rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-8 text-center">
-              <Package className="mx-auto h-10 w-10 text-gray-300" />
-              <p className="mt-3 text-xs text-gray-500">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
+                <Package className="h-6 w-6 text-zeluxe-gold" />
+              </div>
+              <p className="mt-3 text-sm font-bold text-zeluxe-black">
                 এখনো কোনো অর্ডার নেই
+              </p>
+              <p className="mt-1 text-xs text-gray-500">
+                প্রথম অর্ডার দিলেই Welcome Bonus-এর পথে এগোবেন
               </p>
               <Link
                 to="/products"
-                className="mt-3 inline-block rounded-md bg-zeluxe-black px-4 py-2 text-xs font-bold text-white"
+                className="mt-3 inline-flex items-center gap-1 rounded-md bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
               >
                 প্রোডাক্ট দেখুন
+                <ArrowRight size={12} />
               </Link>
             </div>
           )}
