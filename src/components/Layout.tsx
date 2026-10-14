@@ -19,7 +19,7 @@ import LogoutModal from './LogoutModal';
 
 // ═══ Horizontal Logo (Cloudinary) ═══
 const LOGO_URL =
-  'https://res.cloudinary.com/q1zrv81l/image/upload/e_trim,h_100,c_fit/v1792001963/file_00000000537882099a4733703efdbdd1.png';
+  'https://res.cloudinary.com/q1zrv81l/image/upload/e_make_transparent,h_100,c_fit/v1792003969/file_000000009da4820b95630d85ec992cbb.png';
 
 type LayoutProps = {
   children: ReactNode;
