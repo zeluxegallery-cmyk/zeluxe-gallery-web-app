@@ -1,5 +1,5 @@
-// Zeluxe Gallery Service Worker
-self.addEventListener('install', (event) => {
+// Zeluxe Gallery Reseller - Service Worker
+self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
@@ -8,5 +8,5 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', () => {
-  // Network-first — no caching for now
+  // Network-only — no caching for now
 });
