@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc, updateDoc } from 'firebase/firestore';
 import {
   Loader2,
   Package,
@@ -23,7 +23,13 @@ import {
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
-import { getReferralStats, buildReferralLink, REFERRAL_BONUS_AMOUNT } from '../lib/referral';
+import {
+  getReferralStats,
+  buildReferralLink,
+  REFERRAL_BONUS_AMOUNT,
+  generateUniqueReferralCode,
+  publishReferralCode,
+} from '../lib/referral';
 
 type Order = {
   id: string;
@@ -160,8 +166,36 @@ export default function ResellerDashboard() {
         const userDoc = await getDoc(doc(db, 'users', uid));
         const userInfo = userDoc.exists() ? userDoc.data() : null;
 
-        // Referral stats
-        const refStats = await getReferralStats(uid);
+        // ═══ REFERRAL STATS + AUTO-GENERATE FOR OLD USERS ═══
+        let refStats = await getReferralStats(uid);
+
+        // If user has no referral code (old user), generate one now
+        if (refStats && !refStats.referralCode) {
+          try {
+            const newCode = await generateUniqueReferralCode();
+            await updateDoc(doc(db, 'users', uid), {
+              referralCode: newCode,
+              referralCount: 0,
+              referralBonusEarned: 0,
+            });
+
+            // Also publish to public referralCodes collection
+            const userName =
+              (userInfo?.name as string) ||
+              auth.currentUser?.email?.split('@')[0] ||
+              'Reseller';
+            await publishReferralCode(uid, userName, newCode);
+
+            refStats = {
+              referralCode: newCode,
+              referralCount: 0,
+              referralBonusEarned: 0,
+            };
+          } catch (err) {
+            console.error('Failed to generate referral code:', err);
+          }
+        }
+
         if (refStats) setReferralInfo(refStats);
 
         // Products
@@ -169,7 +203,8 @@ export default function ResellerDashboard() {
         const productMap: Record<string, number> = {};
         productsSnap.docs.forEach((p) => {
           const data = p.data();
-          productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
+          productMap[p.id] =
+            typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
         });
 
         // Featured products — ONLY with image
@@ -189,18 +224,23 @@ export default function ResellerDashboard() {
               id: d.id,
               name: typeof data.name === 'string' ? data.name : 'Product',
               imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
-              resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+              resellerPrice:
+                typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
             };
           });
         setFeaturedProducts(activeProducts);
 
         // Orders
-        const ordersQuery = query(collection(db, 'orders'), where('resellerId', '==', uid));
+        const ordersQuery = query(
+          collection(db, 'orders'),
+          where('resellerId', '==', uid)
+        );
         const snapshot = await getDocs(ordersQuery);
         const fetchedOrders: Order[] = snapshot.docs.map((orderDocument) => {
           const data = orderDocument.data();
           const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
-          const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
+          const sellingPrice =
+            typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
           const resellerPrice = productMap[productId] || 0;
           const actualProfit = (sellingPrice - resellerPrice) * quantity;
@@ -208,7 +248,8 @@ export default function ResellerDashboard() {
           return {
             id: orderDocument.id,
             orderId: typeof data.orderId === 'string' ? data.orderId : orderDocument.id,
-            productName: typeof data.productName === 'string' ? data.productName : 'Product',
+            productName:
+              typeof data.productName === 'string' ? data.productName : 'Product',
             status: typeof data.status === 'string' ? data.status : 'pending',
             total: typeof data.total === 'number' ? data.total : 0,
             quantity,
@@ -228,13 +269,18 @@ export default function ResellerDashboard() {
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
           .filter((d) => d.status === 'approved' || d.status === 'paid')
-          .reduce((sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0), 0);
+          .reduce(
+            (sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0),
+            0
+          );
 
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
         const pendingOrders = fetchedOrders.filter((order) =>
           PENDING_STATUSES.includes(order.status)
         ).length;
-        const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered').length;
+        const deliveredOrders = fetchedOrders.filter(
+          (order) => order.status === 'delivered'
+        ).length;
         const actualProfit = fetchedOrders
           .filter((order) => order.status === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
@@ -242,8 +288,12 @@ export default function ResellerDashboard() {
 
         // Today
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
-        const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
+        const todayStart =
+          new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() /
+          1000;
+        const todayOrders = fetchedOrders.filter(
+          (o) => (o.createdAt?.seconds || 0) >= todayStart
+        );
         const todaySales = todayOrders.reduce((sum, o) => sum + o.total, 0);
 
         setOrders(fetchedOrders);
@@ -263,7 +313,10 @@ export default function ResellerDashboard() {
         setBonusStartDate(userCreatedAt);
         const nowSec = Math.floor(Date.now() / 1000);
         const bonusDeadline = userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
-        const daysLeft = Math.max(0, Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)));
+        const daysLeft = Math.max(
+          0,
+          Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60))
+        );
         setBonusDaysLeft(daysLeft);
         setBonusProgress(Math.min(deliveredOrders, WELCOME_BONUS_TARGET));
         setBonusAchieved(deliveredOrders >= WELCOME_BONUS_TARGET);
@@ -407,7 +460,9 @@ export default function ResellerDashboard() {
                     <span className="text-gray-300">
                       {bonusProgress}/{WELCOME_BONUS_TARGET} সম্পন্ন
                     </span>
-                    <span className="font-bold text-zeluxe-gold">{bonusPercent}%</span>
+                    <span className="font-bold text-zeluxe-gold">
+                      {bonusPercent}%
+                    </span>
                   </div>
                   <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                     <div
@@ -582,7 +637,7 @@ export default function ResellerDashboard() {
           </div>
         )}
 
-        {/* ═══ REFER & EARN (FUNCTIONAL) ═══ */}
+        {/* ═══ REFER & EARN ═══ */}
         {referralInfo && referralInfo.referralCode && (
           <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4">
             <div className="flex items-start gap-3">
@@ -661,8 +716,8 @@ export default function ResellerDashboard() {
                 </div>
 
                 <p className="mt-2.5 text-[10px] text-gray-500">
-                  💡 বন্ধু আপনার লিংক দিয়ে রেজিস্ট্রেশন করলে এবং অ্যাডমিন approve করলে আপনি Tk{' '}
-                  {REFERRAL_BONUS_AMOUNT} বোনাস পাবেন।
+                  💡 বন্ধু আপনার লিংক দিয়ে রেজিস্ট্রেশন করলে এবং অ্যাডমিন
+                  approve করলে আপনি Tk {REFERRAL_BONUS_AMOUNT} বোনাস পাবেন।
                 </p>
               </div>
             </div>
