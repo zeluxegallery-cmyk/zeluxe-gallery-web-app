@@ -12,6 +12,7 @@ import {
   Wallet,
   X,
   Headphones,
+  Gift,
 } from 'lucide-react';
 import { auth } from '../firebase';
 import BottomNav from './BottomNav';
@@ -38,6 +39,7 @@ const resellerNav: NavItem[] = [
   { label: 'My Orders', path: '/orders', icon: ShoppingBag },
   { label: 'Earnings', path: '/earnings', icon: TrendingUp },
   { label: 'টাকা তুলুন', path: '/withdraw', icon: Wallet },
+  { label: 'Refer & Earn', path: '/refer', icon: Gift },
   { label: 'সাপোর্ট', path: '/support', icon: Headphones },
   { label: 'Profile', path: '/profile', icon: User },
 ];
