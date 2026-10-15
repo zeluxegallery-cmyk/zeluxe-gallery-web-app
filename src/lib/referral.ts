@@ -1,16 +1,24 @@
-import { doc, getDoc, getDocs, collection, query, where, updateDoc } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  setDoc,
+  getDocs,
+  collection,
+  query,
+  where,
+  updateDoc,
+} from 'firebase/firestore';
 import { db } from '../firebase';
 
 // ═══════════════════════════════════════
 // CONSTANTS
 // ═══════════════════════════════════════
-export const REFERRAL_BONUS_AMOUNT = 30; // Tk per successful referral
+export const REFERRAL_BONUS_AMOUNT = 30;
 
-// Readable chars (no 0/O/1/I/L to avoid confusion)
 const CODE_CHARS = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 
 // ═══════════════════════════════════════
-// GENERATE UNIQUE REFERRAL CODE
+// GENERATE CODE
 // ═══════════════════════════════════════
 export function generateReferralCode(): string {
   let code = 'ZEL';
@@ -20,18 +28,15 @@ export function generateReferralCode(): string {
   return code;
 }
 
-// ═══════════════════════════════════════
-// CHECK IF CODE IS ALREADY TAKEN
-// ═══════════════════════════════════════
 async function isCodeTaken(code: string): Promise<boolean> {
-  const q = query(collection(db, 'users'), where('referralCode', '==', code));
-  const snap = await getDocs(q);
-  return !snap.empty;
+  try {
+    const snap = await getDoc(doc(db, 'referralCodes', code));
+    return snap.exists();
+  } catch {
+    return false;
+  }
 }
 
-// ═══════════════════════════════════════
-// GENERATE UNIQUE CODE (retry if taken)
-// ═══════════════════════════════════════
 export async function generateUniqueReferralCode(): Promise<string> {
   let attempts = 0;
   while (attempts < 10) {
@@ -40,35 +45,53 @@ export async function generateUniqueReferralCode(): Promise<string> {
     if (!taken) return code;
     attempts++;
   }
-  // Fallback: timestamp-based
   return `ZEL${Date.now().toString(36).toUpperCase().slice(-5)}`;
 }
 
 // ═══════════════════════════════════════
-// FIND REFERRER BY CODE
+// PUBLISH CODE (public collection)
 // ═══════════════════════════════════════
-export async function findReferrerByCode(code: string): Promise<{
-  uid: string;
-  name: string;
-} | null> {
+export async function publishReferralCode(
+  uid: string,
+  name: string,
+  code: string
+): Promise<boolean> {
+  try {
+    await setDoc(doc(db, 'referralCodes', code), {
+      uid,
+      name,
+      createdAt: new Date().toISOString(),
+    });
+    return true;
+  } catch (err) {
+    console.error('Failed to publish referral code:', err);
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════
+// FIND REFERRER BY CODE (public read)
+// ═══════════════════════════════════════
+export async function findReferrerByCode(
+  code: string
+): Promise<{ uid: string; name: string } | null> {
   if (!code || code.trim().length === 0) return null;
 
   const normalizedCode = code.trim().toUpperCase();
 
-  const q = query(
-    collection(db, 'users'),
-    where('referralCode', '==', normalizedCode)
-  );
-  const snap = await getDocs(q);
+  try {
+    const snap = await getDoc(doc(db, 'referralCodes', normalizedCode));
+    if (!snap.exists()) return null;
 
-  if (snap.empty) return null;
-
-  const doc = snap.docs[0];
-  const data = doc.data();
-  return {
-    uid: doc.id,
-    name: typeof data.name === 'string' ? data.name : 'Reseller',
-  };
+    const data = snap.data();
+    return {
+      uid: typeof data.uid === 'string' ? data.uid : '',
+      name: typeof data.name === 'string' ? data.name : 'Reseller',
+    };
+  } catch (err) {
+    console.error('Failed to find referrer:', err);
+    return null;
+  }
 }
 
 // ═══════════════════════════════════════
@@ -80,12 +103,13 @@ export async function creditReferrer(referrerUid: string): Promise<boolean> {
   try {
     const referrerRef = doc(db, 'users', referrerUid);
     const referrerSnap = await getDoc(referrerRef);
-
     if (!referrerSnap.exists()) return false;
 
     const data = referrerSnap.data();
-    const currentBonus = typeof data.referralBonusEarned === 'number' ? data.referralBonusEarned : 0;
-    const currentCount = typeof data.referralCount === 'number' ? data.referralCount : 0;
+    const currentBonus =
+      typeof data.referralBonusEarned === 'number' ? data.referralBonusEarned : 0;
+    const currentCount =
+      typeof data.referralCount === 'number' ? data.referralCount : 0;
 
     await updateDoc(referrerRef, {
       referralBonusEarned: currentBonus + REFERRAL_BONUS_AMOUNT,
@@ -101,7 +125,7 @@ export async function creditReferrer(referrerUid: string): Promise<boolean> {
 }
 
 // ═══════════════════════════════════════
-// GET USER'S REFERRAL STATS
+// GET USER REFERRAL STATS
 // ═══════════════════════════════════════
 export async function getReferralStats(uid: string): Promise<{
   referralCode: string;
@@ -114,9 +138,14 @@ export async function getReferralStats(uid: string): Promise<{
 
     const data = userSnap.data();
     return {
-      referralCode: typeof data.referralCode === 'string' ? data.referralCode : '',
-      referralCount: typeof data.referralCount === 'number' ? data.referralCount : 0,
-      referralBonusEarned: typeof data.referralBonusEarned === 'number' ? data.referralBonusEarned : 0,
+      referralCode:
+        typeof data.referralCode === 'string' ? data.referralCode : '',
+      referralCount:
+        typeof data.referralCount === 'number' ? data.referralCount : 0,
+      referralBonusEarned:
+        typeof data.referralBonusEarned === 'number'
+          ? data.referralBonusEarned
+          : 0,
     };
   } catch (err) {
     console.error('Failed to load referral stats:', err);
@@ -125,7 +154,7 @@ export async function getReferralStats(uid: string): Promise<{
 }
 
 // ═══════════════════════════════════════
-// GENERATE REFERRAL LINK
+// BUILD REFERRAL LINK
 // ═══════════════════════════════════════
 export function buildReferralLink(code: string): string {
   const baseUrl = 'https://zeluxe-gallery-web-app.vercel.app';
