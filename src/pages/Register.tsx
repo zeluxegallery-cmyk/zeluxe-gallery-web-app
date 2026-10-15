@@ -4,7 +4,11 @@ import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Check, X, User as UserIcon } from 'lucide-react';
 import { auth, db } from '../firebase';
-import { findReferrerByCode, generateUniqueReferralCode } from '../lib/referral';
+import {
+  findReferrerByCode,
+  generateUniqueReferralCode,
+  publishReferralCode,
+} from '../lib/referral';
 
 const inputClass =
   'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none';
@@ -90,7 +94,11 @@ export default function Register() {
     setLoading(true);
     try {
       // 1. Create Firebase Auth user
-      const { user } = await createUserWithEmailAndPassword(auth, email.trim(), password);
+      const { user } = await createUserWithEmailAndPassword(
+        auth,
+        email.trim(),
+        password
+      );
 
       // 2. Generate own referral code
       const ownReferralCode = await generateUniqueReferralCode();
@@ -119,7 +127,10 @@ export default function Register() {
       // 5. Save to Firestore
       await setDoc(doc(db, 'users', user.uid), userData);
 
-      // 6. Navigate to membership payment
+      // 6. Publish referral code to public collection
+      await publishReferralCode(user.uid, name.trim(), ownReferralCode);
+
+      // 7. Navigate to membership payment
       navigate('/membership');
     } catch (err: any) {
       const code = err?.code || '';
@@ -299,7 +310,10 @@ export default function Register() {
               />
               <span className="text-xs text-gray-600">
                 আমি{' '}
-                <Link to="/legal" className="font-medium text-zeluxe-gold hover:underline">
+                <Link
+                  to="/legal"
+                  className="font-medium text-zeluxe-gold hover:underline"
+                >
                   শর্তাবলী ও প্রাইভেসি পলিসি
                 </Link>{' '}
                 পড়েছি এবং সম্মত আছি।
@@ -324,7 +338,10 @@ export default function Register() {
 
           <p className="mt-6 text-center text-sm text-gray-600">
             আগেই অ্যাকাউন্ট আছে?{' '}
-            <Link to="/login" className="font-semibold text-zeluxe-gold hover:underline">
+            <Link
+              to="/login"
+              className="font-semibold text-zeluxe-gold hover:underline"
+            >
               লগইন করুন
             </Link>
           </p>
