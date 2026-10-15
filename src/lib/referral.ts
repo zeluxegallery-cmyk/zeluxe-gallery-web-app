@@ -95,6 +95,32 @@ export async function findReferrerByCode(
 }
 
 // ═══════════════════════════════════════
+// LEADERBOARD UPDATE
+// ═══════════════════════════════════════
+async function updateLeaderboard(
+  uid: string,
+  name: string,
+  count: number,
+  earned: number
+): Promise<void> {
+  try {
+    await setDoc(
+      doc(db, 'leaderboard', uid),
+      {
+        uid,
+        name,
+        referralCount: count,
+        referralBonusEarned: earned,
+        lastUpdated: new Date().toISOString(),
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.error('Failed to update leaderboard:', err);
+  }
+}
+
+// ═══════════════════════════════════════
 // CREDIT REFERRER ON APPROVAL
 // ═══════════════════════════════════════
 export async function creditReferrer(referrerUid: string): Promise<boolean> {
@@ -111,11 +137,18 @@ export async function creditReferrer(referrerUid: string): Promise<boolean> {
     const currentCount =
       typeof data.referralCount === 'number' ? data.referralCount : 0;
 
+    const newBonus = currentBonus + REFERRAL_BONUS_AMOUNT;
+    const newCount = currentCount + 1;
+
     await updateDoc(referrerRef, {
-      referralBonusEarned: currentBonus + REFERRAL_BONUS_AMOUNT,
-      referralCount: currentCount + 1,
+      referralBonusEarned: newBonus,
+      referralCount: newCount,
       lastReferralAt: new Date().toISOString(),
     });
+
+    // Update leaderboard with new stats
+    const referrerName = typeof data.name === 'string' ? data.name : 'Reseller';
+    await updateLeaderboard(referrerUid, referrerName, newCount, newBonus);
 
     return true;
   } catch (err) {
@@ -150,6 +183,48 @@ export async function getReferralStats(uid: string): Promise<{
   } catch (err) {
     console.error('Failed to load referral stats:', err);
     return null;
+  }
+}
+
+// ═══════════════════════════════════════
+// GET TOP REFERRERS (for leaderboard)
+// ═══════════════════════════════════════
+export async function getTopReferrers(limit: number = 10): Promise<
+  {
+    uid: string;
+    name: string;
+    referralCount: number;
+    referralBonusEarned: number;
+  }[]
+> {
+  try {
+    const snap = await getDocs(collection(db, 'leaderboard'));
+    const list = snap.docs.map((d) => {
+      const data = d.data();
+      return {
+        uid: d.id,
+        name: typeof data.name === 'string' ? data.name : 'Reseller',
+        referralCount:
+          typeof data.referralCount === 'number' ? data.referralCount : 0,
+        referralBonusEarned:
+          typeof data.referralBonusEarned === 'number'
+            ? data.referralBonusEarned
+            : 0,
+      };
+    });
+
+    // Sort by referralCount desc, then by earned
+    list.sort((a, b) => {
+      if (b.referralCount !== a.referralCount) {
+        return b.referralCount - a.referralCount;
+      }
+      return b.referralBonusEarned - a.referralBonusEarned;
+    });
+
+    return list.slice(0, limit);
+  } catch (err) {
+    console.error('Failed to load leaderboard:', err);
+    return [];
   }
 }
 
