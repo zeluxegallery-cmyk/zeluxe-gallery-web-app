@@ -56,6 +56,7 @@ type Stats = {
   availableBalance: number;
   todayOrders: number;
   todaySales: number;
+  referralBonus: number;
 };
 
 type ReferralInfo = {
@@ -73,6 +74,7 @@ const initialStats: Stats = {
   availableBalance: 0,
   todayOrders: 0,
   todaySales: 0,
+  referralBonus: 0,
 };
 
 const PENDING_STATUSES = ['pending', 'confirmed', 'shipped'];
@@ -276,7 +278,15 @@ export default function ResellerDashboard() {
         const actualProfit = fetchedOrders
           .filter((order) => order.status === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
-        const availableBalance = actualProfit - totalWithdrawn;
+
+        // ═══ Referral Bonus (added to balance) ═══
+        const referralBonus =
+          typeof userInfo?.referralBonusEarned === 'number'
+            ? userInfo.referralBonusEarned
+            : 0;
+
+        // ═══ Available Balance = Order Profit + Referral Bonus - Withdrawn ═══
+        const availableBalance = actualProfit + referralBonus - totalWithdrawn;
 
         const now = new Date();
         const todayStart =
@@ -297,6 +307,7 @@ export default function ResellerDashboard() {
           availableBalance: availableBalance > 0 ? availableBalance : 0,
           todayOrders: todayOrders.length,
           todaySales,
+          referralBonus,
         });
 
         const userCreatedAt = userInfo?.createdAt?.seconds || 0;
@@ -462,9 +473,19 @@ export default function ResellerDashboard() {
               <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black">
                 Tk {stats.availableBalance.toLocaleString()}
               </p>
-              <p className="mt-1 text-[11px] text-gray-500">
-                মোট আয় Tk {stats.actualProfit.toLocaleString()} থেকে
-              </p>
+              <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                <span className="text-gray-500">
+                  Order Profit: Tk {stats.actualProfit.toLocaleString()}
+                </span>
+                {stats.referralBonus > 0 && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <span className="font-bold text-green-600">
+                      Referral: +Tk {stats.referralBonus.toLocaleString()}
+                    </span>
+                  </>
+                )}
+              </div>
             </div>
             <Link
               to="/withdraw"
