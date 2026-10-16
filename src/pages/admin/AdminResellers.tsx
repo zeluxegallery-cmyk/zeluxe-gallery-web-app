@@ -9,6 +9,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { Eye, Loader2, Search, Trash2, UserCheck, Users, X } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
@@ -77,6 +78,9 @@ export default function AdminResellers() {
           };
         }),
       );
+    } catch (err) {
+      console.error('Failed to load resellers:', err);
+      toast.error('রিসেলার লোড করতে সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
     }
@@ -93,10 +97,11 @@ export default function AdminResellers() {
         accountStatus: 'active',
         membershipStatus: 'approved',
       });
+      toast.success(`✓ ${reseller.name} কে activate করা হয়েছে।`);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Activate failed.';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -104,10 +109,11 @@ export default function AdminResellers() {
     if (!window.confirm(`Suspend ${reseller.name}?`)) return;
     try {
       await updateDoc(doc(db, 'users', reseller.id), { accountStatus: 'suspended' });
+      toast.success(`✓ ${reseller.name} কে suspend করা হয়েছে।`);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Suspend failed.';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -116,10 +122,11 @@ export default function AdminResellers() {
     if (!window.confirm(`Are you absolutely sure? This permanently removes the reseller record.`)) return;
     try {
       await deleteDoc(doc(db, 'users', reseller.id));
+      toast.success(`✓ ${reseller.name} কে ডিলিট করা হয়েছে।`);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Delete failed.';
-      alert(message);
+      toast.error(message);
     }
   };
 
