@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { sendPasswordResetEmail } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { auth } from '../firebase';
 import logo from '../assets/zeluxe-logo.png';
 
@@ -35,6 +36,7 @@ export default function ForgotPassword() {
 
     if (!email.trim()) {
       setError('ইমেইল দিন।');
+      toast.error('ইমেইল দিন।');
       return;
     }
 
@@ -42,8 +44,11 @@ export default function ForgotPassword() {
     try {
       await sendPasswordResetEmail(auth, email.trim());
       setSuccess(true);
+      toast.success('✓ রিসেট লিংক পাঠানো হয়েছে। ইমেইল চেক করুন।');
     } catch (err: any) {
-      setError(getBengaliError(err));
+      const errorMessage = getBengaliError(err);
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
