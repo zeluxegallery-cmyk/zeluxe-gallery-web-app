@@ -10,6 +10,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { Eye, Loader2, Search, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
@@ -112,10 +113,11 @@ export default function AdminOrders() {
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
       await updateDoc(doc(db, 'orders', id), { status: newStatus });
+      toast.success(`✓ অর্ডার স্ট্যাটাস "${newStatus}" এ আপডেট হয়েছে।`);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Update failed.';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -123,10 +125,11 @@ export default function AdminOrders() {
     if (!window.confirm(`Delete order "${order.orderId}"? This cannot be undone.`)) return;
     try {
       await deleteDoc(doc(db, 'orders', order.id));
+      toast.success(`✓ অর্ডার "${order.orderId}" ডিলিট হয়েছে।`);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Delete failed.';
-      alert(message);
+      toast.error(message);
     }
   };
 
@@ -200,7 +203,7 @@ export default function AdminOrders() {
                 <td className="px-4 py-3 font-mono text-xs text-zeluxe-black">{order.orderId}</td>
                 <td className="px-4 py-3 text-zeluxe-black">{order.customerName}</td>
                 <td className="px-4 py-3 text-zeluxe-gray">{order.resellerName}</td>
-                <td className="px-4 py-3 font-bold text-zeluxe-gold">৳{order.total.toLocaleString()}</td>
+                <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</td>
                 <td className="px-4 py-3">
                   <select
                     value={order.status}
@@ -261,7 +264,7 @@ export default function AdminOrders() {
             <p className="mt-2 font-medium text-zeluxe-black">{order.customerName}</p>
             <p className="text-xs text-zeluxe-gray">{order.resellerName}</p>
             <div className="mt-2 flex items-center justify-between">
-              <span className="font-bold text-zeluxe-gold">৳{order.total.toLocaleString()}</span>
+              <span className="font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</span>
               <select
                 value={order.status}
                 onChange={(e) => handleStatusChange(order.id, e.target.value)}
