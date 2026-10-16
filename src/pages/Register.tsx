@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Loader2, Check, X, User as UserIcon } from 'lucide-react';
+import { toast } from 'sonner';
 import { auth, db } from '../firebase';
 import {
   findReferrerByCode,
@@ -72,22 +73,27 @@ export default function Register() {
     // Validation
     if (!name.trim() || !phone.trim() || !email.trim() || !password) {
       setError('সব প্রয়োজনীয় তথ্য দিন।');
+      toast.error('সব প্রয়োজনীয় তথ্য দিন।');
       return;
     }
     if (phone.trim().length !== 11) {
       setError('মোবাইল নাম্বার ১১ সংখ্যার হতে হবে।');
+      toast.error('মোবাইল নাম্বার ১১ সংখ্যার হতে হবে।');
       return;
     }
     if (password.length < 6) {
       setError('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
+      toast.error('পাসওয়ার্ড কমপক্ষে ৬ অক্ষরের হতে হবে।');
       return;
     }
     if (password !== confirmPassword) {
       setError('দুইটা পাসওয়ার্ড একই হতে হবে।');
+      toast.error('দুইটা পাসওয়ার্ড একই হতে হবে।');
       return;
     }
     if (!agreed) {
       setError('শর্তাবলীতে সম্মত হতে হবে।');
+      toast.error('শর্তাবলীতে সম্মত হতে হবে।');
       return;
     }
 
@@ -130,11 +136,16 @@ export default function Register() {
       // 6. Publish referral code to public collection
       await publishReferralCode(user.uid, name.trim(), ownReferralCode);
 
-      // 7. Navigate to membership payment
+      // 7. Show success toast
+      toast.success('অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে!');
+
+      // 8. Navigate to membership payment
       navigate('/membership');
     } catch (err: any) {
       const code = err?.code || '';
-      setError(getBengaliError(code));
+      const errorMessage = getBengaliError(code);
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
