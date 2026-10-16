@@ -15,6 +15,7 @@ import {
   MessageCircle,
   Facebook,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -95,6 +96,9 @@ export default function Refer() {
         // Load leaderboard
         const top = await getTopReferrers(10);
         setLeaderboard(top);
+      } catch (err) {
+        console.error('Failed to load referral data:', err);
+        toast.error('রেফারেল ডেটা লোড করতে সমস্যা হয়েছে।');
       } finally {
         setLoading(false);
       }
@@ -108,9 +112,10 @@ export default function Refer() {
     try {
       await navigator.clipboard.writeText(referralInfo.referralCode);
       setCodeCopied(true);
+      toast.success('✓ Referral code কপি হয়েছে!');
       setTimeout(() => setCodeCopied(false), 2000);
     } catch {
-      alert('কপি করা যায়নি');
+      toast.error('কপি করা যায়নি');
     }
   };
 
@@ -120,16 +125,17 @@ export default function Refer() {
       const link = buildReferralLink(referralInfo.referralCode);
       await navigator.clipboard.writeText(link);
       setLinkCopied(true);
+      toast.success('✓ Referral link কপি হয়েছে!');
       setTimeout(() => setLinkCopied(false), 2000);
     } catch {
-      alert('কপি করা যায়নি');
+      toast.error('কপি করা যায়নি');
     }
   };
 
   const handleWhatsAppShare = () => {
     if (!referralInfo?.referralCode) return;
     const link = buildReferralLink(referralInfo.referralCode);
-    const message = `🎁 Zeluxe Gallery-তে রিসেলার হয়ে নিজের ব্যবসা শুরু করুন!\n\nশূন্য ইনভেস্টমেন্টে, মাত্র ৳99 এককালীন মেম্বারশিপ ফি।\n\nআমার রেফারেল লিংক:\n${link}`;
+    const message = `🎁 Zeluxe Gallery-তে রিসেলার হয়ে নিজের ব্যবসা শুরু করুন!\n\nশূন্য ইনভেস্টমেন্টে, মাত্র Tk 99 এককালীন মেম্বারশিপ ফি।\n\nআমার রেফারেল লিংক:\n${link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -326,7 +332,7 @@ export default function Refer() {
               },
               {
                 num: '৩',
-                text: 'বন্ধু ৳99 payment submit করবে',
+                text: 'বন্ধু Tk 99 payment submit করবে',
               },
               {
                 num: '৪',
