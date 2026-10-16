@@ -8,6 +8,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { CheckCircle, Loader2, XCircle, Clock, Wallet } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
@@ -47,7 +48,7 @@ export default function AdminWithdrawals() {
       setWithdrawals(list);
     } catch (err) {
       console.error('Load failed:', err);
-      alert('Withdraw load করতে সমস্যা: ' + (err instanceof Error ? err.message : 'Unknown'));
+      toast.error('Withdraw load করতে সমস্যা: ' + (err instanceof Error ? err.message : 'Unknown'));
     } finally {
       setLoading(false);
     }
@@ -56,15 +57,16 @@ export default function AdminWithdrawals() {
   useEffect(() => { loadData(); }, []);
 
   const handleApprove = async (w: Withdrawal) => {
-    if (!window.confirm(`৳${w.amount} approve করবেন?`)) return;
+    if (!window.confirm(`Tk ${w.amount} approve করবেন?`)) return;
     try {
       await updateDoc(doc(db, 'withdrawRequests', w.id), {
         status: 'approved',
         processedAt: serverTimestamp(),
       });
+      toast.success(`✓ Tk ${w.amount} approve করা হয়েছে।`);
       await loadData();
     } catch (err) {
-      alert('Approve failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+      toast.error('Approve failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   };
 
@@ -77,22 +79,24 @@ export default function AdminWithdrawals() {
         note: reason,
         processedAt: serverTimestamp(),
       });
+      toast.success(`✓ Tk ${w.amount} reject করা হয়েছে।`);
       await loadData();
     } catch (err) {
-      alert('Reject failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+      toast.error('Reject failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   };
 
   const handleMarkPaid = async (w: Withdrawal) => {
-    if (!window.confirm(`৳${w.amount} ${w.method}-এ পাঠানো হয়েছে?`)) return;
+    if (!window.confirm(`Tk ${w.amount} ${w.method}-এ পাঠানো হয়েছে?`)) return;
     try {
       await updateDoc(doc(db, 'withdrawRequests', w.id), {
         status: 'paid',
         paidAt: serverTimestamp(),
       });
+      toast.success(`✓ Tk ${w.amount} mark as paid হয়েছে।`);
       await loadData();
     } catch (err) {
-      alert('Update failed: ' + (err instanceof Error ? err.message : 'Unknown'));
+      toast.error('Update failed: ' + (err instanceof Error ? err.message : 'Unknown'));
     }
   };
 
@@ -152,15 +156,15 @@ export default function AdminWithdrawals() {
       <div className="mb-6 grid grid-cols-3 gap-3">
         <div className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
           <p className="text-xs uppercase text-gray-500">Pending</p>
-          <p className="mt-1 text-xl font-bold text-yellow-600">৳{totalPending.toFixed(0)}</p>
+          <p className="mt-1 text-xl font-bold text-yellow-600">Tk {totalPending.toFixed(0)}</p>
         </div>
         <div className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
           <p className="text-xs uppercase text-gray-500">Approved</p>
-          <p className="mt-1 text-xl font-bold text-blue-600">৳{totalApproved.toFixed(0)}</p>
+          <p className="mt-1 text-xl font-bold text-blue-600">Tk {totalApproved.toFixed(0)}</p>
         </div>
         <div className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
           <p className="text-xs uppercase text-gray-500">Paid</p>
-          <p className="mt-1 text-xl font-bold text-green-600">৳{totalPaid.toFixed(0)}</p>
+          <p className="mt-1 text-xl font-bold text-green-600">Tk {totalPaid.toFixed(0)}</p>
         </div>
       </div>
 
@@ -206,7 +210,7 @@ export default function AdminWithdrawals() {
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-xl font-bold text-zeluxe-gold">৳{w.amount}</p>
+                  <p className="text-xl font-bold text-zeluxe-gold">Tk {w.amount}</p>
                 </div>
               </div>
 
