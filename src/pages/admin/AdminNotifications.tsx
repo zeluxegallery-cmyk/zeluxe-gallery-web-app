@@ -10,6 +10,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { Bell, Loader2, Send } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
@@ -104,7 +105,7 @@ export default function AdminNotifications() {
 
   const handleSend = async () => {
     if (!title.trim() || !message.trim()) {
-      alert('Title and message are required.');
+      toast.error('Title এবং Message দুটোই দিতে হবে।');
       return;
     }
 
@@ -112,7 +113,7 @@ export default function AdminNotifications() {
     try {
       if (recipientType === 'specific') {
         if (!selectedUser) {
-          alert('Select a reseller.');
+          toast.error('একজন রিসেলার সিলেক্ট করুন।');
           setSending(false);
           return;
         }
@@ -123,6 +124,7 @@ export default function AdminNotifications() {
           read: false,
           createdAt: serverTimestamp(),
         });
+        toast.success('✓ নির্দিষ্ট রিসেলারকে নোটিফিকেশন পাঠানো হয়েছে।');
       } else {
         for (const reseller of resellers) {
           await addDoc(collection(db, 'notifications'), {
@@ -133,14 +135,15 @@ export default function AdminNotifications() {
             createdAt: serverTimestamp(),
           });
         }
+        toast.success(`✓ ${resellers.length} জন রিসেলারকে নোটিফিকেশন পাঠানো হয়েছে।`);
       }
       setTitle('');
       setMessage('');
       setSelectedUser('');
       await loadData();
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Send failed.';
-      alert(message);
+      const msg = err instanceof Error ? err.message : 'Send failed.';
+      toast.error(msg);
     } finally {
       setSending(false);
     }
