@@ -137,7 +137,7 @@ export default function Orders() {
                     <td className="px-4 py-3 font-mono text-xs text-zeluxe-black">{order.orderId}</td>
                     <td className="px-4 py-3 text-zeluxe-black">{order.customerName}</td>
                     <td className="px-4 py-3 text-zeluxe-gray">{formatDate(order.createdAt?.seconds)}</td>
-                    <td className="px-4 py-3 font-bold text-zeluxe-gold">৳{order.total.toLocaleString()}</td>
+                    <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block rounded-full px-2 py-1 text-xs font-bold capitalize ${getStatusClass(order.status)}`}
@@ -169,7 +169,7 @@ export default function Orders() {
                 <p className="mt-2 font-bold text-zeluxe-black">{order.customerName}</p>
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-xs text-gray-500">{formatDate(order.createdAt?.seconds)}</span>
-                  <span className="font-bold text-zeluxe-gold">৳{order.total.toLocaleString()}</span>
+                  <span className="font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</span>
                 </div>
               </div>
             ))}
