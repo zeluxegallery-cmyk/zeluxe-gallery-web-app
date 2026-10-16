@@ -18,6 +18,7 @@ import {
   Users,
   Gift,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminLayout from '../components/AdminLayout';
 import { db } from '../firebase';
 import { creditReferrer, REFERRAL_BONUS_AMOUNT } from '../lib/referral';
@@ -106,6 +107,7 @@ export default function AdminMemberships() {
       setRequests(list);
     } catch (err) {
       console.error('Failed to load membership requests:', err);
+      toast.error('Request লোড করতে সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
     }
@@ -139,9 +141,11 @@ export default function AdminMemberships() {
         }
       }
 
+      toast.success(`✓ ${req.name} এর membership approve হয়েছে!`);
       await loadRequests();
     } catch (err) {
-      alert('Approve failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error('Approve failed: ' + message);
     } finally {
       setProcessingId(null);
     }
@@ -160,9 +164,11 @@ export default function AdminMemberships() {
         reason,
         rejectedAt: serverTimestamp(),
       });
+      toast.success(`✓ ${req.name} এর membership reject হয়েছে।`);
       await loadRequests();
     } catch (err) {
-      alert('Reject failed: ' + (err instanceof Error ? err.message : 'Unknown error'));
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      toast.error('Reject failed: ' + message);
     } finally {
       setProcessingId(null);
     }
