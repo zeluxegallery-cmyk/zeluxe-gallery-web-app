@@ -9,6 +9,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { FolderTree, Loader2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
@@ -110,6 +111,9 @@ export default function AdminCategories() {
           return { id: catDoc.id, name, imageUrl, productCount };
         }),
       );
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      toast.error('ক্যাটাগরি লোড করতে সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
     }
@@ -136,16 +140,20 @@ export default function AdminCategories() {
     try {
       const url = await uploadImageToCloudinary(file);
       setForm((prev) => ({ ...prev, imageUrl: url }));
+      toast.success('✓ ছবি আপলোড হয়েছে।');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Upload failed.';
-      alert(message);
+      toast.error(message);
     } finally {
       setUploading(false);
     }
   };
 
   const handleSave = async () => {
-    if (!form.name.trim()) return;
+    if (!form.name.trim()) {
+      toast.error('ক্যাটাগরির নাম দিতে হবে।');
+      return;
+    }
     setSaving(true);
     try {
       const payload = {
@@ -154,14 +162,16 @@ export default function AdminCategories() {
       };
       if (editingId) {
         await updateDoc(doc(db, 'categories', editingId), payload);
+        toast.success('✓ ক্যাটাগরি আপডেট হয়েছে!');
       } else {
         await addDoc(collection(db, 'categories'), { ...payload, createdAt: serverTimestamp() });
+        toast.success('✓ নতুন ক্যাটাগরি যোগ হয়েছে!');
       }
       setModalOpen(false);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Save failed.';
-      alert(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -171,10 +181,11 @@ export default function AdminCategories() {
     if (!window.confirm(`Delete category "${cat.name}"?`)) return;
     try {
       await deleteDoc(doc(db, 'categories', cat.id));
+      toast.success(`✓ "${cat.name}" ডিলিট হয়েছে।`);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Delete failed.';
-      alert(message);
+      toast.error(message);
     }
   };
 
