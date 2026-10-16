@@ -21,6 +21,7 @@ import {
   Gift,
   ArrowRight,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
@@ -105,15 +106,21 @@ export default function Withdraw() {
     const amt = Number(amount);
 
     if (!amt || amt < MIN_WITHDRAW) {
-      setError(`সর্বনিম্ন Tk ${MIN_WITHDRAW} তুলতে পারবেন।`);
+      const msg = `সর্বনিম্ন Tk ${MIN_WITHDRAW} তুলতে পারবেন।`;
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (amt > availableBalance) {
-      setError('Available Balance এর চেয়ে বেশি তুলতে পারবেন না।');
+      const msg = 'Available Balance এর চেয়ে বেশি তুলতে পারবেন না।';
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (!/^\d{11}$/.test(accountNumber)) {
-      setError('১১ ডিজিটের সঠিক মোবাইল নাম্বার দিন।');
+      const msg = '১১ ডিজিটের সঠিক মোবাইল নাম্বার দিন।';
+      setError(msg);
+      toast.error(msg);
       return;
     }
     if (!auth.currentUser) return;
@@ -132,10 +139,12 @@ export default function Withdraw() {
       });
       setAmount('');
       setAccountNumber('');
-      alert('✓ Withdraw request জমা হয়েছে। Admin যাচাই করে approve করবে।');
+      toast.success('✓ Withdraw request জমা হয়েছে। Admin যাচাই করে approve করবে।');
       await loadData();
     } catch (err: any) {
-      setError(err?.message || 'Request পাঠানো যায়নি।');
+      const msg = err?.message || 'Request পাঠানো যায়নি।';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSubmitting(false);
     }
