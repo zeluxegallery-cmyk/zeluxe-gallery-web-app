@@ -20,6 +20,7 @@ import {
   MapPin,
   Wallet,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import LogoutModal from '../components/LogoutModal';
 import { auth, db } from '../firebase';
@@ -87,9 +88,9 @@ export default function Profile() {
       const url = await uploadImageToCloudinary(file);
       await updateDoc(doc(db, 'users', auth.currentUser.uid), { avatarUrl: url });
       setUserData((prev: any) => ({ ...prev, avatarUrl: url }));
-      alert('✓ প্রোফাইল ছবি আপডেট হয়েছে!');
+      toast.success('✓ প্রোফাইল ছবি আপডেট হয়েছে!');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'ছবি আপলোড ব্যর্থ');
+      toast.error(err instanceof Error ? err.message : 'ছবি আপলোড ব্যর্থ');
     } finally {
       setUploading(false);
     }
@@ -101,7 +102,7 @@ export default function Profile() {
       const url = await uploadImageToCloudinary(file);
       setForm((prev) => ({ ...prev, businessLogo: url }));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'লোগো আপলোড ব্যর্থ');
+      toast.error(err instanceof Error ? err.message : 'লোগো আপলোড ব্যর্থ');
     } finally {
       setLogoUploading(false);
     }
@@ -122,9 +123,9 @@ export default function Profile() {
       });
       setUserData((prev: any) => ({ ...prev, ...form }));
       setEditOpen(false);
-      alert('✓ ব্যবসার তথ্য আপডেট হয়েছে!');
+      toast.success('✓ ব্যবসার তথ্য আপডেট হয়েছে!');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'সেভ ব্যর্থ');
+      toast.error(err instanceof Error ? err.message : 'সেভ ব্যর্থ');
     } finally {
       setSaving(false);
     }
