@@ -166,15 +166,15 @@ export default function OrderDetails() {
             </div>
             <div className="flex justify-between">
               <span className="text-zeluxe-gray">Unit Price</span>
-              <span className="font-medium text-zeluxe-black">৳{order.sellingPrice.toLocaleString()}</span>
+              <span className="font-medium text-zeluxe-black">Tk {order.sellingPrice.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-zeluxe-gray">Delivery Charge</span>
-              <span className="font-medium text-zeluxe-black">৳{order.deliveryCharge.toLocaleString()}</span>
+              <span className="font-medium text-zeluxe-black">Tk {order.deliveryCharge.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-zeluxe-gray">Discount</span>
-              <span className="font-medium text-zeluxe-black">-৳{order.discount.toLocaleString()}</span>
+              <span className="font-medium text-zeluxe-black">-Tk {order.discount.toLocaleString()}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-zeluxe-gray">Payment Method</span>
@@ -186,7 +186,7 @@ export default function OrderDetails() {
         <div className="mt-4 rounded-xl bg-zeluxe-fieldbg p-6">
           <div className="flex justify-between text-xl font-bold">
             <span className="text-zeluxe-black">Total</span>
-            <span className="text-zeluxe-gold">৳{order.total.toLocaleString()}</span>
+            <span className="text-zeluxe-gold">Tk {order.total.toLocaleString()}</span>
           </div>
         </div>
 
