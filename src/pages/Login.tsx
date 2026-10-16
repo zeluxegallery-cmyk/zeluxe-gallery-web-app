@@ -4,6 +4,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import { Eye, EyeOff, Loader2, Check } from 'lucide-react';
+import { toast } from 'sonner';
 import logo from '../assets/zeluxe-logo.png';
 
 export default function Login() {
@@ -43,12 +44,15 @@ export default function Login() {
 
     if (!email.trim() || !password.trim()) {
       setError('ইমেইল এবং পাসওয়ার্ড দুটোই দিন।');
+      toast.error('ইমেইল এবং পাসওয়ার্ড দুটোই দিন।');
       return;
     }
 
     setLoading(true);
     try {
       const { user } = await signInWithEmailAndPassword(auth, email.trim(), password);
+
+      toast.success('সফলভাবে লগইন হয়েছে!');
 
       const adminDoc = await getDoc(doc(db, 'admins', user.uid));
       if (adminDoc.exists()) {
@@ -68,7 +72,9 @@ export default function Login() {
         navigate('/pending');
       }
     } catch (err: any) {
-      setError(getBengaliError(err));
+      const errorMessage = getBengaliError(err);
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
