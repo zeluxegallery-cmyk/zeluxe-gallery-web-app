@@ -11,6 +11,7 @@ import {
   Gift,
   ArrowRight,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
@@ -214,6 +215,7 @@ export default function Earnings() {
         const message =
           err instanceof Error ? err.message : 'Failed to load earnings.';
         setError(message);
+        toast.error('আর্নিংস লোড করতে সমস্যা হয়েছে।');
       } finally {
         setLoading(false);
       }
