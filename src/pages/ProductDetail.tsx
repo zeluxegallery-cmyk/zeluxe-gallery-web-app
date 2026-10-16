@@ -24,6 +24,7 @@ import {
   X,
   ChevronDown,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
@@ -176,9 +177,10 @@ export default function ProductDetail() {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
+      toast.success('✓ প্রোডাক্টের বিবরণ কপি হয়েছে!');
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      alert('কপি করা যায়নি');
+      toast.error('কপি করা যায়নি');
     }
   };
 
@@ -201,8 +203,10 @@ export default function ProductDetail() {
         window.URL.revokeObjectURL(blobUrl);
         await new Promise((r) => setTimeout(r, 300));
       }
+      toast.success('✓ সব ছবি ডাউনলোড হয়েছে!');
     } catch (err) {
       console.error('Download failed:', err);
+      toast.error('ছবি ডাউনলোড করতে সমস্যা হয়েছে।');
     } finally {
       setDownloading(false);
     }
@@ -216,11 +220,11 @@ export default function ProductDetail() {
     if (!product) return;
 
     if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !sellingPrice) {
-      alert('সব প্রয়োজনীয় তথ্য দিন');
+      toast.error('সব প্রয়োজনীয় তথ্য দিন');
       return;
     }
     if (numSelling <= 0) {
-      alert('সঠিক বিক্রয় মূল্য দিন');
+      toast.error('সঠিক বিক্রয় মূল্য দিন');
       return;
     }
 
@@ -272,11 +276,11 @@ export default function ProductDetail() {
         updatedAt: new Date().toISOString(),
       }, { merge: true });
 
-      alert('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
+      toast.success('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
       setOrderModalOpen(false);
       navigate('/orders');
     } catch (err) {
-      alert('Error: ' + (err instanceof Error ? err.message : 'Unknown'));
+      toast.error('Error: ' + (err instanceof Error ? err.message : 'Unknown'));
     } finally {
       setSubmitting(false);
     }
