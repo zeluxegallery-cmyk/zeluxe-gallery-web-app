@@ -56,7 +56,8 @@ export default function Login() {
 
       const adminDoc = await getDoc(doc(db, 'admins', user.uid));
       if (adminDoc.exists()) {
-        navigate('/admin-dashboard');
+        // ১ সেকেন্ড দেরি করে navigate করবে, যাতে টোস্ট মেসেজটি দেখা যায়
+        setTimeout(() => navigate('/admin-dashboard'), 1000);
         return;
       }
 
@@ -64,12 +65,12 @@ export default function Login() {
       if (userDoc.exists()) {
         const data = userDoc.data();
         if (data.accountStatus === 'active') {
-          navigate('/reseller-dashboard');
+          setTimeout(() => navigate('/reseller-dashboard'), 1000);
         } else {
-          navigate('/pending');
+          setTimeout(() => navigate('/pending'), 1000);
         }
       } else {
-        navigate('/pending');
+        setTimeout(() => navigate('/pending'), 1000);
       }
     } catch (err: any) {
       const errorMessage = getBengaliError(err);
