@@ -11,6 +11,7 @@ import {
   updateDoc,
 } from 'firebase/firestore';
 import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2, Palette } from 'lucide-react';
+import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
@@ -136,6 +137,9 @@ export default function AdminProducts() {
           name: typeof catDoc.data().name === 'string' ? catDoc.data().name : 'Unnamed',
         })),
       );
+    } catch (err) {
+      console.error('Failed to load products:', err);
+      toast.error('ডেটা লোড করতে সমস্যা হয়েছে।');
     } finally {
       setLoading(false);
     }
@@ -182,7 +186,7 @@ export default function AdminProducts() {
 
   const handleRegenerateSku = async () => {
     if (!form.category) {
-      alert('প্রথমে ক্যাটাগরি সিলেক্ট করুন');
+      toast.error('প্রথমে ক্যাটাগরি সিলেক্ট করুন');
       return;
     }
     setSkuLoading(true);
@@ -220,7 +224,7 @@ export default function AdminProducts() {
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.sku.trim()) {
-      alert('নাম এবং SKU অবশ্যই দিতে হবে');
+      toast.error('নাম এবং SKU অবশ্যই দিতে হবে');
       return;
     }
     setSaving(true);
@@ -247,14 +251,16 @@ export default function AdminProducts() {
       };
       if (editingId) {
         await updateDoc(doc(db, 'products', editingId), payload);
+        toast.success('✓ প্রোডাক্ট আপডেট হয়েছে!');
       } else {
         await addDoc(collection(db, 'products'), { ...payload, createdAt: serverTimestamp() });
+        toast.success('✓ নতুন প্রোডাক্ট যোগ হয়েছে!');
       }
       setModalOpen(false);
       await loadData();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Save failed.';
-      alert(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }
@@ -264,9 +270,10 @@ export default function AdminProducts() {
     if (!window.confirm(`"${name}" ডিলিট করবেন? এটা ফেরত আনা যাবে না।`)) return;
     try {
       await deleteDoc(doc(db, 'products', id));
+      toast.success(`✓ "${name}" ডিলিট হয়েছে।`);
       await loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Delete failed.');
+      toast.error(err instanceof Error ? err.message : 'Delete failed.');
     }
   };
 
@@ -275,14 +282,14 @@ export default function AdminProducts() {
       await updateDoc(doc(db, 'products', product.id), { active: !product.active });
       await loadData();
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Toggle failed.');
+      toast.error(err instanceof Error ? err.message : 'Toggle failed.');
     }
   };
 
   const handleMultipleImageUpload = async (files: FileList) => {
     const remaining = MAX_IMAGES - form.imageUrls.length;
     if (remaining <= 0) {
-      alert(`সর্বোচ্চ ${MAX_IMAGES}টি ছবি আপলোড করা যাবে`);
+      toast.error(`সর্বোচ্চ ${MAX_IMAGES}টি ছবি আপলোড করা যাবে`);
       return;
     }
     const filesToUpload = Array.from(files).slice(0, remaining);
@@ -291,8 +298,9 @@ export default function AdminProducts() {
       const uploadPromises = filesToUpload.map((file) => uploadImageToCloudinary(file));
       const urls = await Promise.all(uploadPromises);
       setForm((prev) => ({ ...prev, imageUrls: [...prev.imageUrls, ...urls] }));
+      toast.success(`✓ ${urls.length}টি ছবি আপলোড হয়েছে`);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Upload failed.');
+      toast.error(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       setUploading(false);
     }
