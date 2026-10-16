@@ -150,7 +150,7 @@ export default function AdminReports() {
         <div className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
           <TrendingUp className="text-green-600" size={20} />
           <p className="mt-2 text-xs uppercase text-gray-500">Total Sales</p>
-          <p className="mt-1 text-xl font-bold text-zeluxe-black">৳{grandTotalSales.toLocaleString()}</p>
+          <p className="mt-1 text-xl font-bold text-zeluxe-black">Tk {grandTotalSales.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
           <CheckCircle className="text-green-600" size={20} />
@@ -196,13 +196,13 @@ export default function AdminReports() {
                 <div>
                   <p className="text-xs uppercase text-gray-500">Total Sales</p>
                   <p className="mt-1 text-lg font-bold text-zeluxe-black">
-                    ৳{report.totalSales.toLocaleString()}
+                    Tk {report.totalSales.toLocaleString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs uppercase text-gray-500">Delivered Sales</p>
                   <p className="mt-1 text-lg font-bold text-green-600">
-                    ৳{report.deliveredSales.toLocaleString()}
+                    Tk {report.deliveredSales.toLocaleString()}
                   </p>
                 </div>
                 <div>
