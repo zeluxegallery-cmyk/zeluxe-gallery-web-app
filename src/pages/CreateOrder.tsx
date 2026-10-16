@@ -9,6 +9,7 @@ import {
   where,
 } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 import { generateOrderId } from '../lib/orderId';
@@ -110,13 +111,13 @@ export default function CreateOrder() {
     }
 
     if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !district || !productId || !sellingPrice || numSellingPrice <= 0) {
-      alert('সব প্রয়োজনীয় তথ্য দিন।');
+      toast.error('সব প্রয়োজনীয় তথ্য দিন।');
       return;
     }
 
     const selectedProductData = products.find((item) => item.id === productId);
     if (!selectedProductData) {
-      alert('সঠিক প্রোডাক্ট সিলেক্ট করুন।');
+      toast.error('সঠিক প্রোডাক্ট সিলেক্ট করুন।');
       return;
     }
 
@@ -143,11 +144,11 @@ export default function CreateOrder() {
         status: 'pending',
         createdAt: serverTimestamp(),
       });
-      alert('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
+      toast.success('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
       navigate('/orders');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
-      alert('Error: ' + message);
+      toast.error('অর্ডার তৈরি করতে সমস্যা হয়েছে: ' + message);
     } finally {
       setSubmitting(false);
     }
@@ -256,7 +257,7 @@ export default function CreateOrder() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zeluxe-black">Selling Price (৳)</label>
+                  <label className="block text-sm font-medium text-zeluxe-black">Selling Price (Tk)</label>
                   <input
                     type="number"
                     min={0}
@@ -269,7 +270,7 @@ export default function CreateOrder() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zeluxe-black">Delivery Charge (৳)</label>
+                  <label className="block text-sm font-medium text-zeluxe-black">Delivery Charge (Tk)</label>
                   <select
                     value={deliveryCharge}
                     onChange={(e) => setDeliveryCharge(e.target.value)}
@@ -280,7 +281,7 @@ export default function CreateOrder() {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zeluxe-black">Discount (৳)</label>
+                  <label className="block text-sm font-medium text-zeluxe-black">Discount (Tk)</label>
                   <input
                     type="number"
                     min={0}
@@ -306,7 +307,7 @@ export default function CreateOrder() {
                   <span className={`text-lg font-bold ${
                     profit >= 0 ? 'text-green-700' : 'text-red-700'
                   }`}>
-                    ৳{Math.abs(profit)}
+                    Tk{Math.abs(profit)}
                   </span>
                 </div>
               )}
@@ -342,27 +343,27 @@ export default function CreateOrder() {
             <div className="space-y-2 text-sm">
               <div className="flex justify-between text-zeluxe-black">
                 <span>Item Total</span>
-                <span>৳{itemTotal.toLocaleString()}</span>
+                <span>Tk{itemTotal.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-zeluxe-black">
                 <span>Delivery Charge</span>
-                <span>৳{numDeliveryCharge.toLocaleString()}</span>
+                <span>Tk{numDeliveryCharge.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-zeluxe-black">
                 <span>Discount</span>
-                <span>-৳{numDiscount.toLocaleString()}</span>
+                <span>-Tk{numDiscount.toLocaleString()}</span>
               </div>
               <div className="my-3 border-t border-zeluxe-lightgray" />
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">আপনার লাভ:</span>
                 <span className={profit >= 0 ? 'font-bold text-green-600' : 'font-bold text-red-600'}>
-                  ৳{profit}
+                  Tk{profit}
                 </span>
               </div>
               <div className="my-3 border-t border-zeluxe-lightgray" />
               <div className="flex justify-between text-lg font-bold text-zeluxe-black">
                 <span>Total</span>
-                <span>৳{total.toLocaleString()}</span>
+                <span>Tk{total.toLocaleString()}</span>
               </div>
             </div>
           </section>
