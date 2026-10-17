@@ -9,7 +9,7 @@ type NavEntry = {
 };
 
 const items: NavEntry[] = [
-  { label: 'হোম', path: '/', icon: Home },
+  { label: 'হোম', path: '/reseller-dashboard', icon: Home },
   { label: 'প্রোডাক্ট', path: '/products', icon: Package },
   { label: '', path: '/orders/new', icon: Plus, elevated: true },
   { label: 'অর্ডার', path: '/orders', icon: ShoppingBag },
