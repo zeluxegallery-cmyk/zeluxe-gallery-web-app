@@ -144,8 +144,12 @@ export default function CreateOrder() {
         status: 'pending',
         createdAt: serverTimestamp(),
       });
+      
       toast.success('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
-      navigate('/orders');
+      
+      // ১ সেকেন্ড দেরি করে navigate করবে, যাতে টোস্ট মেসেজটি দেখা যায়
+      setTimeout(() => navigate('/orders'), 1000);
+      
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
       toast.error('অর্ডার তৈরি করতে সমস্যা হয়েছে: ' + message);
