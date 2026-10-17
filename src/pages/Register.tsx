@@ -139,8 +139,9 @@ export default function Register() {
       // 7. Show success toast
       toast.success('অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে!');
 
-      // 8. Navigate to membership payment
-      navigate('/membership');
+      // 8. Navigate to membership payment (১ সেকেন্ড দেরি করে, যাতে টোস্ট দেখা যায়)
+      setTimeout(() => navigate('/membership'), 1000);
+      
     } catch (err: any) {
       const code = err?.code || '';
       const errorMessage = getBengaliError(code);
