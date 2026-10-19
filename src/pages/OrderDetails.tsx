@@ -12,6 +12,7 @@ type OrderData = {
   address: string;
   district: string;
   productName: string;
+  size?: string | null; // নতুন যোগ করা হয়েছে
   quantity: number;
   sellingPrice: number;
   deliveryCharge: number;
@@ -74,6 +75,7 @@ export default function OrderDetails() {
             address: typeof data.address === 'string' ? data.address : '—',
             district: typeof data.district === 'string' ? data.district : '—',
             productName: typeof data.productName === 'string' ? data.productName : '—',
+            size: typeof data.size === 'string' ? data.size : null, // নতুন যোগ করা হয়েছে
             quantity: typeof data.quantity === 'number' ? data.quantity : 0,
             sellingPrice: typeof data.sellingPrice === 'number' ? data.sellingPrice : 0,
             deliveryCharge: typeof data.deliveryCharge === 'number' ? data.deliveryCharge : 0,
@@ -160,6 +162,13 @@ export default function OrderDetails() {
               <span className="text-zeluxe-gray">Product</span>
               <span className="font-medium text-zeluxe-black">{order.productName}</span>
             </div>
+            {/* ═══ Size ডিসপ্লে ═══ */}
+            {order.size && (
+              <div className="flex justify-between">
+                <span className="text-zeluxe-gray">Size</span>
+                <span className="font-medium text-zeluxe-black">{order.size}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-zeluxe-gray">Quantity</span>
               <span className="font-medium text-zeluxe-black">{order.quantity}</span>
