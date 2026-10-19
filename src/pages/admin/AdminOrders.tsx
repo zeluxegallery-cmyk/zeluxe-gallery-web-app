@@ -19,6 +19,7 @@ type Order = {
   orderId: string;
   customerName: string;
   resellerName: string;
+  size?: string | null; // নতুন যোগ করা হয়েছে
   total: number;
   status: string;
   createdAt?: { seconds?: number };
@@ -73,6 +74,7 @@ export default function AdminOrders() {
             orderId: typeof data.orderId === 'string' ? data.orderId : orderDoc.id,
             customerName: typeof data.customerName === 'string' ? data.customerName : 'Unknown',
             resellerName: typeof data.resellerName === 'string' ? data.resellerName : '—',
+            size: typeof data.size === 'string' ? data.size : null, // নতুন যোগ করা হয়েছে
             total: typeof data.total === 'number' ? data.total : 0,
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
@@ -95,6 +97,7 @@ export default function AdminOrders() {
             orderId: typeof data.orderId === 'string' ? data.orderId : orderDoc.id,
             customerName: typeof data.customerName === 'string' ? data.customerName : 'Unknown',
             resellerName: typeof data.resellerName === 'string' ? data.resellerName : '—',
+            size: typeof data.size === 'string' ? data.size : null, // নতুন যোগ করা হয়েছে
             total: typeof data.total === 'number' ? data.total : 0,
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
@@ -200,7 +203,15 @@ export default function AdminOrders() {
           <tbody>
             {filtered.map((order) => (
               <tr key={order.id} className="border-b border-zeluxe-lightgray last:border-0">
-                <td className="px-4 py-3 font-mono text-xs text-zeluxe-black">{order.orderId}</td>
+                <td className="px-4 py-3">
+                  <div className="font-mono text-xs text-zeluxe-black">{order.orderId}</div>
+                  {/* ═══ Size ব্যাজ ডেস্কটপে ═══ */}
+                  {order.size && (
+                    <div className="mt-0.5 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
+                      Size: {order.size}
+                    </div>
+                  )}
+                </td>
                 <td className="px-4 py-3 text-zeluxe-black">{order.customerName}</td>
                 <td className="px-4 py-3 text-zeluxe-gray">{order.resellerName}</td>
                 <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</td>
@@ -245,7 +256,15 @@ export default function AdminOrders() {
         {filtered.map((order) => (
           <div key={order.id} className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
             <div className="flex items-center justify-between">
-              <p className="font-mono text-xs text-zeluxe-gray">{order.orderId}</p>
+              <div>
+                <p className="font-mono text-xs text-zeluxe-gray">{order.orderId}</p>
+                {/* ═══ Size ব্যাজ মোবাইলে ═══ */}
+                {order.size && (
+                  <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
+                    Size: {order.size}
+                  </span>
+                )}
+              </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => navigate(`/orders/${order.id}`)}
