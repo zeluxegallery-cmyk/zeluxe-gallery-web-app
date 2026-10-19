@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
-import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2, Palette } from 'lucide-react';
+import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2, Palette, Ruler } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
@@ -25,6 +25,7 @@ type Product = {
   imageUrl: string;
   imageUrls: string[];
   colors: string[];
+  sizes: string[]; // নতুন যোগ করা হয়েছে
   stock: number;
   purchaseCost: number;
   resellerPrice: number;
@@ -44,6 +45,7 @@ type ProductForm = {
   description: string;
   imageUrls: string[];
   colorsInput: string;
+  sizesInput: string; // নতুন যোগ করা হয়েছে
   stock: string;
   purchaseCost: string;
   resellerPrice: string;
@@ -58,6 +60,7 @@ const emptyForm: ProductForm = {
   description: '',
   imageUrls: [],
   colorsInput: '',
+  sizesInput: '', // নতুন যোগ করা হয়েছে
   stock: '0',
   purchaseCost: '0',
   resellerPrice: '0',
@@ -114,6 +117,11 @@ export default function AdminProducts() {
             colors = data.colors.filter((c: any) => typeof c === 'string');
           }
 
+          let sizes: string[] = [];
+          if (Array.isArray(data.sizes)) {
+            sizes = data.sizes.filter((s: any) => typeof s === 'string');
+          }
+
           return {
             id: productDoc.id,
             name: typeof data.name === 'string' ? data.name : '—',
@@ -123,6 +131,7 @@ export default function AdminProducts() {
             imageUrl: imgUrl,
             imageUrls: urls,
             colors,
+            sizes,
             stock: typeof data.stock === 'number' ? data.stock : 0,
             purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
@@ -212,6 +221,7 @@ export default function AdminProducts() {
       description: product.description,
       imageUrls: product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : []),
       colorsInput: product.colors.join(', '),
+      sizesInput: product.sizes.join(', '), // এডিটের সময় সাইজ দেখাবে
       stock: String(product.stock),
       purchaseCost: String(product.purchaseCost),
       resellerPrice: String(product.resellerPrice),
@@ -229,11 +239,15 @@ export default function AdminProducts() {
     }
     setSaving(true);
     try {
-      // Parse colors from comma-separated input
       const colors = form.colorsInput
         .split(',')
         .map((c) => c.trim())
         .filter((c) => c.length > 0);
+
+      const sizes = form.sizesInput
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0);
 
       const payload = {
         name: form.name.trim(),
@@ -243,6 +257,7 @@ export default function AdminProducts() {
         imageUrl: form.imageUrls[0] || '',
         imageUrls: form.imageUrls,
         colors,
+        sizes, // ডাটাবেসে সাইজ সেভ হবে
         stock: Number(form.stock) || 0,
         purchaseCost: Number(form.purchaseCost) || 0,
         resellerPrice: Number(form.resellerPrice) || 0,
@@ -547,6 +562,36 @@ export default function AdminProducts() {
                   placeholder="প্রোডাক্টের বিবরণ..."
                   className={inputClass}
                 />
+              </div>
+
+              {/* ═══ SIZES (নতুন যোগ করা হয়েছে) ═══ */}
+              <div>
+                <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
+                  <Ruler size={14} className="text-zeluxe-gold" />
+                  <span>উপলব্ধ সাইজ</span>
+                </label>
+                <input
+                  value={form.sizesInput}
+                  onChange={(e) => setForm({ ...form, sizesInput: e.target.value })}
+                  placeholder="যেমন: S, M, L, XL, XXL"
+                  className={inputClass}
+                />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  কমা (,) দিয়ে একাধিক সাইজ আলাদা করুন। খালি রাখলে কোনো সাইজ অপশন দেখাবে না।
+                </p>
+                {form.sizesInput.trim() && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {form.sizesInput
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter((s) => s)
+                      .map((size, i) => (
+                        <span key={i} className="rounded-md border border-zeluxe-lightgray bg-zeluxe-cream px-2 py-0.5 text-[11px] text-zeluxe-black">
+                          {size}
+                        </span>
+                      ))}
+                  </div>
+                )}
               </div>
 
               {/* ═══ COLORS ═══ */}
