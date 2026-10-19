@@ -19,6 +19,7 @@ type Product = {
   name: string;
   suggestedPrice: number;
   resellerPrice: number;
+  sizes: string[]; // নতুন যোগ করা হয়েছে
 };
 
 const DISTRICTS = ['Dhaka', 'Chattogram', 'Sylhet', 'Khulna', 'Rajshahi', 'Barishal', 'Rangpur', 'Mymensingh', 'Other'];
@@ -40,6 +41,7 @@ export default function CreateOrder() {
   const [district, setDistrict] = useState('Dhaka');
 
   const [productId, setProductId] = useState(presetProductId || '');
+  const [size, setSize] = useState(''); // নতুন স্টেট
   const [quantity, setQuantity] = useState('1');
   const [sellingPrice, setSellingPrice] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState('70');
@@ -56,11 +58,18 @@ export default function CreateOrder() {
         const snapshot = await getDocs(productsQuery);
         const fetchedProducts: Product[] = snapshot.docs.map((productDocument) => {
           const data = productDocument.data();
+          
+          let sizes: string[] = [];
+          if (Array.isArray(data.sizes)) {
+            sizes = data.sizes.filter((s: any) => typeof s === 'string');
+          }
+
           return {
             id: productDocument.id,
             name: typeof data.name === 'string' ? data.name : 'Unnamed Product',
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+            sizes,
           };
         });
         setProducts(fetchedProducts);
@@ -70,6 +79,7 @@ export default function CreateOrder() {
           if (preset) {
             setProductId(preset.id);
             setSellingPrice(String(preset.suggestedPrice));
+            if (preset.sizes.length > 0) setSize(preset.sizes[0]);
           }
         }
       } finally {
@@ -85,6 +95,9 @@ export default function CreateOrder() {
     const product = products.find((item) => item.id === value);
     if (product) {
       setSellingPrice(String(product.suggestedPrice));
+      setSize(product.sizes.length > 0 ? product.sizes[0] : ''); // প্রোডাক্ট চেঞ্জ হলে সাইজ রিসেট হবে
+    } else {
+      setSize('');
     }
   };
 
@@ -121,6 +134,12 @@ export default function CreateOrder() {
       return;
     }
 
+    // সাইজ ভ্যালিডেশন
+    if (selectedProductData.sizes.length > 0 && !size) {
+      toast.error('অনুগ্রহ করে সাইজ সিলেক্ট করুন।');
+      return;
+    }
+
     setSubmitting(true);
     try {
       const orderId = await generateOrderId();
@@ -134,6 +153,7 @@ export default function CreateOrder() {
         district,
         productId,
         productName: selectedProductData.name,
+        size: size || null, // অর্ডারে সাইজ সেভ হবে
         quantity: numQuantity,
         sellingPrice: numSellingPrice,
         deliveryCharge: numDeliveryCharge,
@@ -246,6 +266,30 @@ export default function CreateOrder() {
                   ))}
                 </select>
               </div>
+
+              {/* ═══ SIZE SELECTION ═══ */}
+              {selectedProduct && selectedProduct.sizes.length > 0 && (
+                <div>
+                  <label className="block text-sm font-medium text-zeluxe-black">Size</label>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {selectedProduct.sizes.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSize(s)}
+                        className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                          size === s
+                            ? 'border-zeluxe-gold bg-zeluxe-gold text-zeluxe-black'
+                            : 'border-zeluxe-lightgray bg-white text-zeluxe-black hover:border-zeluxe-gold'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black">Quantity</label>
