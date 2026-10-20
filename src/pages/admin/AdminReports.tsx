@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
-import { BarChart3, TrendingUp, Loader2, Calendar, ShoppingBag, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { BarChart3, TrendingUp, Loader2, Calendar, ShoppingBag, CheckCircle, XCircle, Clock, Wallet } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
+
+type OrderItem = {
+  resellerPrice: number;
+  purchaseCost: number;
+  quantity: number;
+};
 
 type Order = {
   id: string;
@@ -12,6 +18,7 @@ type Order = {
   total: number;
   status: string;
   createdAt?: any;
+  items?: OrderItem[]; // ═══ নতুন যোগ করা হয়েছে ═══
 };
 
 type MonthlyReport = {
@@ -23,6 +30,7 @@ type MonthlyReport = {
   cancelled: number;
   totalSales: number;
   deliveredSales: number;
+  totalProfit: number;   // ═══ নতুন যোগ করা হয়েছে ═══
 };
 
 export default function AdminReports() {
@@ -36,7 +44,6 @@ export default function AdminReports() {
   ];
 
   const parseOrderId = (orderId: string): { monthKey: string; label: string } | null => {
-    // Format: ZEL-YYMM-NNNN
     const match = orderId?.match(/^ZEL-(\d{2})(\d{2})-/);
     if (!match) return null;
 
@@ -66,6 +73,7 @@ export default function AdminReports() {
             total: typeof data.total === 'number' ? data.total : 0,
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
+            items: Array.isArray(data.items) ? data.items : undefined, // ═══ নতুন যোগ করা হয়েছে ═══
           };
         });
         setOrders(list);
@@ -87,12 +95,26 @@ export default function AdminReports() {
               cancelled: 0,
               totalSales: 0,
               deliveredSales: 0,
+              totalProfit: 0, // ═══ নতুন যোগ করা হয়েছে ═══
             };
           }
 
           const report = grouped[parsed.monthKey];
           report.totalOrders += 1;
           report.totalSales += order.total;
+
+          // ═══ অ্যাডমিন প্রফিট ক্যালকুলেশন ═══
+          let orderProfit = 0;
+          if (order.items && order.items.length > 0) {
+            orderProfit = order.items.reduce((sum, item) => {
+              const resellerP = item.resellerPrice || 0;
+              const purchaseP = item.purchaseCost || 0;
+              const qty = item.quantity || 0;
+              return sum + ((resellerP - purchaseP) * qty);
+            }, 0);
+          }
+          report.totalProfit += orderProfit;
+          // ═══════════════════════════════════
 
           if (order.status === 'delivered') {
             report.delivered += 1;
@@ -134,6 +156,7 @@ export default function AdminReports() {
   const grandTotalSales = monthlyReports.reduce((s, r) => s + r.totalSales, 0);
   const grandTotalDelivered = monthlyReports.reduce((s, r) => s + r.delivered, 0);
   const grandTotalCancelled = monthlyReports.reduce((s, r) => s + r.cancelled, 0);
+  const grandTotalProfit = monthlyReports.reduce((s, r) => s + r.totalProfit, 0); // ═══ নতুন ═══
 
   return (
     <AdminLayout>
@@ -141,7 +164,7 @@ export default function AdminReports() {
       <p className="mb-6 text-sm text-gray-500">মাসিক অর্ডার ও বিক্রয় রিপোর্ট</p>
 
       {/* Overall Summary */}
-      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-5">
         <div className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
           <ShoppingBag className="text-zeluxe-gold" size={20} />
           <p className="mt-2 text-xs uppercase text-gray-500">Total Orders</p>
@@ -151,6 +174,12 @@ export default function AdminReports() {
           <TrendingUp className="text-green-600" size={20} />
           <p className="mt-2 text-xs uppercase text-gray-500">Total Sales</p>
           <p className="mt-1 text-xl font-bold text-zeluxe-black">Tk {grandTotalSales.toLocaleString()}</p>
+        </div>
+        {/* ═══ নতুন প্রফিট কার্ড ═══ */}
+        <div className="rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-4">
+          <Wallet className="text-zeluxe-gold" size={20} />
+          <p className="mt-2 text-xs uppercase text-zeluxe-gold font-bold">Admin Profit</p>
+          <p className="mt-1 text-xl font-bold text-zeluxe-black">Tk {grandTotalProfit.toLocaleString()}</p>
         </div>
         <div className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
           <CheckCircle className="text-green-600" size={20} />
@@ -192,7 +221,7 @@ export default function AdminReports() {
               </div>
 
               {/* Month Stats */}
-              <div className="grid grid-cols-2 gap-3 p-4 md:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 p-4 lg:grid-cols-5">
                 <div>
                   <p className="text-xs uppercase text-gray-500">Total Sales</p>
                   <p className="mt-1 text-lg font-bold text-zeluxe-black">
@@ -203,6 +232,13 @@ export default function AdminReports() {
                   <p className="text-xs uppercase text-gray-500">Delivered Sales</p>
                   <p className="mt-1 text-lg font-bold text-green-600">
                     Tk {report.deliveredSales.toLocaleString()}
+                  </p>
+                </div>
+                {/* ═══ নতুন প্রফিট ডিসপ্লে ═══ */}
+                <div>
+                  <p className="text-xs uppercase text-zeluxe-gold font-bold">Admin Profit</p>
+                  <p className="mt-1 text-lg font-bold text-zeluxe-gold">
+                    Tk {report.totalProfit.toLocaleString()}
                   </p>
                 </div>
                 <div>
