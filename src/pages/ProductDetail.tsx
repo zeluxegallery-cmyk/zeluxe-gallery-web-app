@@ -23,6 +23,7 @@ import {
   Plus,
   X,
   ChevronDown,
+  ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Layout from '../components/Layout';
@@ -93,14 +94,10 @@ export default function ProductDetail() {
           if (urls.length === 0 && imgUrl) urls = [imgUrl];
 
           let colors: string[] = [];
-          if (Array.isArray(data.colors)) {
-            colors = data.colors.filter((c: any) => typeof c === 'string');
-          }
-
+          if (Array.isArray(data.colors)) colors = data.colors.filter((c: any) => typeof c === 'string');
+          
           let sizes: string[] = [];
-          if (Array.isArray(data.sizes)) {
-            sizes = data.sizes.filter((s: any) => typeof s === 'string');
-          }
+          if (Array.isArray(data.sizes)) sizes = data.sizes.filter((s: any) => typeof s === 'string');
 
           const loadedProduct: Product = {
             id: snap.id,
@@ -123,7 +120,7 @@ export default function ProductDetail() {
           if (colors.length > 0) setSelectedColor(colors[0]);
           if (sizes.length > 0) setSelectedSize(sizes[0]);
 
-          // Load related products (same category)
+          // Load related products
           if (loadedProduct.category) {
             try {
               const relQ = query(
@@ -169,6 +166,51 @@ export default function ProductDetail() {
     };
     void loadProduct();
   }, [id]);
+
+  // ═══ কার্টে যোগ করার ফাংশন ═══
+  const handleAddToCart = () => {
+    if (!product) return;
+    
+    if (product.sizes.length > 0 && !selectedSize) {
+      toast.error('অনুগ্রহ করে সাইজ সিলেক্ট করুন');
+      return;
+    }
+
+    const newItem = {
+      productId: product.id,
+      name: product.name,
+      sku: product.sku,
+      imageUrl: product.imageUrl,
+      size: selectedSize || 'N/A',
+      quantity: quantity,
+      sellingPrice: Number(sellingPrice) || product.suggestedPrice,
+      resellerPrice: product.resellerPrice,
+    };
+
+    try {
+      const existingCartStr = localStorage.getItem('zeluxe_cart');
+      let existingCart = [];
+      if (existingCartStr) {
+        existingCart = JSON.parse(existingCartStr);
+      }
+
+      // চেক করা হচ্ছে একই প্রোডাক্ট এবং সাইজ আগে থেকে আছে কি না
+      const existingIdx = existingCart.findIndex(
+        (item: any) => item.productId === newItem.productId && item.size === newItem.size
+      );
+      
+      if (existingIdx > -1) {
+        existingCart[existingIdx].quantity += newItem.quantity;
+      } else {
+        existingCart.push(newItem);
+      }
+
+      localStorage.setItem('zeluxe_cart', JSON.stringify(existingCart));
+      toast.success('✓ কার্টে যোগ হয়েছে!');
+    } catch (err) {
+      toast.error('কার্টে যোগ করতে সমস্যা হয়েছে');
+    }
+  };
 
   const numQty = Number(quantity) || 0;
   const numSelling = Number(sellingPrice) || 0;
@@ -245,7 +287,6 @@ export default function ProductDetail() {
 
     setSubmitting(true);
     try {
-      // Generate order ID
       const counterRef = doc(db, 'settings', 'orderCounter');
       const counterSnap = await getDoc(counterRef);
       const now = new Date();
@@ -329,7 +370,6 @@ export default function ProductDetail() {
   return (
     <Layout>
       <div className="mx-auto max-w-5xl">
-        {/* Back */}
         <Link
           to="/products"
           className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-zeluxe-gold"
@@ -338,7 +378,6 @@ export default function ProductDetail() {
           সব প্রোডাক্ট
         </Link>
 
-        {/* Product Card */}
         <div className="rounded-lg border border-zeluxe-lightgray bg-white p-5 md:p-6">
           <div className="grid gap-6 md:grid-cols-2 md:gap-8">
             {/* LEFT — Images */}
@@ -359,7 +398,6 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* Thumbnails */}
               {product.imageUrls.length > 1 && (
                 <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
                   {product.imageUrls.map((url, idx) => (
@@ -390,7 +428,6 @@ export default function ProductDetail() {
                 SKU: {product.sku}
               </p>
 
-              {/* Variation box */}
               <div className="mt-4 rounded-md border border-zeluxe-lightgray bg-zeluxe-cream p-4">
                 <label className="mb-2 block text-xs font-medium text-gray-600">
                   Variation & Price:
@@ -404,15 +441,10 @@ export default function ProductDetail() {
                       className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-3 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
                     >
                       {product.colors.map((c) => (
-                        <option key={c} value={c}>
-                          Color: {c}
-                        </option>
+                        <option key={c} value={c}>Color: {c}</option>
                       ))}
                     </select>
-                    <ChevronDown
-                      size={16}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    />
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   </div>
                 )}
 
@@ -424,163 +456,96 @@ export default function ProductDetail() {
                       className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-3 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
                     >
                       {product.sizes.map((s) => (
-                        <option key={s} value={s}>
-                          Size: {s}
-                        </option>
+                        <option key={s} value={s}>Size: {s}</option>
                       ))}
                     </select>
-                    <ChevronDown
-                      size={16}
-                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    />
+                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
                   </div>
                 )}
 
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-500">Color:</span>
-                  <span className="font-medium text-zeluxe-black">
-                    {selectedColor || '—'}
-                  </span>
+                  <span className="font-medium text-zeluxe-black">{selectedColor || '—'}</span>
                 </div>
                 <div className="mt-1.5 flex justify-between text-xs">
                   <span className="text-gray-500">Size:</span>
-                  <span className="font-medium text-zeluxe-black">
-                    {selectedSize || '—'}
-                  </span>
+                  <span className="font-medium text-zeluxe-black">{selectedSize || '—'}</span>
                 </div>
                 <div className="mt-1.5 flex justify-between text-xs">
                   <span className="text-gray-500">Price:</span>
-                  <span className="font-bold text-zeluxe-black">
-                    Tk {product.resellerPrice.toLocaleString()}
-                  </span>
+                  <span className="font-bold text-zeluxe-black">Tk {product.resellerPrice.toLocaleString()}</span>
                 </div>
                 <div className="mt-1.5 flex justify-between text-xs">
                   <span className="text-gray-500">Customer / Retail Price:</span>
-                  <span className="font-bold text-zeluxe-gold">
-                    Tk {product.suggestedPrice.toLocaleString()}
-                  </span>
+                  <span className="font-bold text-zeluxe-gold">Tk {product.suggestedPrice.toLocaleString()}</span>
                 </div>
               </div>
 
-              {/* Quantity + Order Now */}
-              <div className="mt-4 flex gap-2">
-                <div className="flex items-center rounded-md border border-zeluxe-lightgray bg-white">
-                  <button
-                    type="button"
-                    onClick={() => setQuantity((q) => Math.max(1, q - 1))}
-                    className="p-3 text-zeluxe-black transition hover:bg-zeluxe-cream"
-                  >
-                    <Minus size={16} />
-                  </button>
-                  <span className="min-w-[40px] text-center text-sm font-bold text-zeluxe-black">
-                    {quantity}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setQuantity((q) => q + 1)}
-                    className="p-3 text-zeluxe-black transition hover:bg-zeluxe-cream"
-                  >
-                    <Plus size={16} />
-                  </button>
+              {/* Quantity & Buttons */}
+              <div className="mt-4">
+                <div className="mb-3 flex items-center gap-2">
+                  <span className="text-sm font-medium text-zeluxe-black">পরিমাণ:</span>
+                  <div className="flex items-center rounded-md border border-zeluxe-lightgray bg-white">
+                    <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="p-2 text-zeluxe-black transition hover:bg-zeluxe-cream">
+                      <Minus size={16} />
+                    </button>
+                    <span className="min-w-[32px] text-center text-sm font-bold text-zeluxe-black">{quantity}</span>
+                    <button type="button" onClick={() => setQuantity((q) => q + 1)} className="p-2 text-zeluxe-black transition hover:bg-zeluxe-cream">
+                      <Plus size={16} />
+                    </button>
+                  </div>
                 </div>
 
-                <button
-                  onClick={() => setOrderModalOpen(true)}
-                  disabled={product.stock === 0}
-                  className="flex flex-1 items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
-                >
-                  <Package size={16} />
-                  {product.stock === 0 ? 'স্টক নেই' : 'Order Now'}
-                </button>
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <button
+                    onClick={handleAddToCart}
+                    disabled={product.stock === 0}
+                    className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-black bg-white py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 disabled:opacity-50"
+                  >
+                    <ShoppingCart size={16} />
+                    Add to Cart
+                  </button>
+                  <button
+                    onClick={() => setOrderModalOpen(true)}
+                    disabled={product.stock === 0}
+                    className="flex items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    <Package size={16} />
+                    Order Now
+                  </button>
+                </div>
               </div>
 
               {/* Copy + Download */}
               <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  onClick={handleCopyDetails}
-                  className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold"
-                >
-                  {copied ? (
-                    <>
-                      <Check size={14} className="text-green-600" />
-                      কপি হয়েছে
-                    </>
-                  ) : (
-                    <>
-                      <Copy size={14} />
-                      Copy Details
-                    </>
-                  )}
+                <button onClick={handleCopyDetails} className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold">
+                  {copied ? <><Check size={14} className="text-green-600" /> কপি হয়েছে</> : <><Copy size={14} /> Copy Details</>}
                 </button>
-                <button
-                  onClick={handleDownloadAll}
-                  disabled={downloading || product.imageUrls.length === 0}
-                  className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold disabled:opacity-40"
-                >
-                  {downloading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Download size={14} />
-                  )}
-                  Download Images
+                <button onClick={handleDownloadAll} disabled={downloading || product.imageUrls.length === 0} className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold disabled:opacity-40">
+                  {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download Images
                 </button>
               </div>
 
-              {/* Description */}
               <div className="mt-6">
-                <h3 className="mb-2 text-sm font-bold text-zeluxe-black">
-                  Description
-                </h3>
-                <p className="text-sm leading-relaxed text-gray-700">
-                  {product.description || 'প্রোডাক্টের কোনো বিবরণ নেই।'}
-                </p>
+                <h3 className="mb-2 text-sm font-bold text-zeluxe-black">Description</h3>
+                <p className="text-sm leading-relaxed text-gray-700">{product.description || 'প্রোডাক্টের কোনো বিবরণ নেই।'}</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Related Products */}
         {relatedProducts.length > 0 && (
           <div className="mt-8">
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">
-              Related Products
-            </h2>
+            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">Related Products</h2>
             <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
               {relatedProducts.map((rp) => (
-                <Link
-                  key={rp.id}
-                  to={`/products/${rp.id}`}
-                  className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold"
-                >
+                <Link key={rp.id} to={`/products/${rp.id}`} className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold">
                   <div className="aspect-square bg-zeluxe-cream">
-                    {rp.imageUrl ? (
-                      <img
-                        src={rp.imageUrl}
-                        alt={rp.name}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full items-center justify-center">
-                        <Package className="h-10 w-10 text-gray-300" />
-                      </div>
-                    )}
+                    {rp.imageUrl ? <img src={rp.imageUrl} alt={rp.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-10 w-10 text-gray-300" /></div>}
                   </div>
                   <div className="p-3">
-                    <p className="line-clamp-2 text-xs font-bold text-zeluxe-black">
-                      {rp.name}
-                    </p>
-                    <p className="mt-1.5 text-[11px] text-gray-500">
-                      Price:{' '}
-                      <span className="font-bold text-zeluxe-black">
-                        Tk {rp.resellerPrice.toLocaleString()}
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-gray-500">
-                      Customer / Retail Price:{' '}
-                      <span className="font-bold text-zeluxe-gold">
-                        Tk {rp.suggestedPrice.toLocaleString()}
-                      </span>
-                    </p>
+                    <p className="line-clamp-2 text-xs font-bold text-zeluxe-black">{rp.name}</p>
+                    <p className="mt-1.5 text-[11px] text-gray-500">Price: <span className="font-bold text-zeluxe-black">Tk {rp.resellerPrice.toLocaleString()}</span></p>
                   </div>
                 </Link>
               ))}
@@ -595,247 +560,89 @@ export default function ProductDetail() {
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-zeluxe-black">অর্ডার করুন</h2>
-              <button
-                onClick={() => setOrderModalOpen(false)}
-                className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream"
-              >
-                <X size={18} />
-              </button>
+              <button onClick={() => setOrderModalOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream"><X size={18} /></button>
             </div>
 
             <form onSubmit={handleSubmitOrder} className="space-y-4">
-              
-              {/* ═══ নতুন প্রোডাক্ট সামারি (ছবির মতো) ═══ */}
               <div className="flex items-start gap-3 rounded-md border border-zeluxe-lightgray bg-white p-3 shadow-sm">
-                {/* প্রোডাক্টের ছবি */}
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-zeluxe-lightgray bg-zeluxe-cream">
-                  {product.imageUrl ? (
-                    <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Package size={20} className="text-gray-400" />
-                    </div>
-                  )}
-                  {/* Quantity Badge */}
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zeluxe-black text-[10px] font-bold text-white shadow-sm">
-                    {quantity}
-                  </span>
+                  {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><Package size={20} className="text-gray-400" /></div>}
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zeluxe-black text-[10px] font-bold text-white shadow-sm">{quantity}</span>
                 </div>
-
-                {/* প্রোডাক্টের তথ্য */}
                 <div className="flex-1">
                   <p className="text-sm font-bold text-zeluxe-black line-clamp-2">{product.name}</p>
                   <p className="mt-0.5 font-mono text-[10px] text-gray-500">SKU: {product.sku}</p>
-                  
-                  {/* কালার ও সাইজ ব্যাজ */}
                   <div className="mt-1.5 flex flex-wrap gap-2 text-[11px]">
-                    {selectedColor && (
-                      <span className="rounded bg-zeluxe-cream px-2 py-1 font-medium text-gray-700 border border-zeluxe-lightgray">
-                        Color: {selectedColor}
-                      </span>
-                    )}
-                    {selectedSize && (
-                      <span className="rounded bg-zeluxe-cream px-2 py-1 font-medium text-gray-700 border border-zeluxe-lightgray">
-                        Size: {selectedSize}
-                      </span>
-                    )}
+                    {selectedColor && <span className="rounded bg-zeluxe-cream px-2 py-1 font-medium text-gray-700 border border-zeluxe-lightgray">Color: {selectedColor}</span>}
+                    {selectedSize && <span className="rounded bg-zeluxe-cream px-2 py-1 font-medium text-gray-700 border border-zeluxe-lightgray">Size: {selectedSize}</span>}
                   </div>
                 </div>
               </div>
 
-              {product.sizes.length > 0 && (
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    সাইজ পরিবর্তন করুন
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {product.sizes.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setSelectedSize(s)}
-                        className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
-                          selectedSize === s
-                            ? 'border-zeluxe-gold bg-zeluxe-gold text-zeluxe-black'
-                            : 'border-zeluxe-lightgray bg-white text-zeluxe-black hover:border-zeluxe-gold'
-                        }`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  কাস্টমারের নাম *
-                </label>
-                <input
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  required
-                  placeholder="পূর্ণ নাম"
-                  className={inputClass}
-                />
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">কাস্টমারের নাম *</label>
+                <input value={customerName} onChange={(e) => setCustomerName(e.target.value)} required placeholder="পূর্ণ নাম" className={inputClass} />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  মোবাইল নাম্বার *
-                </label>
-                <input
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  required
-                  placeholder="01XXXXXXXXX"
-                  className={inputClass}
-                />
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">মোবাইল নাম্বার *</label>
+                <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required placeholder="01XXXXXXXXX" className={inputClass} />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  ঠিকানা *
-                </label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  required
-                  rows={2}
-                  placeholder="সম্পূর্ণ ঠিকানা"
-                  className={inputClass}
-                />
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ঠিকানা *</label>
+                <textarea value={address} onChange={(e) => setAddress(e.target.value)} required rows={2} placeholder="সম্পূর্ণ ঠিকানা" className={inputClass} />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  এলাকা
-                </label>
-                <select
-                  value={district}
-                  onChange={(e) => {
-                    setDistrict(e.target.value);
-                    setDeliveryCharge(e.target.value === 'ঢাকার ভিতরে' ? '70' : '120');
-                  }}
-                  className={inputClass}
-                >
-                  {DISTRICTS.map((d) => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">এলাকা</label>
+                <select value={district} onChange={(e) => { setDistrict(e.target.value); setDeliveryCharge(e.target.value === 'ঢাকার ভিতরে' ? '70' : '120'); }} className={inputClass}>
+                  {DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
                 </select>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    বিক্রয় মূল্য (Tk)
-                  </label>
-                  <input
-                    type="number"
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    required
-                    className={inputClass}
-                  />
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">বিক্রয় মূল্য (Tk)</label>
+                  <input type="number" value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} onFocus={(e) => e.target.select()} required className={inputClass} />
                 </div>
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    ডিসকাউন্ট (Tk)
-                  </label>
-                  <input
-                    type="number"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0"
-                    className={inputClass}
-                  />
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ডিসকাউন্ট (Tk)</label>
+                  <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} onFocus={(e) => e.target.select()} placeholder="0" className={inputClass} />
                 </div>
               </div>
 
               {numSelling > 0 && (
-                <div
-                  className={`flex items-center justify-between rounded-md p-3 ${
-                    profit >= 0
-                      ? 'border border-green-200 bg-green-50'
-                      : 'border border-red-200 bg-red-50'
-                  }`}
-                >
-                  <span className={`text-xs font-medium ${profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    {profit >= 0 ? 'আপনার লাভ:' : 'লস হচ্ছে:'}
-                  </span>
-                  <span className={`text-base font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    Tk {Math.abs(profit)}
-                  </span>
+                <div className={`flex items-center justify-between rounded-md p-3 ${profit >= 0 ? 'border border-green-200 bg-green-50' : 'border border-red-200 bg-red-50'}`}>
+                  <span className={`text-xs font-medium ${profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>{profit >= 0 ? 'আপনার লাভ:' : 'লস হচ্ছে:'}</span>
+                  <span className={`text-base font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>Tk {Math.abs(profit)}</span>
                 </div>
               )}
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  পেমেন্ট পদ্ধতি
-                </label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className={inputClass}
-                >
-                  {PAYMENT_METHODS.map((m) => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">পেমেন্ট পদ্ধতি</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputClass}>
+                  {PAYMENT_METHODS.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  নোট (ঐচ্ছিক)
-                </label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={2}
-                  placeholder="বিশেষ নির্দেশনা..."
-                  className={inputClass}
-                />
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">নোট (ঐচ্ছিক)</label>
+                <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} placeholder="বিশেষ নির্দেশনা..." className={inputClass} />
               </div>
 
-              {/* Summary */}
               <div className="rounded-md bg-zeluxe-black p-4 text-white">
                 <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">আইটেম মোট</span>
-                    <span>Tk {itemTotal.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">ডেলিভারি</span>
-                    <span>Tk {numDelivery.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">ডিসকাউন্ট</span>
-                    <span>-Tk {numDiscount.toLocaleString()}</span>
-                  </div>
+                  <div className="flex justify-between"><span className="text-gray-400">আইটেম মোট</span><span>Tk {itemTotal.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">ডেলিভারি</span><span>Tk {numDelivery.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-gray-400">ডিসকাউন্ট</span><span>-Tk {numDiscount.toLocaleString()}</span></div>
                   <div className="my-2 border-t border-white/20" />
-                  <div className="flex justify-between text-sm font-bold">
-                    <span>সর্বমোট</span>
-                    <span className="text-zeluxe-gold">Tk {total.toLocaleString()}</span>
-                  </div>
+                  <div className="flex justify-between text-sm font-bold"><span>সর্বমোট</span><span className="text-zeluxe-gold">Tk {total.toLocaleString()}</span></div>
                 </div>
               </div>
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-md bg-zeluxe-gold py-3 text-sm font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-60"
-              >
-                {submitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    অর্ডার হচ্ছে...
-                  </span>
-                ) : (
-                  '✓ অর্ডার কনফার্ম করুন'
-                )}
+              <button type="submit" disabled={submitting} className="w-full rounded-md bg-zeluxe-gold py-3 text-sm font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-60">
+                {submitting ? <span className="flex items-center justify-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> অর্ডার হচ্ছে...</span> : '✓ অর্ডার কনফার্ম করুন'}
               </button>
             </form>
           </div>
