@@ -26,7 +26,7 @@ type Product = {
   imageUrls: string[];
   colors: string[];
   sizes: string[];
-  sourceUrl: string; // নতুন যোগ করা হয়েছে
+  sourceUrl: string;
   stock: number;
   purchaseCost: number;
   resellerPrice: number;
@@ -47,7 +47,7 @@ type ProductForm = {
   imageUrls: string[];
   colorsInput: string;
   sizesInput: string;
-  sourceUrl: string; // নতুন যোগ করা হয়েছে
+  sourceUrl: string;
   stock: string;
   purchaseCost: string;
   resellerPrice: string;
@@ -63,7 +63,7 @@ const emptyForm: ProductForm = {
   imageUrls: [],
   colorsInput: '',
   sizesInput: '',
-  sourceUrl: '', // নতুন যোগ করা হয়েছে
+  sourceUrl: '',
   stock: '0',
   purchaseCost: '0',
   resellerPrice: '0',
@@ -131,7 +131,7 @@ export default function AdminProducts() {
             imageUrls: urls,
             colors,
             sizes,
-            sourceUrl: typeof data.sourceUrl === 'string' ? data.sourceUrl : '', // নতুন
+            sourceUrl: typeof data.sourceUrl === 'string' ? data.sourceUrl : '',
             stock: typeof data.stock === 'number' ? data.stock : 0,
             purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
@@ -221,7 +221,7 @@ export default function AdminProducts() {
       imageUrls: product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : []),
       colorsInput: product.colors.join(', '),
       sizesInput: product.sizes.join(', '),
-      sourceUrl: product.sourceUrl, // নতুন
+      sourceUrl: product.sourceUrl,
       stock: String(product.stock),
       purchaseCost: String(product.purchaseCost),
       resellerPrice: String(product.resellerPrice),
@@ -251,7 +251,7 @@ export default function AdminProducts() {
         imageUrls: form.imageUrls,
         colors,
         sizes,
-        sourceUrl: form.sourceUrl.trim(), // নতুন
+        sourceUrl: form.sourceUrl.trim(),
         stock: Number(form.stock) || 0,
         purchaseCost: Number(form.purchaseCost) || 0,
         resellerPrice: Number(form.resellerPrice) || 0,
@@ -379,7 +379,70 @@ export default function AdminProducts() {
         </select>
       </div>
 
-      {/* Mobile cards (Simplified for brevity, assume you have the desktop table too) */}
+      {/* Desktop table */}
+      <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
+        <table className="w-full text-left text-sm">
+          <thead className="bg-zeluxe-cream">
+            <tr>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Image</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Name</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">SKU</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Category</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Stock</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Price</th>
+              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Active</th>
+              <th className="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((product) => (
+              <tr key={product.id} className="border-b border-zeluxe-lightgray last:border-0">
+                <td className="px-4 py-3">
+                  {product.imageUrl ? (
+                    <div className="relative">
+                      <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-md object-cover" />
+                      {product.imageUrls.length > 1 && (
+                        <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
+                          {product.imageUrls.length}
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zeluxe-cream">
+                      <Package className="h-5 w-5 text-gray-400" />
+                    </div>
+                  )}
+                </td>
+                <td className="px-4 py-3 font-medium text-zeluxe-black">{product.name}</td>
+                <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
+                <td className="px-4 py-3 text-xs text-gray-500">{product.category}</td>
+                <td className="px-4 py-3 text-zeluxe-black">{product.stock}</td>
+                <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</td>
+                <td className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={product.active}
+                    onChange={() => toggleActive(product)}
+                    className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
+                  />
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex gap-2">
+                    <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold hover:bg-zeluxe-cream">
+                      <Pencil className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile cards */}
       <div className="space-y-3 md:hidden">
         {filtered.map((product) => (
           <div key={product.id} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
@@ -413,8 +476,6 @@ export default function AdminProducts() {
           </div>
         ))}
       </div>
-      
-      {/* Desktop Table would go here (same as before) */}
 
       {filtered.length === 0 && (
         <div className="mt-6 rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-8 text-center">
@@ -450,7 +511,12 @@ export default function AdminProducts() {
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
                   <span>SKU *</span>
-                  <button type="button" onClick={handleRegenerateSku} disabled={!form.category || skuLoading} className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline disabled:opacity-40">
+                  <button
+                    type="button"
+                    onClick={handleRegenerateSku}
+                    disabled={!form.category || skuLoading}
+                    className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline disabled:opacity-40"
+                  >
                     <Wand2 size={12} /> Auto Generate
                   </button>
                 </label>
@@ -461,6 +527,9 @@ export default function AdminProducts() {
                     placeholder="ক্যাটাগরি সিলেক্ট করলে অটো তৈরি হবে"
                     className={`${inputClass} bg-zeluxe-cream font-mono text-gray-600 ${skuLoading ? 'animate-pulse' : ''}`}
                   />
+                  {skuLoading && (
+                    <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zeluxe-gold" />
+                  )}
                 </div>
               </div>
 
@@ -485,7 +554,7 @@ export default function AdminProducts() {
                 />
               </div>
 
-              {/* ═══ নতুন সোর্স লিংক ফিল্ড ═══ */}
+              {/* Source URL */}
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <LinkIcon size={14} className="text-zeluxe-gold" />
@@ -515,6 +584,9 @@ export default function AdminProducts() {
                   placeholder="যেমন: S, M, L, XL, XXL"
                   className={inputClass}
                 />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  কমা (,) দিয়ে একাধিক সাইজ আলাদা করুন। খালি রাখলে কোনো সাইজ অপশন দেখাবে না।
+                </p>
               </div>
 
               {/* Colors */}
@@ -526,70 +598,155 @@ export default function AdminProducts() {
                 <input
                   value={form.colorsInput}
                   onChange={(e) => setForm({ ...form, colorsInput: e.target.value })}
-                  placeholder="যেমন: Red, Blue, Green"
+                  placeholder="যেমন: Red, Blue, Green, Black"
                   className={inputClass}
                 />
+                <p className="mt-1 text-[11px] text-gray-400">
+                  কমা (,) দিয়ে একাধিক কালার আলাদা করুন।
+                </p>
               </div>
 
-              {/* Images (Same as before) */}
+              {/* Images */}
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
                   <span>প্রোডাক্টের ছবি</span>
                   <span className="text-[11px] font-normal text-gray-500">{form.imageUrls.length}/{MAX_IMAGES}</span>
                 </label>
+
                 {form.imageUrls.length > 0 && (
                   <div className="mb-3 grid grid-cols-3 gap-2">
                     {form.imageUrls.map((url, idx) => (
-                      <div key={idx} className={`group relative aspect-square overflow-hidden rounded-md border-2 ${idx === 0 ? 'border-zeluxe-gold' : 'border-zeluxe-lightgray'}`}>
+                      <div
+                        key={idx}
+                        className={`group relative aspect-square overflow-hidden rounded-md border-2 ${
+                          idx === 0 ? 'border-zeluxe-gold' : 'border-zeluxe-lightgray'
+                        }`}
+                      >
                         <img src={url} alt={`Product ${idx + 1}`} className="h-full w-full object-cover" />
-                        {idx === 0 && <span className="absolute left-1 top-1 rounded bg-zeluxe-gold px-1.5 py-0.5 text-[9px] font-bold text-zeluxe-black">Primary</span>}
-                        <button type="button" onClick={() => removeImage(idx)} className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-md">
+                        {idx === 0 && (
+                          <span className="absolute left-1 top-1 rounded bg-zeluxe-gold px-1.5 py-0.5 text-[9px] font-bold text-zeluxe-black">
+                            Primary
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => removeImage(idx)}
+                          className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-md"
+                        >
                           <X size={11} />
                         </button>
+                        {idx > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setPrimaryImage(idx)}
+                            className="absolute bottom-1 left-1 right-1 rounded bg-black/70 px-2 py-1 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100"
+                          >
+                            Primary করুন
+                          </button>
+                        )}
                       </div>
                     ))}
                   </div>
                 )}
+
                 {form.imageUrls.length < MAX_IMAGES && (
-                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed border-zeluxe-lightgray p-4 text-center transition hover:border-zeluxe-gold disabled:opacity-60">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed border-zeluxe-lightgray p-4 text-center transition hover:border-zeluxe-gold disabled:opacity-60"
+                  >
                     {uploading ? (
-                      <><Loader2 className="mx-auto h-6 w-6 animate-spin text-zeluxe-gold" /><p className="mt-2 text-xs text-gray-500">আপলোড হচ্ছে...</p></>
+                      <>
+                        <Loader2 className="mx-auto h-6 w-6 animate-spin text-zeluxe-gold" />
+                        <p className="mt-2 text-xs text-gray-500">আপলোড হচ্ছে...</p>
+                      </>
                     ) : (
-                      <><Upload className="mx-auto h-6 w-6 text-zeluxe-gold" /><p className="mt-2 text-sm font-medium text-zeluxe-black">ছবি আপলোড করুন</p></>
+                      <>
+                        <Upload className="mx-auto h-6 w-6 text-zeluxe-gold" />
+                        <p className="mt-2 text-sm font-medium text-zeluxe-black">
+                          {form.imageUrls.length === 0 ? 'ছবি আপলোড করুন' : 'আরো ছবি যোগ করুন'}
+                        </p>
+                      </>
                     )}
                   </button>
                 )}
-                <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={(e) => { const files = e.target.files; if (files && files.length > 0) void handleMultipleImageUpload(files); e.target.value = ''; }} className="hidden" />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) void handleMultipleImageUpload(files);
+                    e.target.value = '';
+                  }}
+                  className="hidden"
+                />
               </div>
 
+              {/* ═══ Prices & Stock (সমস্যা সমাধান করা হয়েছে) ═══ */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">স্টক</label>
-                  <input type="number" value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} className={inputClass} />
+                  <input
+                    type="number"
+                    value={form.stock}
+                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
+                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    className={inputClass}
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ক্রয় মূল্য (Tk)</label>
-                  <input type="number" value={form.purchaseCost} onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })} className={inputClass} />
+                  <input
+                    type="number"
+                    value={form.purchaseCost}
+                    onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })}
+                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    className={inputClass}
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">রিসেলার মূল্য (Tk)</label>
-                  <input type="number" value={form.resellerPrice} onChange={(e) => setForm({ ...form, resellerPrice: e.target.value })} className={inputClass} />
+                  <input
+                    type="number"
+                    value={form.resellerPrice}
+                    onChange={(e) => setForm({ ...form, resellerPrice: e.target.value })}
+                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    className={inputClass}
+                  />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">সাজেস্টেড মূল্য (Tk)</label>
-                  <input type="number" value={form.suggestedPrice} onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value })} className={inputClass} />
+                  <input
+                    type="number"
+                    value={form.suggestedPrice}
+                    onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value })}
+                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    className={inputClass}
+                  />
                 </div>
               </div>
 
               <label className="flex items-center gap-2">
-                <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold" />
+                <input
+                  type="checkbox"
+                  checked={form.active}
+                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                  className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
+                />
                 <span className="text-sm text-zeluxe-black">Active (রিসেলাররা দেখতে পাবে)</span>
               </label>
             </div>
 
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setModalOpen(false)} className="flex-1 rounded-md border border-zeluxe-lightgray py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-cream">বাতিল</button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-60">{saving ? 'সেভ হচ্ছে...' : 'সেভ করুন'}</button>
+              <button onClick={() => setModalOpen(false)} className="flex-1 rounded-md border border-zeluxe-lightgray py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-cream">
+                বাতিল
+              </button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-60">
+                {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
+              </button>
             </div>
           </div>
         </div>
