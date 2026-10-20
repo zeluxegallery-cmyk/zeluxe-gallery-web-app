@@ -111,15 +111,13 @@ export default function CreateOrder() {
 
     void loadProducts();
 
-    // ═══ localStorage থেকে কার্ট লোড করা হচ্ছে ═══
+    // ═══ localStorage থেকে কার্ট লোড করা হচ্ছে (ডিলিট করা হবে না) ═══
     try {
       const savedCart = localStorage.getItem('zeluxe_cart');
       if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
         if (Array.isArray(parsedCart) && parsedCart.length > 0) {
           setCart(parsedCart);
-          toast.success('কার্ট থেকে প্রোডাক্ট লোড হয়েছে');
-          localStorage.removeItem('zeluxe_cart'); // লোড হওয়ার পর ক্লিয়ার করে দিচ্ছি
         }
       }
     } catch (e) {
@@ -180,7 +178,9 @@ export default function CreateOrder() {
       resellerPrice: selectedProduct.resellerPrice,
     };
 
-    setCart([...cart, newItem]);
+    const newCart = [...cart, newItem];
+    setCart(newCart);
+    localStorage.setItem('zeluxe_cart', JSON.stringify(newCart)); // ═══ স্টোরেজে আপডেট ═══
     
     // Reset current item form
     setCurrentProductId('');
@@ -190,8 +190,11 @@ export default function CreateOrder() {
     toast.success('প্রোডাক্ট অর্ডারে যোগ হয়েছে!');
   };
 
+  // ═══ ডিলিট করলে স্টোরেজ থেকেও মুছবে ═══
   const removeFromCart = (index: number) => {
-    setCart(cart.filter((_, i) => i !== index));
+    const updatedCart = cart.filter((_, i) => i !== index);
+    setCart(updatedCart);
+    localStorage.setItem('zeluxe_cart', JSON.stringify(updatedCart));
   };
 
   // Calculations
@@ -249,6 +252,7 @@ export default function CreateOrder() {
       });
       
       toast.success('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
+      localStorage.removeItem('zeluxe_cart'); // অর্ডার শেষে কার্ট খালি হবে
       setTimeout(() => navigate('/orders'), 1000);
       
     } catch (err) {
@@ -346,13 +350,12 @@ export default function CreateOrder() {
                   <label className="block text-sm font-medium text-zeluxe-black mb-1.5">বিক্রয় মূল্য (Tk)</label>
                   <input type="text" inputMode="numeric" value={currentSellingPrice} onChange={(e) => setCurrentSellingPrice(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
                   
-                  {/* ═══ নতুন যোগ করা অংশ: ক্রয় মূল্য দেখানো হচ্ছে ═══ */}
+                  {/* ক্রয় মূল্য দেখানো হচ্ছে */}
                   {selectedProduct && (
                     <p className="mt-1 text-[11px] text-gray-500">
                       রিসেলার মূল্য (ক্রয়): <span className="font-bold text-zeluxe-black">Tk {selectedProduct.resellerPrice}</span>
                     </p>
                   )}
-                  {/* ══════════════════════════════════════════════ */}
 
                 </div>
               </div>
