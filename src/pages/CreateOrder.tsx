@@ -110,6 +110,23 @@ export default function CreateOrder() {
     };
 
     void loadProducts();
+
+    // ═══ localStorage থেকে কার্ট লোড করা হচ্ছে ═══
+    try {
+      const savedCart = localStorage.getItem('zeluxe_cart');
+      if (savedCart) {
+        const parsedCart = JSON.parse(savedCart);
+        if (Array.isArray(parsedCart) && parsedCart.length > 0) {
+          setCart(parsedCart);
+          toast.success('কার্ট থেকে প্রোডাক্ট লোড হয়েছে');
+          localStorage.removeItem('zeluxe_cart'); // লোড হওয়ার পর ক্লিয়ার করে দিচ্ছি
+        }
+      }
+    } catch (e) {
+      console.error('Failed to load cart', e);
+    }
+    // ═══ কার্ট লোড শেষ ═══
+
   }, [presetProductId]);
 
   const selectedProduct = products.find((p) => p.id === currentProductId);
