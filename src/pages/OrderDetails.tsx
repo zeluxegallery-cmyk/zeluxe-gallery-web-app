@@ -13,7 +13,7 @@ type OrderItem = {
   size: string;
   quantity: number;
   sellingPrice: number;
-  resellerPrice?: number; // নতুন - লাভ ক্যালকুলেশনের জন্য
+  resellerPrice?: number;
 };
 
 type OrderData = {
@@ -22,7 +22,7 @@ type OrderData = {
   customerPhone: string;
   address: string;
   district: string;
-  resellerId: string; // নতুন
+  resellerId: string;
   productId?: string;
   productName?: string;
   size?: string | null;
@@ -34,6 +34,7 @@ type OrderData = {
   discount: number;
   total: number;
   paymentMethod: string;
+  transactionId?: string; // ═══ নতুন যোগ করা হয়েছে ═══
   status: string;
   note?: string;
   createdAt?: { seconds?: number };
@@ -64,7 +65,7 @@ function formatDate(seconds?: number) {
 export default function OrderDetails() {
   const { id } = useParams();
   const [order, setOrder] = useState<OrderData | null>(null);
-  const [reseller, setReseller] = useState<ResellerInfo | null>(null); // নতুন স্টেট
+  const [reseller, setReseller] = useState<ResellerInfo | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -104,6 +105,7 @@ export default function OrderDetails() {
             discount: typeof data.discount === 'number' ? data.discount : 0,
             total: typeof data.total === 'number' ? data.total : 0,
             paymentMethod: typeof data.paymentMethod === 'string' ? data.paymentMethod : '—',
+            transactionId: typeof data.transactionId === 'string' ? data.transactionId : '', // ═══ নতুন যোগ করা হয়েছে ═══
             status: typeof data.status === 'string' ? data.status : 'pending',
             note: typeof data.note === 'string' ? data.note : undefined,
             createdAt: data.createdAt,
@@ -164,17 +166,14 @@ export default function OrderDetails() {
   }
 
   // ═══ পেমেন্ট ক্যালকুলেশন ═══
-  // অ্যাডমিন কত টাকা পাবে (রিসেলার প্রাইস + ডেলিভারি চার্জ - ডিসকাউন্ট)
   let adminPayment = 0;
   if (order.items && order.items.length > 0) {
     const resellerTotal = order.items.reduce((sum, item) => sum + ((item.resellerPrice || 0) * item.quantity), 0);
     adminPayment = resellerTotal + order.deliveryCharge - order.discount;
   } else {
-    // পুরনো সিস্টেমের জন্য ফ্যালব্যাক
-    adminPayment = order.total; // যদি রিসেলার প্রাইস সেভ না থাকে, তবে পুরো টাকাই ধরা হলো
+    adminPayment = order.total; 
   }
 
-  // রিসেলারের লাভ (কাস্টমারের মোট বিল - অ্যাডমিন পেমেন্ট)
   const resellerProfit = order.total - adminPayment;
 
   return (
@@ -293,6 +292,13 @@ export default function OrderDetails() {
               <span className="text-zeluxe-gray">Payment Method</span>
               <span className="font-medium text-zeluxe-black">{order.paymentMethod}</span>
             </div>
+            {/* ═══ নতুন যোগ করা ট্রানজেকশন আইডি ═══ */}
+            {order.transactionId && (
+              <div className="flex justify-between text-sm">
+                <span className="text-zeluxe-gray">Transaction ID</span>
+                <span className="font-mono font-bold text-blue-600">{order.transactionId}</span>
+              </div>
+            )}
           </div>
         </div>
 
