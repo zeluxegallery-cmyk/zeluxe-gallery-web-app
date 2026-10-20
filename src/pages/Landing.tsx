@@ -4,7 +4,7 @@ import {
   Crown, Gem, Headphones, Palette, ShoppingBag, Shirt, Sparkles,
   Tag, TrendingUp, Truck, FolderTree, Menu, X, Package, Wallet,
   ShieldCheck, Check, BarChart3, GraduationCap, CreditCard,
-  Star, ArrowRight, Zap, Users,
+  Star, ArrowRight, Zap, Users, Send, Facebook, MessageCircle,
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -503,8 +503,8 @@ export default function Landing() {
       {/* ═══════ FOOTER ═══════ */}
       <footer className="border-t border-zeluxe-lightgray bg-white px-5 py-10">
         <div className="mx-auto max-w-6xl">
-          <div className="flex flex-col items-center gap-6 md:flex-row md:items-start md:justify-between">
-            <div className="text-center md:text-left">
+          <div className="flex flex-col items-center gap-8 md:flex-row md:items-start md:justify-between">
+            <div className="text-center md:text-left md:w-1/4">
               <img
                 src={LOGO_URL}
                 alt="Zeluxe Gallery"
@@ -513,7 +513,7 @@ export default function Landing() {
               <p className="mt-2 text-xs text-gray-500">প্রিমিয়াম ফ্যাশন রিসেলিং প্লাটফর্ম</p>
             </div>
 
-            <div className="text-center">
+            <div className="text-center md:text-left md:w-1/4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">যোগাযোগ</p>
               <p className="mt-2 text-sm font-medium text-zeluxe-black">01603-226151</p>
               <a href="mailto:zeluxegallery@gmail.com" className="mt-1 block text-xs text-zeluxe-gold hover:underline">
@@ -521,7 +521,23 @@ export default function Landing() {
               </a>
             </div>
 
-            <div className="text-center">
+            {/* ═══ নতুন সোশ্যাল মিডিয়া সেকশন ═══ */}
+            <div className="text-center md:text-left md:w-1/4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">সোশ্যাল মিডিয়া</p>
+              <div className="mt-2 flex flex-col gap-2 text-xs">
+                <a href="https://t.me/+NX7sLkCLMPk0YWI1" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 text-gray-500 hover:text-[#0088cc] md:justify-start">
+                  <Send size={14} /> Telegram Channel
+                </a>
+                <a href="https://www.facebook.com/share/1BKSZiGu3v/" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 text-gray-500 hover:text-[#1877F2] md:justify-start">
+                  <Facebook size={14} /> Facebook Page
+                </a>
+                <a href="https://t.me/zeluxegalleryreseller" target="_blank" rel="noreferrer" className="flex items-center justify-center gap-1.5 text-gray-500 hover:text-[#229ED9] md:justify-start">
+                  <MessageCircle size={14} /> Telegram Support
+                </a>
+              </div>
+            </div>
+
+            <div className="text-center md:text-left md:w-1/4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">লিংক</p>
               <div className="mt-2 flex flex-col gap-1 text-xs">
                 <Link to="/register" className="text-gray-500 hover:text-zeluxe-gold">রেজিস্ট্রেশন</Link>
