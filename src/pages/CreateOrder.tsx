@@ -345,6 +345,15 @@ export default function CreateOrder() {
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black mb-1.5">বিক্রয় মূল্য (Tk)</label>
                   <input type="text" inputMode="numeric" value={currentSellingPrice} onChange={(e) => setCurrentSellingPrice(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
+                  
+                  {/* ═══ নতুন যোগ করা অংশ: ক্রয় মূল্য দেখানো হচ্ছে ═══ */}
+                  {selectedProduct && (
+                    <p className="mt-1 text-[11px] text-gray-500">
+                      রিসেলার মূল্য (ক্রয়): <span className="font-bold text-zeluxe-black">Tk {selectedProduct.resellerPrice}</span>
+                    </p>
+                  )}
+                  {/* ══════════════════════════════════════════════ */}
+
                 </div>
               </div>
 
