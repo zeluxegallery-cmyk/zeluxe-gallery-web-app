@@ -37,6 +37,7 @@ type Product = {
   imageUrl: string;
   imageUrls: string[];
   colors: string[];
+  sizes: string[]; // নতুন যোগ করা হয়েছে
   stock: number;
   resellerPrice: number;
   suggestedPrice: number;
@@ -57,6 +58,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState('');
+  const [selectedSize, setSelectedSize] = useState(''); // নতুন স্টেট
 
   const [quantity, setQuantity] = useState(1);
   const [copied, setCopied] = useState(false);
@@ -95,6 +97,11 @@ export default function ProductDetail() {
             colors = data.colors.filter((c: any) => typeof c === 'string');
           }
 
+          let sizes: string[] = []; // নতুন
+          if (Array.isArray(data.sizes)) {
+            sizes = data.sizes.filter((s: any) => typeof s === 'string');
+          }
+
           const loadedProduct: Product = {
             id: snap.id,
             name: typeof data.name === 'string' ? data.name : 'Product',
@@ -104,6 +111,7 @@ export default function ProductDetail() {
             imageUrl: imgUrl,
             imageUrls: urls,
             colors,
+            sizes, // নতুন
             stock: typeof data.stock === 'number' ? data.stock : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
@@ -113,6 +121,7 @@ export default function ProductDetail() {
           setProduct(loadedProduct);
           setSellingPrice(String(loadedProduct.suggestedPrice));
           if (colors.length > 0) setSelectedColor(colors[0]);
+          if (sizes.length > 0) setSelectedSize(sizes[0]); // প্রথম সাইজ ডিফল্ট
 
           // Load related products (same category)
           if (loadedProduct.category) {
@@ -139,6 +148,7 @@ export default function ProductDetail() {
                     imageUrl: rImg,
                     imageUrls: rImg ? [rImg] : [],
                     colors: [],
+                    sizes: [], // নতুন
                     stock: typeof rData.stock === 'number' ? rData.stock : 0,
                     resellerPrice: typeof rData.resellerPrice === 'number' ? rData.resellerPrice : 0,
                     suggestedPrice: typeof rData.suggestedPrice === 'number' ? rData.suggestedPrice : 0,
@@ -173,7 +183,8 @@ export default function ProductDetail() {
   const handleCopyDetails = async () => {
     if (!product) return;
     const colorLine = selectedColor ? `\nকালার: ${selectedColor}` : '';
-    const text = `${product.name}\n${product.sku}${colorLine}\n\n${product.description}\n\nদাম: Tk ${product.suggestedPrice}\n\nZeluxe Gallery`;
+    const sizeLine = selectedSize ? `\nসাইজ: ${selectedSize}` : '';
+    const text = `${product.name}\n${product.sku}${colorLine}${sizeLine}\n\n${product.description}\n\nদাম: Tk ${product.suggestedPrice}\n\nZeluxe Gallery`;
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -223,6 +234,10 @@ export default function ProductDetail() {
       toast.error('সব প্রয়োজনীয় তথ্য দিন');
       return;
     }
+    if (product.sizes.length > 0 && !selectedSize) {
+      toast.error('অনুগ্রহ করে সাইজ সিলেক্ট করুন');
+      return;
+    }
     if (numSelling <= 0) {
       toast.error('সঠিক বিক্রয় মূল্য দিন');
       return;
@@ -259,6 +274,7 @@ export default function ProductDetail() {
         productName: product.name,
         productSku: product.sku,
         productColor: selectedColor || '',
+        productSize: selectedSize || '', // নতুন
         quantity: numQty,
         sellingPrice: numSelling,
         deliveryCharge: numDelivery,
@@ -400,10 +416,36 @@ export default function ProductDetail() {
                   </div>
                 )}
 
+                {product.sizes.length > 0 && (
+                  <div className="relative mb-3">
+                    <select
+                      value={selectedSize}
+                      onChange={(e) => setSelectedSize(e.target.value)}
+                      className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-3 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+                    >
+                      {product.sizes.map((s) => (
+                        <option key={s} value={s}>
+                          Size: {s}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={16}
+                      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    />
+                  </div>
+                )}
+
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-500">Color:</span>
                   <span className="font-medium text-zeluxe-black">
                     {selectedColor || '—'}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex justify-between text-xs">
+                  <span className="text-gray-500">Size:</span>
+                  <span className="font-medium text-zeluxe-black">
+                    {selectedSize || '—'}
                   </span>
                 </div>
                 <div className="mt-1.5 flex justify-between text-xs">
@@ -571,11 +613,39 @@ export default function ProductDetail() {
                 {selectedColor && (
                   <p className="mt-1 text-xs text-gray-600">কালার: {selectedColor}</p>
                 )}
+                {selectedSize && (
+                  <p className="mt-0.5 text-xs text-gray-600">সাইজ: {selectedSize}</p>
+                )}
                 <div className="mt-2 flex items-center justify-between border-t border-zeluxe-lightgray pt-2 text-xs">
                   <span className="text-gray-500">পরিমাণ</span>
                   <span className="font-bold text-zeluxe-black">{quantity}</span>
                 </div>
               </div>
+
+              {/* ═══ SIZE SELECTION IN MODAL ═══ */}
+              {product.sizes.length > 0 && (
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    সাইজ সিলেক্ট করুন *
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {product.sizes.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setSelectedSize(s)}
+                        className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
+                          selectedSize === s
+                            ? 'border-zeluxe-gold bg-zeluxe-gold text-zeluxe-black'
+                            : 'border-zeluxe-lightgray bg-white text-zeluxe-black hover:border-zeluxe-gold'
+                        }`}
+                      >
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
