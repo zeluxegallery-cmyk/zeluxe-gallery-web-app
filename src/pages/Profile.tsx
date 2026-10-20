@@ -19,6 +19,9 @@ import {
   Upload,
   MapPin,
   Wallet,
+  Send,
+  Facebook,
+  Headphones,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Layout from '../components/Layout';
@@ -353,6 +356,56 @@ export default function Profile() {
             value={formatDate(userData.createdAt)}
             isLast
           />
+        </div>
+
+        {/* ═══ নতুন সোশ্যাল মিডিয়া লিংক সেকশন ═══ */}
+        <div className="mb-4 space-y-3 rounded-xl border border-zeluxe-lightgray bg-white p-4">
+          <h3 className="text-sm font-bold text-zeluxe-black mb-1">আমাদের সাথে যুক্ত থাকুন</h3>
+          
+          <a
+            href="https://t.me/+NX7sLkCLMPk0YWI1"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#0088cc] hover:bg-blue-50/50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0088cc]/10">
+              <Send size={18} className="text-[#0088cc]" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-zeluxe-black">Telegram Channel</p>
+              <p className="text-[11px] text-gray-500">নতুন আপডেট ও অফার পেতে জয়েন করুন</p>
+            </div>
+          </a>
+
+          <a
+            href="https://www.facebook.com/share/1BKSZiGu3v/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#1877F2] hover:bg-blue-50/50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1877F2]/10">
+              <Facebook size={18} className="text-[#1877F2]" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-zeluxe-black">Facebook Page</p>
+              <p className="text-[11px] text-gray-500">আমাদের অফিসিয়াল ফেসবুক পেজ</p>
+            </div>
+          </a>
+
+          <a
+            href="https://t.me/zeluxegalleryreseller"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#229ED9] hover:bg-blue-50/50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#229ED9]/10">
+              <Headphones size={18} className="text-[#229ED9]" />
+            </div>
+            <div>
+              <p className="text-sm font-bold text-zeluxe-black">Telegram Support</p>
+              <p className="text-[11px] text-gray-500">যেকোনো সমস্যায় সরাসরি মেসেজ করুন</p>
+            </div>
+          </a>
         </div>
 
         {/* Withdraw Button */}
