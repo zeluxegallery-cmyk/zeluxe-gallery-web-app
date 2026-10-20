@@ -37,7 +37,7 @@ type Product = {
   imageUrl: string;
   imageUrls: string[];
   colors: string[];
-  sizes: string[]; // নতুন যোগ করা হয়েছে
+  sizes: string[];
   stock: number;
   resellerPrice: number;
   suggestedPrice: number;
@@ -58,7 +58,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState('');
-  const [selectedSize, setSelectedSize] = useState(''); // নতুন স্টেট
+  const [selectedSize, setSelectedSize] = useState('');
 
   const [quantity, setQuantity] = useState(1);
   const [copied, setCopied] = useState(false);
@@ -97,7 +97,7 @@ export default function ProductDetail() {
             colors = data.colors.filter((c: any) => typeof c === 'string');
           }
 
-          let sizes: string[] = []; // নতুন
+          let sizes: string[] = [];
           if (Array.isArray(data.sizes)) {
             sizes = data.sizes.filter((s: any) => typeof s === 'string');
           }
@@ -111,7 +111,7 @@ export default function ProductDetail() {
             imageUrl: imgUrl,
             imageUrls: urls,
             colors,
-            sizes, // নতুন
+            sizes,
             stock: typeof data.stock === 'number' ? data.stock : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
@@ -121,7 +121,7 @@ export default function ProductDetail() {
           setProduct(loadedProduct);
           setSellingPrice(String(loadedProduct.suggestedPrice));
           if (colors.length > 0) setSelectedColor(colors[0]);
-          if (sizes.length > 0) setSelectedSize(sizes[0]); // প্রথম সাইজ ডিফল্ট
+          if (sizes.length > 0) setSelectedSize(sizes[0]);
 
           // Load related products (same category)
           if (loadedProduct.category) {
@@ -148,7 +148,7 @@ export default function ProductDetail() {
                     imageUrl: rImg,
                     imageUrls: rImg ? [rImg] : [],
                     colors: [],
-                    sizes: [], // নতুন
+                    sizes: [],
                     stock: typeof rData.stock === 'number' ? rData.stock : 0,
                     resellerPrice: typeof rData.resellerPrice === 'number' ? rData.resellerPrice : 0,
                     suggestedPrice: typeof rData.suggestedPrice === 'number' ? rData.suggestedPrice : 0,
@@ -274,7 +274,7 @@ export default function ProductDetail() {
         productName: product.name,
         productSku: product.sku,
         productColor: selectedColor || '',
-        productSize: selectedSize || '', // নতুন
+        productSize: selectedSize || '',
         quantity: numQty,
         sellingPrice: numSelling,
         deliveryCharge: numDelivery,
@@ -604,29 +604,49 @@ export default function ProductDetail() {
             </div>
 
             <form onSubmit={handleSubmitOrder} className="space-y-4">
-              {/* Product Summary */}
-              <div className="rounded-md border border-zeluxe-lightgray bg-zeluxe-cream p-3">
-                <p className="text-xs font-bold text-zeluxe-black">{product.name}</p>
-                <p className="mt-0.5 font-mono text-[10px] text-gray-500">
-                  {product.sku}
-                </p>
-                {selectedColor && (
-                  <p className="mt-1 text-xs text-gray-600">কালার: {selectedColor}</p>
-                )}
-                {selectedSize && (
-                  <p className="mt-0.5 text-xs text-gray-600">সাইজ: {selectedSize}</p>
-                )}
-                <div className="mt-2 flex items-center justify-between border-t border-zeluxe-lightgray pt-2 text-xs">
-                  <span className="text-gray-500">পরিমাণ</span>
-                  <span className="font-bold text-zeluxe-black">{quantity}</span>
+              
+              {/* ═══ নতুন প্রোডাক্ট সামারি (ছবির মতো) ═══ */}
+              <div className="flex items-start gap-3 rounded-md border border-zeluxe-lightgray bg-white p-3 shadow-sm">
+                {/* প্রোডাক্টের ছবি */}
+                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-zeluxe-lightgray bg-zeluxe-cream">
+                  {product.imageUrl ? (
+                    <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center">
+                      <Package size={20} className="text-gray-400" />
+                    </div>
+                  )}
+                  {/* Quantity Badge */}
+                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zeluxe-black text-[10px] font-bold text-white shadow-sm">
+                    {quantity}
+                  </span>
+                </div>
+
+                {/* প্রোডাক্টের তথ্য */}
+                <div className="flex-1">
+                  <p className="text-sm font-bold text-zeluxe-black line-clamp-2">{product.name}</p>
+                  <p className="mt-0.5 font-mono text-[10px] text-gray-500">SKU: {product.sku}</p>
+                  
+                  {/* কালার ও সাইজ ব্যাজ */}
+                  <div className="mt-1.5 flex flex-wrap gap-2 text-[11px]">
+                    {selectedColor && (
+                      <span className="rounded bg-zeluxe-cream px-2 py-1 font-medium text-gray-700 border border-zeluxe-lightgray">
+                        Color: {selectedColor}
+                      </span>
+                    )}
+                    {selectedSize && (
+                      <span className="rounded bg-zeluxe-cream px-2 py-1 font-medium text-gray-700 border border-zeluxe-lightgray">
+                        Size: {selectedSize}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* ═══ SIZE SELECTION IN MODAL ═══ */}
               {product.sizes.length > 0 && (
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    সাইজ সিলেক্ট করুন *
+                    সাইজ পরিবর্তন করুন
                   </label>
                   <div className="flex flex-wrap gap-2">
                     {product.sizes.map((s) => (
