@@ -62,6 +62,7 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState('');
 
   const [quantity, setQuantity] = useState(1);
+  const [sellingPrice, setSellingPrice] = useState(''); // ═══ নতুন স্টেট কার্টের জন্য ═══
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -75,7 +76,7 @@ export default function ProductDetail() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('ঢাকার ভিতরে');
-  const [sellingPrice, setSellingPrice] = useState('');
+  const [modalSellingPrice, setModalSellingPrice] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState('70');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
@@ -138,6 +139,7 @@ export default function ProductDetail() {
 
           setProduct(loadedProduct);
           setSellingPrice(String(loadedProduct.suggestedPrice));
+          setModalSellingPrice(String(loadedProduct.suggestedPrice));
           if (colors.length > 0) setSelectedColor(colors[0]);
           if (sizes.length > 0) setSelectedSize(sizes[0]);
 
@@ -186,8 +188,6 @@ export default function ProductDetail() {
       }
     };
     void loadProduct();
-    
-    // পেজ লোড হওয়ার সময় কার্ট চেক করবে
     updateCartState();
   }, [id]);
 
@@ -200,6 +200,12 @@ export default function ProductDetail() {
       return;
     }
 
+    const price = Number(sellingPrice) || product.suggestedPrice;
+    if (price <= 0) {
+      toast.error('সঠিক বিক্রয় মূল্য দিন');
+      return;
+    }
+
     const newItem = {
       productId: product.id,
       name: product.name,
@@ -207,7 +213,7 @@ export default function ProductDetail() {
       imageUrl: product.imageUrl,
       size: selectedSize || 'N/A',
       quantity: quantity,
-      sellingPrice: Number(sellingPrice) || product.suggestedPrice,
+      sellingPrice: price, // ═══ এখানে ইউজারের দেওয়া দাম যাচ্ছে ═══
       resellerPrice: product.resellerPrice,
     };
 
@@ -224,20 +230,21 @@ export default function ProductDetail() {
       
       if (existingIdx > -1) {
         existingCart[existingIdx].quantity += newItem.quantity;
+        existingCart[existingIdx].sellingPrice = price; // দাম আপডেট হবে
       } else {
         existingCart.push(newItem);
       }
 
       localStorage.setItem('zeluxe_cart', JSON.stringify(existingCart));
       toast.success('✓ কার্টে যোগ হয়েছে!');
-      updateCartState(); // বাটন আপডেট হবে
+      updateCartState(); // ফ্লোটিং বাটন আপডেট হবে
     } catch (err) {
       toast.error('কার্টে যোগ করতে সমস্যা হয়েছে');
     }
   };
 
   const numQty = Number(quantity) || 0;
-  const numSelling = Number(sellingPrice) || 0;
+  const numSelling = Number(modalSellingPrice) || 0; // মডালের জন্য
   const numDiscount = Number(discount) || 0;
   const numDelivery = Number(deliveryCharge) || 0;
 
@@ -289,14 +296,14 @@ export default function ProductDetail() {
     }
   };
 
-  // Submit order
+  // Submit order from Modal
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     const user = auth.currentUser;
     if (!user) return navigate('/login');
     if (!product) return;
 
-    if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !sellingPrice) {
+    if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !modalSellingPrice) {
       toast.error('সব প্রয়োজনীয় তথ্য দিন');
       return;
     }
@@ -393,7 +400,6 @@ export default function ProductDetail() {
 
   return (
     <Layout>
-      {/* পেজের কন্টেন্ট যাতে নিচের বাটনে ঢাকা না পড়ে, তাই pb-24 দেওয়া হলো */}
       <div className="mx-auto max-w-5xl pb-24">
         <Link
           to="/products"
@@ -506,6 +512,21 @@ export default function ProductDetail() {
                 </div>
               </div>
 
+              {/* ═══ কার্টে যোগ করার আগে দাম পরিবর্তন করার ইনপুট ═══ */}
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">আপনার বিক্রয় মূল্য (Tk)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={sellingPrice}
+                  onChange={(e) => setSellingPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+                />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  আপনার ক্রয় মূল্য: <span className="font-bold text-zeluxe-black">Tk {product.resellerPrice}</span>
+                </p>
+              </div>
+
               {/* Quantity & Buttons */}
               <div className="mt-4">
                 <div className="mb-3 flex items-center gap-2">
@@ -531,7 +552,10 @@ export default function ProductDetail() {
                     Add to Cart
                   </button>
                   <button
-                    onClick={() => setOrderModalOpen(true)}
+                    onClick={() => {
+                      setModalSellingPrice(sellingPrice); // দাম মডালে পাঠানো হলো
+                      setOrderModalOpen(true);
+                    }}
                     disabled={product.stock === 0}
                     className="flex items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
                   >
@@ -606,7 +630,7 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* ═══ ORDER MODAL ═══ */}
+      {/* ═══ ORDER MODAL (Order Now) ═══ */}
       {orderModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6">
@@ -656,7 +680,7 @@ export default function ProductDetail() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">বিক্রয় মূল্য (Tk)</label>
-                  <input type="number" value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} onFocus={(e) => e.target.select()} required className={inputClass} />
+                  <input type="number" value={modalSellingPrice} onChange={(e) => setModalSellingPrice(e.target.value)} onFocus={(e) => e.target.select()} required className={inputClass} />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ডিসকাউন্ট (Tk)</label>
