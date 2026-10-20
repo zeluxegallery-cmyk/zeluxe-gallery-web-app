@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { Loader2, Search, Package, X, ChevronDown } from 'lucide-react';
+import { Loader2, Search, Package, X, ChevronDown, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
@@ -22,6 +22,17 @@ type Product = {
   suggestedPrice: number;
   resellerPrice: number;
   sizes: string[];
+};
+
+type CartItem = {
+  productId: string;
+  name: string;
+  sku: string;
+  imageUrl: string;
+  size: string;
+  quantity: number;
+  sellingPrice: number;
+  resellerPrice: number;
 };
 
 const DISTRICTS = ['ঢাকার ভিতরে', 'ঢাকার বাইরে'];
@@ -43,11 +54,16 @@ export default function CreateOrder() {
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('ঢাকার ভিতরে');
 
-  // Order Details
-  const [productId, setProductId] = useState(presetProductId || '');
-  const [size, setSize] = useState('');
-  const [quantity, setQuantity] = useState('1');
-  const [sellingPrice, setSellingPrice] = useState('');
+  // Cart State
+  const [cart, setCart] = useState<CartItem[]>([]);
+  
+  // Current Item State (for adding to cart)
+  const [currentProductId, setCurrentProductId] = useState(presetProductId || '');
+  const [currentSize, setCurrentSize] = useState('');
+  const [currentQuantity, setCurrentQuantity] = useState('1');
+  const [currentSellingPrice, setCurrentSellingPrice] = useState('');
+
+  // Order Extras
   const [deliveryCharge, setDeliveryCharge] = useState('70');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
@@ -56,7 +72,6 @@ export default function CreateOrder() {
   // Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [productSearch, setProductSearch] = useState('');
-
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -84,9 +99,9 @@ export default function CreateOrder() {
         if (presetProductId) {
           const preset = fetchedProducts.find((p) => p.id === presetProductId);
           if (preset) {
-            setProductId(preset.id);
-            setSellingPrice(String(preset.suggestedPrice));
-            if (preset.sizes.length > 0) setSize(preset.sizes[0]);
+            setCurrentProductId(preset.id);
+            setCurrentSellingPrice(String(preset.suggestedPrice));
+            if (preset.sizes.length > 0) setCurrentSize(preset.sizes[0]);
           }
         }
       } finally {
@@ -97,12 +112,12 @@ export default function CreateOrder() {
     void loadProducts();
   }, [presetProductId]);
 
-  const selectedProduct = products.find((p) => p.id === productId);
+  const selectedProduct = products.find((p) => p.id === currentProductId);
 
   const handleProductSelect = (product: Product) => {
-    setProductId(product.id);
-    setSellingPrice(String(product.suggestedPrice));
-    setSize(product.sizes.length > 0 ? product.sizes[0] : '');
+    setCurrentProductId(product.id);
+    setCurrentSellingPrice(String(product.suggestedPrice));
+    setCurrentSize(product.sizes.length > 0 ? product.sizes[0] : '');
     setIsProductModalOpen(false);
     setProductSearch('');
   };
@@ -112,18 +127,6 @@ export default function CreateOrder() {
     setDeliveryCharge(val === 'ঢাকার ভিতরে' ? '70' : '120');
   };
 
-  const numQuantity = Number(quantity) || 0;
-  const numSellingPrice = Number(sellingPrice) || 0;
-  const numDiscount = Number(discount) || 0;
-  const numDeliveryCharge = Number(deliveryCharge) || 0;
-
-  const profit = selectedProduct
-    ? (numSellingPrice - Number(selectedProduct.resellerPrice)) * numQuantity
-    : 0;
-
-  const itemTotal = numQuantity * numSellingPrice;
-  const total = itemTotal + numDeliveryCharge - numDiscount;
-
   const filteredProducts = useMemo(() => {
     return products.filter(p => 
       p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
@@ -131,19 +134,68 @@ export default function CreateOrder() {
     );
   }, [products, productSearch]);
 
+  // Add item to cart
+  const handleAddToCart = () => {
+    if (!selectedProduct) {
+      toast.error('প্রোডাক্ট সিলেক্ট করুন।');
+      return;
+    }
+    const qty = Number(currentQuantity) || 0;
+    const price = Number(currentSellingPrice) || 0;
+    
+    if (qty <= 0 || price <= 0) {
+      toast.error('সঠিক পরিমাণ এবং বিক্রয় মূল্য দিন।');
+      return;
+    }
+    if (selectedProduct.sizes.length > 0 && !currentSize) {
+      toast.error('সাইজ সিলেক্ট করুন।');
+      return;
+    }
+
+    const newItem: CartItem = {
+      productId: selectedProduct.id,
+      name: selectedProduct.name,
+      sku: selectedProduct.sku,
+      imageUrl: selectedProduct.imageUrl,
+      size: currentSize || 'N/A',
+      quantity: qty,
+      sellingPrice: price,
+      resellerPrice: selectedProduct.resellerPrice,
+    };
+
+    setCart([...cart, newItem]);
+    
+    // Reset current item form
+    setCurrentProductId('');
+    setCurrentSize('');
+    setCurrentQuantity('1');
+    setCurrentSellingPrice('');
+    toast.success('প্রোডাক্ট অর্ডারে যোগ হয়েছে!');
+  };
+
+  const removeFromCart = (index: number) => {
+    setCart(cart.filter((_, i) => i !== index));
+  };
+
+  // Calculations
+  const totalItemPrice = cart.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
+  const totalProfit = cart.reduce((sum, item) => sum + ((item.sellingPrice - item.resellerPrice) * item.quantity), 0);
+  const numDiscount = Number(discount) || 0;
+  const numDeliveryCharge = Number(deliveryCharge) || 0;
+  const grandTotal = totalItemPrice + numDeliveryCharge - numDiscount;
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const user = auth.currentUser;
     if (!user) return navigate('/login');
 
-    if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !productId || !sellingPrice || numSellingPrice <= 0) {
-      toast.error('সব প্রয়োজনীয় তথ্য দিন।');
+    if (cart.length === 0) {
+      toast.error('অন্তত একটি প্রোডাক্ট যোগ করুন।');
       return;
     }
-
-    if (selectedProduct?.sizes.length && !size) {
-      toast.error('অনুগ্রহ করে সাইজ সিলেক্ট করুন।');
+    if (!customerName.trim() || !customerPhone.trim() || !address.trim()) {
+      toast.error('কাস্টমারের সব তথ্য দিন।');
       return;
     }
 
@@ -158,15 +210,21 @@ export default function CreateOrder() {
         customerPhone: customerPhone.trim(),
         address: address.trim(),
         district,
-        productId,
-        productName: selectedProduct?.name || '',
-        productSku: selectedProduct?.sku || '',
-        size: size || null,
-        quantity: numQuantity,
-        sellingPrice: numSellingPrice,
+        
+        // মাল্টিপল আইটেম সেভ করা হচ্ছে
+        items: cart, 
+        // পুরনো সিস্টেমের সাথে কম্প্যাটিবল রাখার জন্য প্রথম প্রোডাক্টের ডাটাও রাখছি
+        productId: cart[0].productId,
+        productName: cart[0].name,
+        size: cart[0].size,
+        quantity: cart[0].quantity,
+        sellingPrice: cart[0].sellingPrice,
+        
+        itemTotal: totalItemPrice,
+        profit: totalProfit,
         deliveryCharge: numDeliveryCharge,
         discount: numDiscount,
-        total: Number(total),
+        total: Number(grandTotal),
         paymentMethod,
         note: note.trim(),
         status: 'pending',
@@ -196,9 +254,9 @@ export default function CreateOrder() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-2xl pb-20">
+      <div className="mx-auto max-w-2xl pb-24">
         <h1 className="text-2xl font-bold text-zeluxe-black">নতুন অর্ডার</h1>
-        <p className="mb-6 text-sm text-gray-600">কাস্টমারের জন্য নতুন অর্ডার তৈরি করুন</p>
+        <p className="mb-6 text-sm text-gray-600">একসাথে একাধিক প্রোডাক্ট যোগ করে অর্ডার করুন</p>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           
@@ -208,91 +266,52 @@ export default function CreateOrder() {
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-zeluxe-black mb-1.5">কাস্টমারের নাম *</label>
-                <input
-                  type="text"
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  required
-                  className={inputClass}
-                  placeholder="যেমন: রফিকুল ইসলাম"
-                />
+                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className={inputClass} placeholder="যেমন: রফিকুল ইসলাম" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zeluxe-black mb-1.5">মোবাইল নাম্বার *</label>
-                <input
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  required
-                  className={inputClass}
-                  placeholder="01XXXXXXXXX"
-                />
+                <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required className={inputClass} placeholder="01XXXXXXXXX" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি ঠিকানা *</label>
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  required
-                  rows={3}
-                  className={`${inputClass} resize-none`}
-                  placeholder="সম্পূর্ণ ঠিকানা লিখুন"
-                />
+                <textarea value={address} onChange={(e) => setAddress(e.target.value)} required rows={2} className={`${inputClass} resize-none`} placeholder="সম্পূর্ণ ঠিকানা লিখুন" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zeluxe-black mb-1.5">এলাকা</label>
-                <select
-                  value={district}
-                  onChange={(e) => handleDistrictChange(e.target.value)}
-                  className={inputClass}
-                >
-                  {DISTRICTS.map((item) => (
-                    <option key={item} value={item}>{item}</option>
-                  ))}
+                <select value={district} onChange={(e) => handleDistrictChange(e.target.value)} className={inputClass}>
+                  {DISTRICTS.map((item) => <option key={item} value={item}>{item}</option>)}
                 </select>
               </div>
             </div>
           </section>
 
-          {/* অর্ডার ডিটেইলস */}
-          <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">অর্ডারের বিবরণ</h2>
+          {/* প্রোডাক্ট অ্যাড সেকশন */}
+          <section className="rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-5">
+            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">প্রোডাক্ট যোগ করুন</h2>
             <div className="space-y-4">
               
-              {/* ═══ নতুন প্রোডাক্ট সিলেক্টর বাটন ═══ */}
               <div>
                 <label className="block text-sm font-medium text-zeluxe-black mb-1.5">প্রোডাক্ট *</label>
                 <button
                   type="button"
                   onClick={() => setIsProductModalOpen(true)}
                   className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm transition ${
-                    selectedProduct 
-                      ? 'border-zeluxe-gold bg-zeluxe-gold/5 text-zeluxe-black font-medium' 
-                      : 'border-zeluxe-lightgray bg-zeluxe-fieldbg text-gray-500'
+                    selectedProduct ? 'border-zeluxe-gold bg-white text-zeluxe-black font-medium' : 'border-zeluxe-lightgray bg-white text-gray-500'
                   }`}
                 >
-                  <span className="truncate pr-4">
-                    {selectedProduct ? selectedProduct.name : 'প্রোডাক্ট সিলেক্ট করুন...'}
-                  </span>
+                  <span className="truncate pr-4">{selectedProduct ? selectedProduct.name : 'প্রোডাক্ট সিলেক্ট করুন...'}</span>
                   <ChevronDown size={18} className={selectedProduct ? 'text-zeluxe-gold' : 'text-gray-400'} />
                 </button>
               </div>
 
-              {/* সাইজ সিলেকশন (যদি প্রোডাক্টে সাইজ থাকে) */}
               {selectedProduct && selectedProduct.sizes.length > 0 && (
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black mb-1.5">সাইজ</label>
                   <div className="flex flex-wrap gap-2">
                     {selectedProduct.sizes.map((s) => (
                       <button
-                        key={s}
-                        type="button"
-                        onClick={() => setSize(s)}
-                        className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${
-                          size === s
-                            ? 'border-zeluxe-gold bg-zeluxe-gold text-zeluxe-black'
-                            : 'border-zeluxe-lightgray bg-white text-zeluxe-black hover:border-zeluxe-gold'
-                        }`}
+                        key={s} type="button" onClick={() => setCurrentSize(s)}
+                        className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${currentSize === s ? 'border-zeluxe-gold bg-zeluxe-gold text-zeluxe-black' : 'border-zeluxe-lightgray bg-white text-zeluxe-black hover:border-zeluxe-gold'}`}
                       >
                         {s}
                       </button>
@@ -304,93 +323,79 @@ export default function CreateOrder() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পরিমাণ</label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    required
-                    className={inputClass}
-                  />
+                  <input type="text" inputMode="numeric" value={currentQuantity} onChange={(e) => setCurrentQuantity(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black mb-1.5">বিক্রয় মূল্য (Tk)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
-                    required
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি চার্জ (Tk)</label>
-                  <input
-                    type="number"
-                    value={deliveryCharge}
-                    readOnly
-                    className={`${inputClass} bg-gray-100 cursor-not-allowed`}
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডিসকাউন্ট (Tk)</label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    className={inputClass}
-                  />
+                  <input type="text" inputMode="numeric" value={currentSellingPrice} onChange={(e) => setCurrentSellingPrice(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
                 </div>
               </div>
 
-              {selectedProduct && numSellingPrice > 0 && (
-                <div className={`mt-2 flex items-center justify-between rounded-xl p-3 ${
-                  profit >= 0 ? 'border border-green-200 bg-green-50' : 'border border-red-200 bg-red-50'
-                }`}>
-                  <span className={`text-sm font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    {profit >= 0 ? 'আপনার লাভ:' : 'লস হচ্ছে:'}
-                  </span>
-                  <span className={`text-lg font-bold ${profit >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                    Tk {Math.abs(profit)}
-                  </span>
-                </div>
-              )}
-
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পেমেন্ট মেথড</label>
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className={inputClass}
-                >
-                  {PAYMENT_METHODS.map((method) => (
-                    <option key={method} value={method}>{method}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">নোট (ঐচ্ছিক)</label>
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  rows={2}
-                  className={`${inputClass} resize-none`}
-                  placeholder="কোনো বিশেষ নির্দেশনা থাকলে লিখুন"
-                />
-              </div>
+              <button type="button" onClick={handleAddToCart} className="w-full flex items-center justify-center gap-2 rounded-xl bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800">
+                <Plus size={18} /> অর্ডার লিস্টে যোগ করুন
+              </button>
             </div>
           </section>
 
+          {/* কার্ট লিস্ট */}
+          {cart.length > 0 && (
+            <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
+              <h2 className="mb-4 text-lg font-bold text-zeluxe-black">অর্ডার লিস্ট ({cart.length})</h2>
+              <div className="space-y-3">
+                {cart.map((item, index) => (
+                  <div key={index} className="flex items-start gap-3 rounded-lg border border-zeluxe-lightgray p-3 bg-zeluxe-fieldbg">
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-white border border-zeluxe-lightgray">
+                      {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" /> : <Package size={20} className="m-auto mt-3 text-gray-400" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-bold text-zeluxe-black line-clamp-1">{item.name}</p>
+                      <p className="text-xs text-gray-500">সাইজ: {item.size} | পরিমাণ: {item.quantity}</p>
+                      <p className="text-xs font-bold text-zeluxe-gold mt-1">Tk {item.sellingPrice} x {item.quantity} = Tk {item.sellingPrice * item.quantity}</p>
+                    </div>
+                    <button type="button" onClick={() => removeFromCart(index)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* অর্ডার সামারি */}
+          <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
+            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">পেমেন্ট ও সামারি</h2>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি চার্জ (Tk)</label>
+                <input type="text" inputMode="numeric" value={deliveryCharge} readOnly className={`${inputClass} bg-gray-100 cursor-not-allowed`} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডিসকাউন্ট (Tk)</label>
+                <input type="text" inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} placeholder="0" />
+              </div>
+            </div>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পেমেন্ট মেথড</label>
+              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputClass}>
+                {PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">নোট (ঐচ্ছিক)</label>
+              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inputClass} resize-none`} placeholder="বিশেষ নির্দেশনা..." />
+            </div>
+          </section>
+
+          {/* ফাইনাল সামারি ও সাবমিট */}
           <section className="rounded-xl bg-zeluxe-black p-6 text-white">
-            <h2 className="mb-4 text-lg font-bold">অর্ডার সামারি</h2>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-sm mb-4">
               <div className="flex justify-between text-gray-300">
-                <span>আইটেম মোট</span>
-                <span>Tk {itemTotal.toLocaleString()}</span>
+                <span>সর্বমোট আইটেম</span>
+                <span>{cart.length} টি</span>
+              </div>
+              <div className="flex justify-between text-gray-300">
+                <span>আইটেম মোট দাম</span>
+                <span>Tk {totalItemPrice.toLocaleString()}</span>
               </div>
               <div className="flex justify-between text-gray-300">
                 <span>ডেলিভারি চার্জ</span>
@@ -400,21 +405,24 @@ export default function CreateOrder() {
                 <span>ডিসকাউন্ট</span>
                 <span>-Tk {numDiscount.toLocaleString()}</span>
               </div>
-              <div className="my-3 border-t border-white/20" />
-              <div className="flex justify-between text-xl font-bold">
-                <span>সর্বমোট</span>
-                <span className="text-zeluxe-gold">Tk {total.toLocaleString()}</span>
+              <div className="flex justify-between text-green-400 font-bold pt-2 border-t border-white/10">
+                <span>আপনার মোট লাভ:</span>
+                <span>Tk {totalProfit.toLocaleString()}</span>
               </div>
             </div>
+            <div className="flex justify-between text-xl font-bold pt-3 border-t border-white/20 mb-6">
+              <span>সর্বমোট বিল</span>
+              <span className="text-zeluxe-gold">Tk {grandTotal.toLocaleString()}</span>
+            </div>
+            
+            <button
+              type="submit"
+              disabled={submitting || cart.length === 0}
+              className="w-full rounded-xl bg-zeluxe-gold py-4 text-sm font-bold text-zeluxe-black transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+            >
+              {submitting ? 'অর্ডার তৈরি হচ্ছে...' : '✓ অর্ডার কনফার্ম করুন'}
+            </button>
           </section>
-
-          <button
-            type="submit"
-            disabled={submitting || !productId}
-            className="w-full rounded-xl bg-zeluxe-gold py-4 text-sm font-bold text-zeluxe-black transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-          >
-            {submitting ? 'অর্ডার তৈরি হচ্ছে...' : '✓ অর্ডার কনফার্ম করুন'}
-          </button>
         </form>
       </div>
 
@@ -422,51 +430,25 @@ export default function CreateOrder() {
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white">
-            {/* Modal Header */}
             <div className="border-b border-zeluxe-lightgray p-4">
               <div className="mb-4 flex items-center justify-between">
                 <h3 className="text-lg font-bold text-zeluxe-black">প্রোডাক্ট সিলেক্ট করুন</h3>
-                <button 
-                  onClick={() => setIsProductModalOpen(false)}
-                  className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"
-                >
-                  <X size={20} />
-                </button>
+                <button onClick={() => setIsProductModalOpen(false)} className="rounded-full p-1.5 text-gray-500 hover:bg-gray-100"><X size={20} /></button>
               </div>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                <input
-                  type="text"
-                  autoFocus
-                  placeholder="নাম বা SKU দিয়ে খুঁজুন..."
-                  value={productSearch}
-                  onChange={(e) => setProductSearch(e.target.value)}
-                  className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg py-2.5 pl-10 pr-4 text-sm focus:border-zeluxe-gold focus:outline-none"
-                />
+                <input type="text" autoFocus placeholder="নাম বা SKU দিয়ে খুঁজুন..." value={productSearch} onChange={(e) => setProductSearch(e.target.value)} className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg py-2.5 pl-10 pr-4 text-sm focus:border-zeluxe-gold focus:outline-none" />
               </div>
             </div>
-
-            {/* Modal Body (Product List) */}
             <div className="flex-1 overflow-y-auto p-2">
               {filteredProducts.length === 0 ? (
-                <div className="p-8 text-center text-gray-500">
-                  <Package className="mx-auto mb-2 text-gray-300" size={32} />
-                  <p>কোনো প্রোডাক্ট পাওয়া যায়নি</p>
-                </div>
+                <div className="p-8 text-center text-gray-500"><Package className="mx-auto mb-2 text-gray-300" size={32} /><p>কোনো প্রোডাক্ট পাওয়া যায়নি</p></div>
               ) : (
                 <div className="space-y-1">
                   {filteredProducts.map((p) => (
-                    <button
-                      key={p.id}
-                      onClick={() => handleProductSelect(p)}
-                      className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-zeluxe-fieldbg"
-                    >
+                    <button key={p.id} onClick={() => handleProductSelect(p)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-zeluxe-fieldbg">
                       <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-gray-50">
-                        {p.imageUrl ? (
-                          <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <Package className="m-auto h-full text-gray-300" size={20} />
-                        )}
+                        {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" /> : <Package className="m-auto h-full text-gray-300" size={20} />}
                       </div>
                       <div className="flex-1 overflow-hidden">
                         <p className="truncate text-sm font-bold text-zeluxe-black">{p.name}</p>
