@@ -21,6 +21,7 @@ type Product = {
   imageUrl: string;
   suggestedPrice: number;
   resellerPrice: number;
+  purchaseCost: number; // ═══ নতুন যোগ করা হয়েছে ═══
   sizes: string[];
   sourceUrl?: string;
 };
@@ -34,6 +35,7 @@ type CartItem = {
   quantity: number;
   sellingPrice: number;
   resellerPrice: number;
+  purchaseCost: number; // ═══ নতুন যোগ করা হয়েছে ═══
   sourceUrl?: string;
 };
 
@@ -71,9 +73,9 @@ export default function CreateOrder() {
   const [deliveryCharge, setDeliveryCharge] = useState('70');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
-  const [transactionId, setTransactionId] = useState(''); // নতুন স্টেট
+  const [transactionId, setTransactionId] = useState(''); 
   const [note, setNote] = useState('');
-  const [copied, setCopied] = useState(false); // কপি বাটনের জন্য
+  const [copied, setCopied] = useState(false); 
 
   // Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -97,6 +99,7 @@ export default function CreateOrder() {
             imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+            purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0, // ═══ নতুন যোগ করা হয়েছে ═══
             sizes,
             sourceUrl: typeof data.sourceUrl === 'string' ? data.sourceUrl : '',
           };
@@ -187,6 +190,7 @@ export default function CreateOrder() {
       quantity: qty,
       sellingPrice: price,
       resellerPrice: selectedProduct.resellerPrice,
+      purchaseCost: selectedProduct.purchaseCost || 0, // ═══ নতুন যোগ করা হয়েছে ═══
       sourceUrl: selectedProduct.sourceUrl || '',
     };
 
@@ -260,7 +264,7 @@ export default function CreateOrder() {
         discount: numDiscount,
         total: Number(grandTotal),
         paymentMethod,
-        transactionId: transactionId.trim(), // ═══ ট্রানজেকশন আইডি সেভ ═══
+        transactionId: transactionId.trim(), 
         note: note.trim(),
         status: 'pending',
         createdAt: serverTimestamp(),
@@ -423,7 +427,7 @@ export default function CreateOrder() {
               </select>
             </div>
 
-            {/* ═══ অ্যাডভান্স পেমেন্ট অপশন (শুধুমাত্র bKash/Full Advance সিলেক্ট করলে দেখাবে) ═══ */}
+            {/* ═══ অ্যাডভান্স পেমেন্ট অপশন ═══ */}
             {(paymentMethod === 'bKash Advance' || paymentMethod === 'Full Advance') && (
               <div className="mb-4 rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-4 animate-in fade-in slide-in-from-top-2">
                 <p className="text-sm font-medium text-zeluxe-black mb-2">
