@@ -34,7 +34,7 @@ type OrderData = {
   discount: number;
   total: number;
   paymentMethod: string;
-  transactionId?: string; // ═══ নতুন যোগ করা হয়েছে ═══
+  transactionId?: string;
   status: string;
   note?: string;
   createdAt?: { seconds?: number };
@@ -105,13 +105,12 @@ export default function OrderDetails() {
             discount: typeof data.discount === 'number' ? data.discount : 0,
             total: typeof data.total === 'number' ? data.total : 0,
             paymentMethod: typeof data.paymentMethod === 'string' ? data.paymentMethod : '—',
-            transactionId: typeof data.transactionId === 'string' ? data.transactionId : '', // ═══ নতুন যোগ করা হয়েছে ═══
+            transactionId: typeof data.transactionId === 'string' ? data.transactionId : '',
             status: typeof data.status === 'string' ? data.status : 'pending',
             note: typeof data.note === 'string' ? data.note : undefined,
             createdAt: data.createdAt,
           });
 
-          // ═══ রিসেলারের তথ্য লোড করা হচ্ছে ═══
           if (data.resellerId) {
             const rDoc = await getDoc(doc(db, 'users', data.resellerId));
             if (rDoc.exists()) {
@@ -156,7 +155,7 @@ export default function OrderDetails() {
     return (
       <Layout>
         <div className="mx-auto max-w-2xl">
-          <Link to="/orders" className="inline-flex items-center gap-2 text-sm font-semibold text-zeluxe-gold hover:underline">
+          <Link to={isAdmin ? "/admin/orders" : "/orders"} className="inline-flex items-center gap-2 text-sm font-semibold text-zeluxe-gold hover:underline">
             <ArrowLeft className="h-4 w-4" /> Back to Orders
           </Link>
           <p className="mt-6 text-gray-600">Order not found.</p>
@@ -165,7 +164,6 @@ export default function OrderDetails() {
     );
   }
 
-  // ═══ পেমেন্ট ক্যালকুলেশন ═══
   let adminPayment = 0;
   if (order.items && order.items.length > 0) {
     const resellerTotal = order.items.reduce((sum, item) => sum + ((item.resellerPrice || 0) * item.quantity), 0);
@@ -179,7 +177,7 @@ export default function OrderDetails() {
   return (
     <Layout>
       <div className="mx-auto max-w-2xl pb-10">
-        <Link to="/orders" className="inline-flex items-center gap-2 text-sm font-semibold text-zeluxe-gold hover:underline">
+        <Link to={isAdmin ? "/admin/orders" : "/orders"} className="inline-flex items-center gap-2 text-sm font-semibold text-zeluxe-gold hover:underline">
           <ArrowLeft className="h-4 w-4" /> Back to Orders
         </Link>
 
@@ -187,7 +185,6 @@ export default function OrderDetails() {
         <span className={`mt-2 inline-block rounded-full px-3 py-1 text-sm font-bold capitalize ${getStatusClass(order.status)}`}>{order.status}</span>
         <p className="mt-1 text-sm text-gray-500">{formatDate(order.createdAt?.seconds)}</p>
 
-        {/* ═══ রিসেলার ইনফরমেশন (শুধু অ্যাডমিন দেখতে পাবে) ═══ */}
         {isAdmin && reseller && (
           <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase text-blue-800">
@@ -292,7 +289,6 @@ export default function OrderDetails() {
               <span className="text-zeluxe-gray">Payment Method</span>
               <span className="font-medium text-zeluxe-black">{order.paymentMethod}</span>
             </div>
-            {/* ═══ নতুন যোগ করা ট্রানজেকশন আইডি ═══ */}
             {order.transactionId && (
               <div className="flex justify-between text-sm">
                 <span className="text-zeluxe-gray">Transaction ID</span>
@@ -302,7 +298,6 @@ export default function OrderDetails() {
           </div>
         </div>
 
-        {/* ═══ পেমেন্ট ব্রেকডাউন (শুধু অ্যাডমিন দেখতে পাবে) ═══ */}
         {isAdmin && (
           <div className="mt-4 rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-6">
             <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase text-zeluxe-gold">
