@@ -65,6 +65,10 @@ export default function ProductDetail() {
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
+  // ═══ কার্ট স্টেট ═══
+  const [cartCount, setCartCount] = useState(0);
+  const [cartTotal, setCartTotal] = useState(0);
+
   // Order modal
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [customerName, setCustomerName] = useState('');
@@ -77,6 +81,23 @@ export default function ProductDetail() {
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // ═══ কার্ট আপডেট ফাংশন ═══
+  const updateCartState = () => {
+    try {
+      const cartStr = localStorage.getItem('zeluxe_cart');
+      if (cartStr) {
+        const cart = JSON.parse(cartStr);
+        if (Array.isArray(cart)) {
+          setCartCount(cart.reduce((sum: number, item: any) => sum + item.quantity, 0));
+          setCartTotal(cart.reduce((sum: number, item: any) => sum + (item.sellingPrice * item.quantity), 0));
+        }
+      } else {
+        setCartCount(0);
+        setCartTotal(0);
+      }
+    } catch (e) {}
+  };
 
   // Load product
   useEffect(() => {
@@ -165,6 +186,9 @@ export default function ProductDetail() {
       }
     };
     void loadProduct();
+    
+    // পেজ লোড হওয়ার সময় কার্ট চেক করবে
+    updateCartState();
   }, [id]);
 
   // ═══ কার্টে যোগ করার ফাংশন ═══
@@ -194,7 +218,6 @@ export default function ProductDetail() {
         existingCart = JSON.parse(existingCartStr);
       }
 
-      // চেক করা হচ্ছে একই প্রোডাক্ট এবং সাইজ আগে থেকে আছে কি না
       const existingIdx = existingCart.findIndex(
         (item: any) => item.productId === newItem.productId && item.size === newItem.size
       );
@@ -207,6 +230,7 @@ export default function ProductDetail() {
 
       localStorage.setItem('zeluxe_cart', JSON.stringify(existingCart));
       toast.success('✓ কার্টে যোগ হয়েছে!');
+      updateCartState(); // বাটন আপডেট হবে
     } catch (err) {
       toast.error('কার্টে যোগ করতে সমস্যা হয়েছে');
     }
@@ -369,7 +393,8 @@ export default function ProductDetail() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-5xl">
+      {/* পেজের কন্টেন্ট যাতে নিচের বাটনে ঢাকা না পড়ে, তাই pb-24 দেওয়া হলো */}
+      <div className="mx-auto max-w-5xl pb-24">
         <Link
           to="/products"
           className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-zeluxe-gold"
@@ -553,6 +578,33 @@ export default function ProductDetail() {
           </div>
         )}
       </div>
+
+      {/* ═══ ফ্লোটিং কার্ট বাটন ═══ */}
+      {cartCount > 0 && (
+        <div className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-md animate-in slide-in-from-bottom-5 fade-in duration-300">
+          <button
+            onClick={() => navigate('/orders/new')}
+            className="flex w-full items-center justify-between rounded-2xl bg-zeluxe-black px-5 py-4 text-white shadow-2xl transition hover:bg-gray-800"
+          >
+            <div className="flex items-center gap-3">
+              <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+                <ShoppingCart size={20} className="text-zeluxe-gold" />
+                <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zeluxe-gold text-[10px] font-bold text-zeluxe-black shadow-sm">
+                  {cartCount}
+                </span>
+              </div>
+              <div className="text-left">
+                <p className="text-sm font-bold">কার্ট দেখুন</p>
+                <p className="text-xs text-gray-300">{cartCount} টি আইটেম</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xs text-gray-300">মোট দাম</p>
+              <p className="text-sm font-bold text-zeluxe-gold">Tk {cartTotal.toLocaleString()}</p>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* ═══ ORDER MODAL ═══ */}
       {orderModalOpen && (
