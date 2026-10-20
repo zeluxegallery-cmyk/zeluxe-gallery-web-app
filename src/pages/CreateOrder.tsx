@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { Loader2, Search, Package, X, ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Search, Package, X, ChevronDown, Plus, Trash2, Copy, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
@@ -22,6 +22,7 @@ type Product = {
   suggestedPrice: number;
   resellerPrice: number;
   sizes: string[];
+  sourceUrl?: string;
 };
 
 type CartItem = {
@@ -33,10 +34,13 @@ type CartItem = {
   quantity: number;
   sellingPrice: number;
   resellerPrice: number;
+  sourceUrl?: string;
 };
 
 const DISTRICTS = ['ঢাকার ভিতরে', 'ঢাকার বাইরে'];
 const PAYMENT_METHODS = ['Cash on Delivery', 'bKash Advance', 'Full Advance'];
+const PAYMENT_NUMBER = '01603226151'; // অ্যাডমিনের নাম্বার
+
 const inputClass =
   'w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold';
 
@@ -57,7 +61,7 @@ export default function CreateOrder() {
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([]);
   
-  // Current Item State (for adding to cart)
+  // Current Item State
   const [currentProductId, setCurrentProductId] = useState(presetProductId || '');
   const [currentSize, setCurrentSize] = useState('');
   const [currentQuantity, setCurrentQuantity] = useState('1');
@@ -67,7 +71,9 @@ export default function CreateOrder() {
   const [deliveryCharge, setDeliveryCharge] = useState('70');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
+  const [transactionId, setTransactionId] = useState(''); // নতুন স্টেট
   const [note, setNote] = useState('');
+  const [copied, setCopied] = useState(false); // কপি বাটনের জন্য
 
   // Modal State
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
@@ -92,6 +98,7 @@ export default function CreateOrder() {
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
             sizes,
+            sourceUrl: typeof data.sourceUrl === 'string' ? data.sourceUrl : '',
           };
         });
         setProducts(fetchedProducts);
@@ -111,7 +118,7 @@ export default function CreateOrder() {
 
     void loadProducts();
 
-    // ═══ localStorage থেকে কার্ট লোড করা হচ্ছে (ডিলিট করা হবে না) ═══
+    // localStorage থেকে কার্ট লোড
     try {
       const savedCart = localStorage.getItem('zeluxe_cart');
       if (savedCart) {
@@ -123,8 +130,6 @@ export default function CreateOrder() {
     } catch (e) {
       console.error('Failed to load cart', e);
     }
-    // ═══ কার্ট লোড শেষ ═══
-
   }, [presetProductId]);
 
   const selectedProduct = products.find((p) => p.id === currentProductId);
@@ -149,7 +154,13 @@ export default function CreateOrder() {
     );
   }, [products, productSearch]);
 
-  // Add item to cart
+  const handleCopyNumber = () => {
+    navigator.clipboard.writeText(PAYMENT_NUMBER);
+    setCopied(true);
+    toast.success('পেমেন্ট নাম্বার কপি হয়েছে!');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const handleAddToCart = () => {
     if (!selectedProduct) {
       toast.error('প্রোডাক্ট সিলেক্ট করুন।');
@@ -176,13 +187,13 @@ export default function CreateOrder() {
       quantity: qty,
       sellingPrice: price,
       resellerPrice: selectedProduct.resellerPrice,
+      sourceUrl: selectedProduct.sourceUrl || '',
     };
 
     const newCart = [...cart, newItem];
     setCart(newCart);
-    localStorage.setItem('zeluxe_cart', JSON.stringify(newCart)); // ═══ স্টোরেজে আপডেট ═══
+    localStorage.setItem('zeluxe_cart', JSON.stringify(newCart));
     
-    // Reset current item form
     setCurrentProductId('');
     setCurrentSize('');
     setCurrentQuantity('1');
@@ -190,14 +201,12 @@ export default function CreateOrder() {
     toast.success('প্রোডাক্ট অর্ডারে যোগ হয়েছে!');
   };
 
-  // ═══ ডিলিট করলে স্টোরেজ থেকেও মুছবে ═══
   const removeFromCart = (index: number) => {
     const updatedCart = cart.filter((_, i) => i !== index);
     setCart(updatedCart);
     localStorage.setItem('zeluxe_cart', JSON.stringify(updatedCart));
   };
 
-  // Calculations
   const totalItemPrice = cart.reduce((sum, item) => sum + (item.sellingPrice * item.quantity), 0);
   const totalProfit = cart.reduce((sum, item) => sum + ((item.sellingPrice - item.resellerPrice) * item.quantity), 0);
   const numDiscount = Number(discount) || 0;
@@ -218,6 +227,13 @@ export default function CreateOrder() {
       toast.error('কাস্টমারের সব তথ্য দিন।');
       return;
     }
+    
+    // ═══ পেমেন্ট ভ্যালিডেশন ═══
+    const isAdvancePayment = paymentMethod === 'bKash Advance' || paymentMethod === 'Full Advance';
+    if (isAdvancePayment && !transactionId.trim()) {
+      toast.error('অনুগ্রহ করে ট্রানজেকশন আইডি (Transaction ID) দিন।');
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -231,9 +247,7 @@ export default function CreateOrder() {
         address: address.trim(),
         district,
         
-        // মাল্টিপল আইটেম সেভ করা হচ্ছে
         items: cart, 
-        // পুরনো সিস্টেমের সাথে কম্প্যাটিবল রাখার জন্য প্রথম প্রোডাক্টের ডাটাও রাখছি
         productId: cart[0].productId,
         productName: cart[0].name,
         size: cart[0].size,
@@ -246,13 +260,14 @@ export default function CreateOrder() {
         discount: numDiscount,
         total: Number(grandTotal),
         paymentMethod,
+        transactionId: transactionId.trim(), // ═══ ট্রানজেকশন আইডি সেভ ═══
         note: note.trim(),
         status: 'pending',
         createdAt: serverTimestamp(),
       });
       
       toast.success('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
-      localStorage.removeItem('zeluxe_cart'); // অর্ডার শেষে কার্ট খালি হবে
+      localStorage.removeItem('zeluxe_cart');
       setTimeout(() => navigate('/orders'), 1000);
       
     } catch (err) {
@@ -349,14 +364,11 @@ export default function CreateOrder() {
                 <div>
                   <label className="block text-sm font-medium text-zeluxe-black mb-1.5">বিক্রয় মূল্য (Tk)</label>
                   <input type="text" inputMode="numeric" value={currentSellingPrice} onChange={(e) => setCurrentSellingPrice(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
-                  
-                  {/* ক্রয় মূল্য দেখানো হচ্ছে */}
                   {selectedProduct && (
                     <p className="mt-1 text-[11px] text-gray-500">
                       রিসেলার মূল্য (ক্রয়): <span className="font-bold text-zeluxe-black">Tk {selectedProduct.resellerPrice}</span>
                     </p>
                   )}
-
                 </div>
               </div>
 
@@ -390,7 +402,7 @@ export default function CreateOrder() {
             </section>
           )}
 
-          {/* অর্ডার সামারি */}
+          {/* পেমেন্ট ও সামারি */}
           <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
             <h2 className="mb-4 text-lg font-bold text-zeluxe-black">পেমেন্ট ও সামারি</h2>
             <div className="grid grid-cols-2 gap-4 mb-4">
@@ -403,12 +415,37 @@ export default function CreateOrder() {
                 <input type="text" inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} placeholder="0" />
               </div>
             </div>
+            
             <div className="mb-4">
               <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পেমেন্ট মেথড</label>
               <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputClass}>
                 {PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
               </select>
             </div>
+
+            {/* ═══ অ্যাডভান্স পেমেন্ট অপশন (শুধুমাত্র bKash/Full Advance সিলেক্ট করলে দেখাবে) ═══ */}
+            {(paymentMethod === 'bKash Advance' || paymentMethod === 'Full Advance') && (
+              <div className="mb-4 rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-4 animate-in fade-in slide-in-from-top-2">
+                <p className="text-sm font-medium text-zeluxe-black mb-2">
+                  অনুগ্রহ করে নিচের নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন:
+                </p>
+                <div className="flex items-center justify-between rounded-lg bg-white border border-zeluxe-gold px-3 py-2 mb-3">
+                  <span className="font-mono text-base font-bold text-zeluxe-black tracking-wider">{PAYMENT_NUMBER}</span>
+                  <button type="button" onClick={handleCopyNumber} className="text-zeluxe-gold hover:text-zeluxe-black transition p-1">
+                    {copied ? <Check size={18} /> : <Copy size={18} />}
+                  </button>
+                </div>
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">Transaction ID *</label>
+                <input 
+                  type="text" 
+                  value={transactionId} 
+                  onChange={(e) => setTransactionId(e.target.value)} 
+                  placeholder="যেমন: 9F7A2B1C4D" 
+                  className={inputClass} 
+                />
+              </div>
+            )}
+
             <div>
               <label className="block text-sm font-medium text-zeluxe-black mb-1.5">নোট (ঐচ্ছিক)</label>
               <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inputClass} resize-none`} placeholder="বিশেষ নির্দেশনা..." />
@@ -455,7 +492,7 @@ export default function CreateOrder() {
         </form>
       </div>
 
-      {/* ═══ প্রোডাক্ট সার্চ মডাল ═══ */}
+      {/* প্রোডাক্ট সার্চ মডাল */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white">
