@@ -5,7 +5,6 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
-  Loader2,
   Wallet,
   Users,
   Gift,
@@ -117,27 +116,24 @@ export default function Earnings() {
       }
 
       try {
-        // Fetch user (for referral bonus)
-        const userSnap = await getDoc(doc(db, 'users', uid));
-        const userData = userSnap.exists() ? userSnap.data() : null;
-        const referralBonus =
-          typeof userData?.referralBonusEarned === 'number'
-            ? userData.referralBonusEarned
-            : 0;
+        // ═══ প্যারালাল ডাটা ফেচিং (Promise.all) ═══
+        const [userSnap, productsSnap, snapshot, withdrawSnap] = await Promise.all([
+          getDoc(doc(db, 'users', uid)),
+          getDocs(collection(db, 'products')),
+          getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid))),
+          getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid)))
+        ]);
 
-        // Fetch products for resellerPrice
-        const productsSnap = await getDocs(collection(db, 'products'));
+        const userData = userSnap.exists() ? userSnap.data() : null;
+        const referralBonus = typeof userData?.referralBonusEarned === 'number' ? userData.referralBonusEarned : 0;
+
+        // প্রোডাক্ট ম্যাপ তৈরি (শুধুমাত্র পুরনো অর্ডারের প্রফিট ক্যালকুলেশনের জন্য)
         const productMap: Record<string, number> = {};
         productsSnap.docs.forEach((p) => {
           const data = p.data();
-          productMap[p.id] =
-            typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
+          productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
         });
 
-        // Fetch orders
-        const snapshot = await getDocs(
-          query(collection(db, 'orders'), where('resellerId', '==', uid))
-        );
         const sorted = snapshot.docs.sort((a, b) => {
           const aTime = a.data().createdAt?.seconds || 0;
           const bTime = b.data().createdAt?.seconds || 0;
@@ -147,11 +143,22 @@ export default function Earnings() {
         const fetchedOrders: Order[] = sorted.map((orderDoc) => {
           const data = orderDoc.data();
           const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
-          const sellingPrice =
-            typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
+          const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
-          const resellerPrice = productMap[productId] || 0;
-          const actualProfit = (sellingPrice - resellerPrice) * quantity;
+          
+          // ═══ স্মার্ট প্রফিট ক্যালকুলেশন ═══
+          let actualProfit = 0;
+          if (Array.isArray(data.items) && data.items.length > 0) {
+            actualProfit = data.items.reduce((sum: number, item: any) => {
+              const sellP = item.sellingPrice || 0;
+              const resP = item.resellerPrice || 0;
+              const qty = item.quantity || 0;
+              return sum + ((sellP - resP) * qty);
+            }, 0);
+          } else {
+            const resellerPrice = productMap[productId] || 0;
+            actualProfit = (sellingPrice - resellerPrice) * quantity;
+          }
 
           return {
             id: orderDoc.id,
@@ -168,37 +175,19 @@ export default function Earnings() {
 
         // ═══ Calculate stats ═══
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
-        const deliveredOrders = fetchedOrders.filter(
-          (order) => order.status === 'delivered'
-        );
-        const deliveredSales = deliveredOrders.reduce(
-          (sum, order) => sum + order.total,
-          0
-        );
+        const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered');
+        const deliveredSales = deliveredOrders.reduce((sum, order) => sum + order.total, 0);
         const pendingAmount = fetchedOrders
           .filter((order) => PENDING_STATUSES.includes(order.status))
           .reduce((sum, order) => sum + order.total, 0);
-        const actualProfit = deliveredOrders.reduce(
-          (sum, order) => sum + order.actualProfit,
-          0
-        );
+        const actualProfit = deliveredOrders.reduce((sum, order) => sum + order.actualProfit, 0);
 
-        // ═══ Fetch withdrawals ═══
-        const withdrawSnap = await getDocs(
-          query(
-            collection(db, 'withdrawRequests'),
-            where('resellerId', '==', uid)
-          )
-        );
+        // ═══ Withdrawals ═══
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
           .filter((d) => d.status === 'approved' || d.status === 'paid')
-          .reduce(
-            (sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0),
-            0
-          );
+          .reduce((sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0), 0);
 
-        // ═══ Available Balance = Order Profit + Referral Bonus - Withdrawn ═══
         const availableBalance = actualProfit + referralBonus - totalWithdrawn;
 
         setStats({
@@ -212,8 +201,7 @@ export default function Earnings() {
         });
         setOrders(fetchedOrders);
       } catch (err) {
-        const message =
-          err instanceof Error ? err.message : 'Failed to load earnings.';
+        const message = err instanceof Error ? err.message : 'Failed to load earnings.';
         setError(message);
         toast.error('আর্নিংস লোড করতে সমস্যা হয়েছে।');
       } finally {
@@ -225,53 +213,47 @@ export default function Earnings() {
   }, []);
 
   const summaryCards = [
-    {
-      label: 'Total Sales',
-      value: `Tk ${stats.totalSales.toLocaleString()}`,
-      icon: TrendingUp,
-      iconClass: 'text-zeluxe-gold',
-      valueClass: 'text-zeluxe-black',
-    },
-    {
-      label: 'Delivered Sales',
-      value: `Tk ${stats.deliveredSales.toLocaleString()}`,
-      icon: CheckCircle,
-      iconClass: 'text-green-600',
-      valueClass: 'text-green-600',
-    },
-    {
-      label: 'Pending Amount',
-      value: `Tk ${stats.pendingAmount.toLocaleString()}`,
-      icon: Clock,
-      iconClass: 'text-yellow-600',
-      valueClass: 'text-yellow-600',
-    },
-    {
-      label: 'Order Profit',
-      value: `Tk ${stats.actualProfit.toLocaleString()}`,
-      icon: Wallet,
-      iconClass: 'text-zeluxe-gold',
-      valueClass: 'text-zeluxe-gold',
-    },
+    { label: 'মোট বিক্রি', value: `Tk ${stats.totalSales.toLocaleString()}`, icon: TrendingUp, iconClass: 'text-zeluxe-gold', valueClass: 'text-zeluxe-black' },
+    { label: 'ডেলিভারড সেলস', value: `Tk ${stats.deliveredSales.toLocaleString()}`, icon: CheckCircle, iconClass: 'text-green-600', valueClass: 'text-green-600' },
+    { label: 'অপেক্ষমাণ টাকা', value: `Tk ${stats.pendingAmount.toLocaleString()}`, icon: Clock, iconClass: 'text-yellow-600', valueClass: 'text-yellow-600' },
+    { label: 'অর্ডার প্রফিট', value: `Tk ${stats.actualProfit.toLocaleString()}`, icon: Wallet, iconClass: 'text-zeluxe-gold', valueClass: 'text-zeluxe-gold' },
   ];
 
-  const breakdown: Breakdown[] = BREAKDOWN_CONFIG.map(
-    ({ status, textClass }) => {
-      const matching = orders.filter((order) => order.status === status);
-      return {
-        status,
-        count: matching.length,
-        amount: matching.reduce((sum, order) => sum + order.total, 0),
-        textClass,
-      };
-    }
-  );
+  const breakdown: Breakdown[] = BREAKDOWN_CONFIG.map(({ status, textClass }) => {
+    const matching = orders.filter((order) => order.status === status);
+    return {
+      status,
+      count: matching.length,
+      amount: matching.reduce((sum, order) => sum + order.total, 0),
+      textClass,
+    };
+  });
 
+  // ═══ SKELETON LOADING UI ═══
   if (loading) {
     return (
       <Layout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+        <div className="mx-auto max-w-2xl">
+          <div className="mb-5">
+            <div className="h-6 w-1/2 animate-pulse rounded bg-gray-300 mb-2"></div>
+            <div className="h-4 w-1/3 animate-pulse rounded bg-gray-200"></div>
+          </div>
+
+          {/* Balance Hero Skeleton */}
+          <div className="mb-5 h-48 w-full animate-pulse rounded-lg bg-gray-300"></div>
+
+          {/* Withdraw Button Skeleton */}
+          <div className="mb-5 h-16 w-full animate-pulse rounded-lg bg-gray-200"></div>
+
+          {/* Summary Cards Skeleton */}
+          <div className="mb-5 grid grid-cols-2 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="h-28 animate-pulse rounded-lg bg-gray-200"></div>
+            ))}
+          </div>
+
+          {/* Recent Transactions Skeleton */}
+          <div className="h-64 w-full animate-pulse rounded-lg bg-gray-200"></div>
         </div>
       </Layout>
     );
@@ -289,14 +271,14 @@ export default function Earnings() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-2xl pb-10">
         {/* ═══ HEADER ═══ */}
         <div className="mb-5">
           <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
-            Earnings & Accounting
+            আর্নিংস ও হিসাব
           </h1>
           <p className="mt-1 text-xs text-gray-500 md:text-sm">
-            আপনার আয়, লাভ এবং balance বিস্তারিত
+            আপনার আয়, লাভ এবং ব্যালেন্সের বিস্তারিত
           </p>
         </div>
 
@@ -306,7 +288,7 @@ export default function Earnings() {
           <div className="relative">
             <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
               <Wallet size={12} />
-              Available Balance
+              উপলব্ধ ব্যালেন্স (Available Balance)
             </div>
             <p className="mt-2 text-4xl font-bold tracking-tight text-zeluxe-gold">
               Tk {stats.availableBalance.toLocaleString()}
@@ -317,7 +299,7 @@ export default function Earnings() {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 text-gray-300">
                   <TrendingUp size={12} className="text-zeluxe-gold" />
-                  Order Profit
+                  অর্ডার প্রফিট
                 </div>
                 <span className="font-bold text-white">
                   Tk {stats.actualProfit.toLocaleString()}
@@ -327,7 +309,7 @@ export default function Earnings() {
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-1.5 text-gray-300">
                   <Users size={12} className="text-zeluxe-gold" />
-                  Referral Bonus
+                  রেফারেল বোনাস
                 </div>
                 <span className="font-bold text-green-400">
                   +Tk {stats.referralBonus.toLocaleString()}
@@ -363,12 +345,8 @@ export default function Earnings() {
               <Wallet className="text-zeluxe-black" size={18} />
             </span>
             <div>
-              <p className="text-sm font-bold text-zeluxe-black">
-                টাকা তুলুন
-              </p>
-              <p className="mt-0.5 text-[11px] text-gray-500">
-                bKash/Nagad-এ টাকা তুলুন
-              </p>
+              <p className="text-sm font-bold text-zeluxe-black">টাকা তুলুন</p>
+              <p className="mt-0.5 text-[11px] text-gray-500">bKash/Nagad-এ টাকা তুলুন</p>
             </div>
           </div>
           <ArrowRight size={18} className="text-zeluxe-gold" />
@@ -377,25 +355,18 @@ export default function Earnings() {
         {/* ═══ SUMMARY CARDS ═══ */}
         <div className="mb-5">
           <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            Sales Overview
+            সেলস ওভারভিউ
           </p>
           <div className="grid grid-cols-2 gap-3">
-            {summaryCards.map(
-              ({ label, value, icon: Icon, iconClass, valueClass }) => (
-                <div
-                  key={label}
-                  className="rounded-lg border border-zeluxe-lightgray bg-white p-4"
-                >
-                  <Icon className={`h-4 w-4 ${iconClass}`} />
-                  <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
-                    {label}
-                  </p>
-                  <p className={`mt-1 text-lg font-bold ${valueClass}`}>
-                    {value}
-                  </p>
-                </div>
-              )
-            )}
+            {summaryCards.map(({ label, value, icon: Icon, iconClass, valueClass }) => (
+              <div key={label} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
+                <Icon className={`h-4 w-4 ${iconClass}`} />
+                <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                  {label}
+                </p>
+                <p className={`mt-1 text-lg font-bold ${valueClass}`}>{value}</p>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -405,65 +376,33 @@ export default function Earnings() {
             কীভাবে হিসাব করা হয়:
           </h2>
           <ul className="space-y-2 text-xs leading-relaxed text-gray-600">
-            <li>
-              <strong className="text-zeluxe-black">Total Sales</strong> — সব
-              অর্ডারের মোট দাম
-            </li>
-            <li>
-              <strong className="text-zeluxe-black">Delivered Sales</strong> —
-              শুধু ডেলিভার হওয়া অর্ডার
-            </li>
-            <li>
-              <strong className="text-zeluxe-black">Pending Amount</strong> —
-              এখনো ডেলিভার হয়নি
-            </li>
-            <li>
-              <strong className="text-zeluxe-black">Order Profit</strong> —
-              (বিক্রয় মূল্য − রিসেলার মূল্য) × পরিমাণ
-            </li>
-            <li>
-              <strong className="text-zeluxe-black">Referral Bonus</strong> —
-              প্রতি সফল referral-এ Tk 30
-            </li>
+            <li><strong className="text-zeluxe-black">মোট বিক্রি</strong> — সব অর্ডারের মোট দাম</li>
+            <li><strong className="text-zeluxe-black">ডেলিভারড সেলস</strong> — শুধু ডেলিভার হওয়া অর্ডার</li>
+            <li><strong className="text-zeluxe-black">অপেক্ষমাণ টাকা</strong> — এখনো ডেলিভার হয়নি</li>
+            <li><strong className="text-zeluxe-black">অর্ডার প্রফিট</strong> — (বিক্রয় মূল্য − রিসেলার মূল্য) × পরিমাণ</li>
+            <li><strong className="text-zeluxe-black">রেফারেল বোনাস</strong> — প্রতি সফল রেফারেলে Tk 30</li>
           </ul>
         </div>
 
         {/* ═══ ORDER BREAKDOWN ═══ */}
         <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
           <div className="border-b border-zeluxe-lightgray px-4 py-3">
-            <h2 className="text-sm font-bold text-zeluxe-black">
-              Order Breakdown
-            </h2>
+            <h2 className="text-sm font-bold text-zeluxe-black">অর্ডার ব্রেকডাউন</h2>
           </div>
           <table className="w-full text-left text-sm">
             <thead className="bg-zeluxe-cream">
               <tr>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Status
-                </th>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Orders
-                </th>
-                <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">
-                  Amount
-                </th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">স্ট্যাটাস</th>
+                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">অর্ডার</th>
+                <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">টাকার পরিমাণ</th>
               </tr>
             </thead>
             <tbody>
               {breakdown.map(({ status, count, amount, textClass }) => (
-                <tr
-                  key={status}
-                  className="border-b border-zeluxe-lightgray last:border-0"
-                >
-                  <td className="px-4 py-2.5 text-xs capitalize text-zeluxe-black">
-                    {getStatusLabel(status)}
-                  </td>
-                  <td className="px-4 py-2.5 text-xs text-zeluxe-black">
-                    {count}
-                  </td>
-                  <td
-                    className={`px-4 py-2.5 text-right text-xs font-bold ${textClass}`}
-                  >
+                <tr key={status} className="border-b border-zeluxe-lightgray last:border-0">
+                  <td className="px-4 py-2.5 text-xs capitalize text-zeluxe-black">{getStatusLabel(status)}</td>
+                  <td className="px-4 py-2.5 text-xs text-zeluxe-black">{count}</td>
+                  <td className={`px-4 py-2.5 text-right text-xs font-bold ${textClass}`}>
                     Tk {amount.toLocaleString()}
                   </td>
                 </tr>
@@ -475,9 +414,7 @@ export default function Earnings() {
         {/* ═══ RECENT TRANSACTIONS ═══ */}
         <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
           <div className="border-b border-zeluxe-lightgray px-4 py-3">
-            <h2 className="text-sm font-bold text-zeluxe-black">
-              Recent Transactions
-            </h2>
+            <h2 className="text-sm font-bold text-zeluxe-black">সাম্প্রতিক লেনদেন</h2>
           </div>
 
           {orders.length === 0 ? (
@@ -485,42 +422,23 @@ export default function Earnings() {
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
                 <TrendingUp className="h-6 w-6 text-zeluxe-gold" />
               </div>
-              <p className="mt-3 text-sm font-bold text-zeluxe-black">
-                এখনো কোনো earning নেই
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                প্রথম অর্ডার দিলেই এখানে দেখতে পাবেন
-              </p>
-              <Link
-                to="/orders/new"
-                className="mt-3 inline-flex items-center gap-1 rounded-md bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
-              >
+              <p className="mt-3 text-sm font-bold text-zeluxe-black">এখনো কোনো আর্নিং নেই</p>
+              <p className="mt-1 text-xs text-gray-500">প্রথম অর্ডার দিলেই এখানে দেখতে পাবেন</p>
+              <Link to="/orders/new" className="mt-3 inline-flex items-center gap-1 rounded-md bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800">
                 অর্ডার তৈরি করুন
                 <ArrowRight size={12} />
               </Link>
             </div>
           ) : (
             orders.slice(0, 10).map((order) => (
-              <Link
-                key={order.id}
-                to={`/orders/${order.id}`}
-                className="flex items-center justify-between border-b border-zeluxe-lightgray px-4 py-3 transition last:border-0 hover:bg-zeluxe-cream"
-              >
+              <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between border-b border-zeluxe-lightgray px-4 py-3 transition last:border-0 hover:bg-zeluxe-cream">
                 <div>
-                  <p className="font-mono text-[11px] font-bold text-zeluxe-black">
-                    {order.orderId}
-                  </p>
-                  <p className="mt-0.5 text-[10px] text-gray-400">
-                    {formatDate(order.createdAt?.seconds)}
-                  </p>
+                  <p className="font-mono text-[11px] font-bold text-zeluxe-black">{order.orderId}</p>
+                  <p className="mt-0.5 text-[10px] text-gray-400">{formatDate(order.createdAt?.seconds)}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-zeluxe-black">
-                    Tk {order.total.toLocaleString()}
-                  </p>
-                  <span
-                    className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold capitalize ${getStatusBadgeClass(order.status)}`}
-                  >
+                  <p className="text-sm font-bold text-zeluxe-black">Tk {order.total.toLocaleString()}</p>
+                  <span className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold capitalize ${getStatusBadgeClass(order.status)}`}>
                     {getStatusLabel(order.status)}
                   </span>
                 </div>
@@ -531,20 +449,14 @@ export default function Earnings() {
 
         {/* ═══ REFERRAL CARD LINK ═══ */}
         {stats.referralBonus > 0 && (
-          <Link
-            to="/refer"
-            className="mt-5 flex items-center gap-3 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 transition hover:border-zeluxe-gold"
-          >
+          <Link to="/refer" className="mt-5 flex items-center gap-3 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 transition hover:border-zeluxe-gold">
             <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold">
               <Gift className="text-zeluxe-black" size={20} />
             </span>
             <div className="flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
-                Referral Earnings
-              </p>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">রেফারেল আর্নিংস</p>
               <p className="mt-0.5 text-sm font-bold text-zeluxe-black">
-                আপনার referral থেকে Tk{' '}
-                {stats.referralBonus.toLocaleString()} পেয়েছেন
+                আপনার রেফারেল থেকে Tk {stats.referralBonus.toLocaleString()} পেয়েছেন
               </p>
             </div>
             <ArrowRight size={18} className="shrink-0 text-zeluxe-gold" />
