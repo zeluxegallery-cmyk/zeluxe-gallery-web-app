@@ -159,12 +159,25 @@ export default function ResellerDashboard() {
       }
 
       try {
-        const userDoc = await getDoc(doc(db, 'users', uid));
+        // ═══ প্যারালাল ডাটা ফেচিং (Promise.all) ═══
+        const [
+          userDoc, 
+          refStatsResult, 
+          productsSnap, 
+          ordersSnapshot, 
+          withdrawSnap
+        ] = await Promise.all([
+          getDoc(doc(db, 'users', uid)),
+          getReferralStats(uid),
+          getDocs(collection(db, 'products')),
+          getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid))),
+          getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid)))
+        ]);
+
         const userInfo = userDoc.exists() ? userDoc.data() : null;
+        let refStats = refStatsResult;
 
-        // ═══ REFERRAL STATS + AUTO-GENERATE FOR OLD USERS ═══
-        let refStats = await getReferralStats(uid);
-
+        // রেফারেল কোড না থাকলে জেনারেট করা
         if (refStats && !refStats.referralCode) {
           try {
             const newCode = await generateUniqueReferralCode();
@@ -174,17 +187,10 @@ export default function ResellerDashboard() {
               referralBonusEarned: 0,
             });
 
-            const userName =
-              (userInfo?.name as string) ||
-              auth.currentUser?.email?.split('@')[0] ||
-              'Reseller';
+            const userName = (userInfo?.name as string) || auth.currentUser?.email?.split('@')[0] || 'Reseller';
             await publishReferralCode(uid, userName, newCode);
 
-            refStats = {
-              referralCode: newCode,
-              referralCount: 0,
-              referralBonusEarned: 0,
-            };
+            refStats = { referralCode: newCode, referralCount: 0, referralBonusEarned: 0 };
           } catch (err) {
             console.error('Failed to generate referral code:', err);
           }
@@ -192,24 +198,18 @@ export default function ResellerDashboard() {
 
         if (refStats) setReferralInfo(refStats);
 
-        // Products
-        const productsSnap = await getDocs(collection(db, 'products'));
+        // প্রোডাক্ট ম্যাপ তৈরি (প্রফিট ক্যালকুলেশনের জন্য)
         const productMap: Record<string, number> = {};
         productsSnap.docs.forEach((p) => {
           const data = p.data();
-          productMap[p.id] =
-            typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
+          productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
         });
 
-        // Featured products — ONLY with image
+        // ফিচার্ড প্রোডাক্ট (শুধু ছবি আছে যেগুলোর)
         const activeProducts: Product[] = productsSnap.docs
           .filter((d) => {
             const data = d.data();
-            return (
-              data.active === true &&
-              typeof data.imageUrl === 'string' &&
-              data.imageUrl.length > 0
-            );
+            return data.active === true && typeof data.imageUrl === 'string' && data.imageUrl.length > 0;
           })
           .slice(0, 6)
           .map((d) => {
@@ -218,32 +218,36 @@ export default function ResellerDashboard() {
               id: d.id,
               name: typeof data.name === 'string' ? data.name : 'Product',
               imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
-              resellerPrice:
-                typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+              resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
             };
           });
         setFeaturedProducts(activeProducts);
 
-        // Orders
-        const ordersQuery = query(
-          collection(db, 'orders'),
-          where('resellerId', '==', uid)
-        );
-        const snapshot = await getDocs(ordersQuery);
-        const fetchedOrders: Order[] = snapshot.docs.map((orderDocument) => {
+        // অর্ডার প্রসেসিং
+        const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
           const data = orderDocument.data();
           const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
-          const sellingPrice =
-            typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
+          const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
-          const resellerPrice = productMap[productId] || 0;
-          const actualProfit = (sellingPrice - resellerPrice) * quantity;
+          
+          // নতুন সিস্টেমে items থাকলে সেখান থেকে প্রফিট বের করা, নাহলে পুরনো পদ্ধতিতে
+          let actualProfit = 0;
+          if (Array.isArray(data.items) && data.items.length > 0) {
+             actualProfit = data.items.reduce((sum: number, item: any) => {
+                const resP = item.resellerPrice || 0;
+                const sellP = item.sellingPrice || 0;
+                const qty = item.quantity || 0;
+                return sum + ((sellP - resP) * qty);
+             }, 0);
+          } else {
+             const resellerPrice = productMap[productId] || 0;
+             actualProfit = (sellingPrice - resellerPrice) * quantity;
+          }
 
           return {
             id: orderDocument.id,
             orderId: typeof data.orderId === 'string' ? data.orderId : orderDocument.id,
-            productName:
-              typeof data.productName === 'string' ? data.productName : 'Product',
+            productName: typeof data.productName === 'string' ? data.productName : 'Product',
             status: typeof data.status === 'string' ? data.status : 'pending',
             total: typeof data.total === 'number' ? data.total : 0,
             quantity,
@@ -254,47 +258,27 @@ export default function ResellerDashboard() {
           };
         });
 
-        // Withdraws
-        const withdrawQuery = query(
-          collection(db, 'withdrawRequests'),
-          where('resellerId', '==', uid)
-        );
-        const withdrawSnap = await getDocs(withdrawQuery);
+        // উইথড্র প্রসেসিং
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
           .filter((d) => d.status === 'approved' || d.status === 'paid')
-          .reduce(
-            (sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0),
-            0
-          );
+          .reduce((sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0), 0);
 
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
-        const pendingOrders = fetchedOrders.filter((order) =>
-          PENDING_STATUSES.includes(order.status)
-        ).length;
-        const deliveredOrders = fetchedOrders.filter(
-          (order) => order.status === 'delivered'
-        ).length;
+        const pendingOrders = fetchedOrders.filter((order) => PENDING_STATUSES.includes(order.status)).length;
+        const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered').length;
+        
+        // প্রফিট শুধুমাত্র ডেলিভারি হওয়া অর্ডার থেকে
         const actualProfit = fetchedOrders
           .filter((order) => order.status === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
-        // ═══ Referral Bonus (added to balance) ═══
-        const referralBonus =
-          typeof userInfo?.referralBonusEarned === 'number'
-            ? userInfo.referralBonusEarned
-            : 0;
-
-        // ═══ Available Balance = Order Profit + Referral Bonus - Withdrawn ═══
+        const referralBonus = typeof userInfo?.referralBonusEarned === 'number' ? userInfo.referralBonusEarned : 0;
         const availableBalance = actualProfit + referralBonus - totalWithdrawn;
 
         const now = new Date();
-        const todayStart =
-          new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() /
-          1000;
-        const todayOrders = fetchedOrders.filter(
-          (o) => (o.createdAt?.seconds || 0) >= todayStart
-        );
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+        const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
         const todaySales = todayOrders.reduce((sum, o) => sum + o.total, 0);
 
         setOrders(fetchedOrders);
@@ -314,13 +298,13 @@ export default function ResellerDashboard() {
         setBonusStartDate(userCreatedAt);
         const nowSec = Math.floor(Date.now() / 1000);
         const bonusDeadline = userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
-        const daysLeft = Math.max(
-          0,
-          Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60))
-        );
+        const daysLeft = Math.max(0, Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)));
+        
         setBonusDaysLeft(daysLeft);
         setBonusProgress(Math.min(deliveredOrders, WELCOME_BONUS_TARGET));
         setBonusAchieved(deliveredOrders >= WELCOME_BONUS_TARGET);
+      } catch (error) {
+        console.error("Dashboard load error:", error);
       } finally {
         setLoading(false);
       }
@@ -601,8 +585,11 @@ export default function ResellerDashboard() {
                 >
                   <div className="aspect-square bg-zeluxe-cream">
                     <img
-                      src={product.imageUrl}
+                      // ═══ অটোমেটিক ইমেজ অপটিমাইজেশন ═══
+                      src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_300/') : product.imageUrl}
                       alt={product.name}
+                      // ═══ Lazy Loading ═══
+                      loading="lazy"
                       className="h-full w-full object-cover"
                     />
                   </div>
