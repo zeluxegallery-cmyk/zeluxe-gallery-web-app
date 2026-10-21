@@ -18,13 +18,14 @@ type Product = {
   stock: number;
 };
 
-const PER_PAGE_OPTIONS = [12, 24, 36, 48];
+const INITIAL_VISIBLE_COUNT = 20;
+const LOAD_MORE_COUNT = 20;
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('সব ক্যাটাগরি');
-  const [perPage, setPerPage] = useState(24);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
@@ -65,6 +66,11 @@ export default function Products() {
     void loadProducts();
   }, []);
 
+  // ফিল্টার পরিবর্তন হলে visibleCount আবার ২০ এ রিসেট হবে
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [searchTerm, selectedCategory]);
+
   const categories = useMemo(() => {
     const unique = Array.from(new Set(products.map((product) => product.category)));
     return ['সব ক্যাটাগরি', ...unique];
@@ -72,18 +78,19 @@ export default function Products() {
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return products
-      .filter((product) => {
-        const matchesSearch =
-          !term ||
-          product.name.toLowerCase().includes(term) ||
-          product.sku.toLowerCase().includes(term);
-        const matchesCategory =
-          selectedCategory === 'সব ক্যাটাগরি' || product.category === selectedCategory;
-        return matchesSearch && matchesCategory;
-      })
-      .slice(0, perPage);
-  }, [products, searchTerm, selectedCategory, perPage]);
+    return products.filter((product) => {
+      const matchesSearch =
+        !term ||
+        product.name.toLowerCase().includes(term) ||
+        product.sku.toLowerCase().includes(term);
+      const matchesCategory =
+        selectedCategory === 'সব ক্যাটাগরি' || product.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
+  }, [products, searchTerm, selectedCategory]);
+
+  // শুধুমাত্র visibleCount পরিমাণ প্রোডাক্ট দেখাবে
+  const displayedProducts = filteredProducts.slice(0, visibleCount);
 
   const handleCopy = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
@@ -128,7 +135,7 @@ export default function Products() {
 
   return (
     <Layout>
-      <div className="mx-auto max-w-6xl">
+      <div className="mx-auto max-w-6xl pb-20">
         {/* Header */}
         <div className="mb-5">
           <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
@@ -153,28 +160,7 @@ export default function Products() {
                 className="w-full rounded-md border border-zeluxe-lightgray bg-white py-3 pl-10 pr-4 text-sm text-zeluxe-black placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none"
               />
             </div>
-            <div className="relative sm:w-40">
-              <select
-                value={perPage}
-                onChange={(e) => setPerPage(Number(e.target.value))}
-                className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 pr-10 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
-              >
-                {PER_PAGE_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n} per page
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={14}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-            </div>
-          </div>
-
-          {/* Category row */}
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
+            <div className="relative sm:w-64">
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
@@ -199,108 +185,130 @@ export default function Products() {
           <div className="flex min-h-40 items-center justify-center">
             <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
           </div>
-        ) : filteredProducts.length > 0 ? (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-            {filteredProducts.map((product) => (
-              <Link
-                key={product.id}
-                to={`/products/${product.id}`}
-                className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold hover:shadow-sm"
-              >
-                {/* Image */}
-                <div className="relative aspect-square overflow-hidden bg-zeluxe-cream">
-                  {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <Package className="h-12 w-12 text-gray-300" />
-                    </div>
-                  )}
+        ) : displayedProducts.length > 0 ? (
+          <>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+              {displayedProducts.map((product) => (
+                <Link
+                  key={product.id}
+                  to={`/products/${product.id}`}
+                  className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold hover:shadow-sm"
+                >
+                  {/* Image */}
+                  <div className="relative aspect-square overflow-hidden bg-zeluxe-cream">
+                    {product.imageUrl ? (
+                      <img
+                        // অটোমেটিক ইমেজ অপটিমাইজেশন
+                        src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_400/') : product.imageUrl}
+                        alt={product.name}
+                        // Lazy loading যুক্ত করা হয়েছে
+                        loading="lazy"
+                        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center">
+                        <Package className="h-12 w-12 text-gray-300" />
+                      </div>
+                    )}
 
-                  {/* Image count badge */}
-                  {product.imageUrls.length > 1 && (
-                    <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                      {product.imageUrls.length} ছবি
-                    </span>
-                  )}
+                    {/* Image count badge */}
+                    {product.imageUrls.length > 1 && (
+                      <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                        {product.imageUrls.length} ছবি
+                      </span>
+                    )}
 
-                  {/* Stock badge */}
-                  {product.stock === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                      <span className="rounded bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
-                        স্টক নেই
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="p-3">
-                  <h3 className="line-clamp-2 text-sm font-bold text-zeluxe-black">
-                    {product.name}
-                  </h3>
-                  <p className="mt-0.5 font-mono text-[10px] text-gray-500">
-                    {product.sku}
-                  </p>
-
-                  <div className="mt-2.5 space-y-0.5">
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-[11px] text-gray-500">Price:</span>
-                      <span className="text-sm font-bold text-zeluxe-black">
-                        Tk {product.resellerPrice.toLocaleString()}
-                      </span>
-                    </div>
-                    <div className="flex items-baseline justify-between">
-                      <span className="text-[11px] text-gray-500">
-                        Customer / Retail Price:
-                      </span>
-                      <span className="text-xs font-bold text-zeluxe-gold">
-                        Tk {product.suggestedPrice.toLocaleString()}
-                      </span>
-                    </div>
+                    {/* Stock badge */}
+                    {product.stock === 0 && (
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                        <span className="rounded bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
+                          স্টক নেই
+                        </span>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Action buttons */}
-                  <div className="mt-3 grid grid-cols-2 gap-2">
-                    <button
-                      onClick={(e) => handleDownloadAll(e, product)}
-                      disabled={downloadingId === product.id || product.imageUrls.length === 0}
-                      className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-40"
-                      title="সব ছবি ডাউনলোড"
-                    >
-                      {downloadingId === product.id ? (
-                        <Loader2 size={13} className="animate-spin" />
-                      ) : (
-                        <Download size={13} />
-                      )}
-                      ছবি
-                    </button>
-                    <button
-                      onClick={(e) => handleCopy(e, product)}
-                      className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110"
-                      title="তথ্য কপি করুন"
-                    >
-                      {copiedId === product.id ? (
-                        <>
-                          <Check size={13} />
-                          কপি হয়েছে
-                        </>
-                      ) : (
-                        <>
-                          <Copy size={13} />
-                          কপি
-                        </>
-                      )}
-                    </button>
+                  {/* Content */}
+                  <div className="p-3">
+                    <h3 className="line-clamp-2 text-sm font-bold text-zeluxe-black">
+                      {product.name}
+                    </h3>
+                    <p className="mt-0.5 font-mono text-[10px] text-gray-500">
+                      {product.sku}
+                    </p>
+
+                    <div className="mt-2.5 space-y-0.5">
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[11px] text-gray-500">Price:</span>
+                        <span className="text-sm font-bold text-zeluxe-black">
+                          Tk {product.resellerPrice.toLocaleString()}
+                        </span>
+                      </div>
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-[11px] text-gray-500">
+                          Customer / Retail Price:
+                        </span>
+                        <span className="text-xs font-bold text-zeluxe-gold">
+                          Tk {product.suggestedPrice.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="mt-3 grid grid-cols-2 gap-2">
+                      <button
+                        onClick={(e) => handleDownloadAll(e, product)}
+                        disabled={downloadingId === product.id || product.imageUrls.length === 0}
+                        className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-40"
+                        title="সব ছবি ডাউনলোড"
+                      >
+                        {downloadingId === product.id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Download size={13} />
+                        )}
+                        ছবি
+                      </button>
+                      <button
+                        onClick={(e) => handleCopy(e, product)}
+                        className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110"
+                        title="তথ্য কপি করুন"
+                      >
+                        {copiedId === product.id ? (
+                          <>
+                            <Check size={13} />
+                            কপি হয়েছে
+                          </>
+                        ) : (
+                          <>
+                            <Copy size={13} />
+                            কপি
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
-                </div>
-              </Link>
-            ))}
-          </div>
+                </Link>
+              ))}
+            </div>
+
+            {/* Load More Button */}
+            {visibleCount < filteredProducts.length && (
+              <div className="mt-8 flex justify-center">
+                <button
+                  onClick={() => setVisibleCount((prev) => prev + LOAD_MORE_COUNT)}
+                  className="rounded-xl border border-zeluxe-black bg-white px-8 py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 active:scale-95"
+                >
+                  আরো দেখুন (Load More)
+                </button>
+              </div>
+            )}
+
+            {/* Results count */}
+            <p className="mt-6 text-center text-xs text-gray-400">
+              {displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে (মোট {filteredProducts.length}টি)
+            </p>
+          </>
         ) : (
           <div className="rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-12 text-center">
             <Package className="mx-auto h-12 w-12 text-gray-300" />
@@ -319,13 +327,6 @@ export default function Products() {
               </button>
             ) : null}
           </div>
-        )}
-
-        {/* Results count */}
-        {!loading && filteredProducts.length > 0 && (
-          <p className="mt-6 text-center text-xs text-gray-400">
-            {filteredProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে
-          </p>
         )}
       </div>
     </Layout>
