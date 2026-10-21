@@ -11,7 +11,6 @@ import {
   FolderTree,
   Bell,
   ArrowRight,
-  Loader2,
   CheckCircle,
 } from 'lucide-react';
 import AdminLayout from '../../components/AdminLayout';
@@ -38,6 +37,22 @@ type NewReseller = {
   name: string;
   accountStatus: string;
 };
+
+// স্ট্যাটাস লেবেল ইংরেজিতে ফিরিয়ে দেওয়া হলো
+function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: 'Pending',
+    confirmed: 'Confirmed',
+    shipped: 'Shipped',
+    delivered: 'Delivered',
+    cancelled: 'Cancelled',
+    returned: 'Returned',
+    active: 'Active',
+    pending_membership: 'Pending',
+    suspended: 'Suspended',
+  };
+  return labels[status.toLowerCase()] || status;
+}
 
 export default function AdminOverview() {
   const [stats, setStats] = useState<Stats>({
@@ -143,11 +158,31 @@ export default function AdminOverview() {
     return styles[status] || 'bg-gray-50 text-gray-700 border border-gray-200';
   };
 
+  // ═══ SKELETON LOADING UI ═══
   if (loading) {
     return (
       <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+        <div className="mx-auto max-w-3xl animate-pulse">
+          {/* Header Skeleton */}
+          <div className="mb-5 h-28 rounded-lg bg-gray-300"></div>
+
+          {/* Summary Cards Skeleton */}
+          <div className="mb-5 grid grid-cols-2 gap-3 md:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-24 rounded-lg bg-gray-200"></div>
+            ))}
+          </div>
+
+          {/* Quick Links Skeleton */}
+          <div className="mb-5 grid grid-cols-3 gap-3 md:grid-cols-6">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="h-16 rounded-lg bg-gray-200"></div>
+            ))}
+          </div>
+
+          {/* Recent Orders Skeleton */}
+          <div className="mb-4 h-64 rounded-lg bg-gray-200"></div>
+          <div className="h-48 rounded-lg bg-gray-200"></div>
         </div>
       </AdminLayout>
     );
@@ -155,7 +190,7 @@ export default function AdminOverview() {
 
   return (
     <AdminLayout>
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-3xl pb-10">
         {/* ═══ HEADER ═══ */}
         <div className="mb-5 rounded-lg bg-zeluxe-black p-6 text-white">
           <p className="text-[11px] uppercase tracking-wider text-gray-400">
@@ -163,7 +198,7 @@ export default function AdminOverview() {
           </p>
           <h1 className="mt-1.5 text-xl font-bold">Zeluxe Gallery</h1>
           <p className="mt-1 text-xs text-gray-400">
-            সব রিসেলার, অর্ডার ও পেমেন্ট একনজরে
+            সব রিসেলার, অর্ডার ও পেমেন্ট একনজরে দেখুন
           </p>
         </div>
 
@@ -174,14 +209,14 @@ export default function AdminOverview() {
               <AlertCircle className="mt-0.5 shrink-0 text-yellow-700" size={18} />
               <div className="flex-1">
                 <p className="text-sm font-bold text-yellow-900">
-                  আপনার মনোযোগ দরকার
+                  Action Required!
                 </p>
                 <div className="mt-1 space-y-0.5 text-xs text-yellow-700">
                   {pendingCount > 0 && (
-                    <p>• {pendingCount}টি Membership Request অপেক্ষমাণ</p>
+                    <p>• {pendingCount} Pending Membership Requests</p>
                   )}
                   {stats.pendingOrders > 0 && (
-                    <p>• {stats.pendingOrders}টি Order অপেক্ষমাণ</p>
+                    <p>• {stats.pendingOrders} Pending Orders</p>
                   )}
                 </div>
               </div>
@@ -242,14 +277,14 @@ export default function AdminOverview() {
               to="/admin/orders"
               className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline"
             >
-              সব দেখুন
+              View All
               <ArrowRight size={12} />
             </Link>
           </div>
 
           {recentOrders.length === 0 ? (
             <p className="p-6 text-center text-sm text-gray-500">
-              এখনো কোনো অর্ডার নেই
+              No orders yet
             </p>
           ) : (
             recentOrders.map((order) => (
@@ -264,7 +299,7 @@ export default function AdminOverview() {
                   <span
                     className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${getStatusBadge(order.status)}`}
                   >
-                    {order.status}
+                    {getStatusLabel(order.status)}
                   </span>
                 </div>
                 <p className="text-sm font-bold text-zeluxe-gold">
@@ -286,14 +321,14 @@ export default function AdminOverview() {
               to="/admin/resellers"
               className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline"
             >
-              সব দেখুন
+              View All
               <ArrowRight size={12} />
             </Link>
           </div>
 
           {newResellers.length === 0 ? (
             <p className="p-6 text-center text-sm text-gray-500">
-              এখনো কোনো রিসেলার নেই
+              No resellers yet
             </p>
           ) : (
             newResellers.map((reseller) => (
@@ -307,7 +342,7 @@ export default function AdminOverview() {
                 <span
                   className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${getStatusBadge(reseller.accountStatus)}`}
                 >
-                  {reseller.accountStatus.replace('_', ' ')}
+                  {getStatusLabel(reseller.accountStatus)}
                 </span>
               </div>
             ))
@@ -325,7 +360,7 @@ export default function AdminOverview() {
               to="/admin/memberships"
               className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline"
             >
-              সব দেখুন
+              View All
               <ArrowRight size={12} />
             </Link>
           </div>
@@ -336,7 +371,7 @@ export default function AdminOverview() {
                 <CheckCircle className="text-green-600" size={18} />
                 <div>
                   <p className="text-sm font-bold text-zeluxe-black">No pending requests</p>
-                  <p className="text-xs text-gray-500">সব membership request প্রসেস করা হয়েছে</p>
+                  <p className="text-xs text-gray-500">সব মেম্বারশিপ রিকোয়েস্ট প্রসেস করা হয়েছে</p>
                 </div>
               </div>
             ) : (
@@ -344,9 +379,9 @@ export default function AdminOverview() {
                 <Clock className="text-yellow-600" size={18} />
                 <div>
                   <p className="text-sm font-bold text-zeluxe-black">
-                    {pendingCount}টি Request অপেক্ষমাণ
+                    {pendingCount} Pending Requests
                   </p>
-                  <p className="text-xs text-gray-500">যাচাই করতে Memberships পেজে যান</p>
+                  <p className="text-xs text-gray-500">যাচাই করতে মেম্বারশিপ পেজে যান</p>
                 </div>
               </div>
             )}
