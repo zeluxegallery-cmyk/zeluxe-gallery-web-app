@@ -9,7 +9,7 @@ import {
   query,
   updateDoc,
 } from 'firebase/firestore';
-import { Eye, Loader2, Search, Trash2 } from 'lucide-react';
+import { Eye, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
@@ -19,7 +19,7 @@ type Order = {
   orderId: string;
   customerName: string;
   resellerName: string;
-  size?: string | null; // নতুন যোগ করা হয়েছে
+  size?: string | null;
   total: number;
   status: string;
   createdAt?: { seconds?: number };
@@ -27,6 +27,8 @@ type Order = {
 
 const STATUS_FILTERS = ['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled', 'Returned'];
 const STATUS_OPTIONS = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'returned'];
+const INITIAL_VISIBLE_COUNT = 20; // প্রথমে ২০টি অর্ডার দেখাবে
+const LOAD_MORE_COUNT = 20; // ক্লিক করলে ২০টি করে বাড়বে
 
 function formatDate(seconds?: number) {
   if (!seconds) return '—';
@@ -62,6 +64,7 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT); // নতুন স্টেট
 
   const loadData = useCallback(async () => {
     try {
@@ -74,7 +77,7 @@ export default function AdminOrders() {
             orderId: typeof data.orderId === 'string' ? data.orderId : orderDoc.id,
             customerName: typeof data.customerName === 'string' ? data.customerName : 'Unknown',
             resellerName: typeof data.resellerName === 'string' ? data.resellerName : '—',
-            size: typeof data.size === 'string' ? data.size : null, // নতুন যোগ করা হয়েছে
+            size: typeof data.size === 'string' ? data.size : null,
             total: typeof data.total === 'number' ? data.total : 0,
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
@@ -97,7 +100,7 @@ export default function AdminOrders() {
             orderId: typeof data.orderId === 'string' ? data.orderId : orderDoc.id,
             customerName: typeof data.customerName === 'string' ? data.customerName : 'Unknown',
             resellerName: typeof data.resellerName === 'string' ? data.resellerName : '—',
-            size: typeof data.size === 'string' ? data.size : null, // নতুন যোগ করা হয়েছে
+            size: typeof data.size === 'string' ? data.size : null,
             total: typeof data.total === 'number' ? data.total : 0,
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
@@ -112,6 +115,11 @@ export default function AdminOrders() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // সার্চ বা ফিল্টার পরিবর্তন হলে আবার ২০টি থেকে শুরু হবে
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [search, statusFilter]);
 
   const handleStatusChange = async (id: string, newStatus: string) => {
     try {
@@ -144,19 +152,17 @@ export default function AdminOrders() {
     return matchesSearch && matchesStatus;
   });
 
-  if (loading) {
-    return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
-        </div>
-      </AdminLayout>
-    );
-  }
+  // শুধুমাত্র visibleCount পরিমাণ ডাটা দেখাবে
+  const displayedOrders = filtered.slice(0, visibleCount);
 
   return (
     <AdminLayout>
-      <h1 className="mb-6 text-2xl font-bold text-zeluxe-black">সব অর্ডার</h1>
+      <div className="mb-6 flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-zeluxe-black">সব অর্ডার</h1>
+        <span className="rounded-full bg-zeluxe-gold/20 px-3 py-1 text-sm font-bold text-zeluxe-black">
+          {filtered.length} Orders
+        </span>
+      </div>
 
       {/* Search */}
       <div className="relative mb-4">
@@ -186,36 +192,138 @@ export default function AdminOrders() {
         ))}
       </div>
 
-      {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white md:block">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zeluxe-fieldbg">
-            <tr>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Order ID</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Customer</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Reseller</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Total</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Status</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Date</th>
-              <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((order) => (
-              <tr key={order.id} className="border-b border-zeluxe-lightgray last:border-0">
-                <td className="px-4 py-3">
-                  <div className="font-mono text-xs text-zeluxe-black">{order.orderId}</div>
-                  {/* ═══ Size ব্যাজ ডেস্কটপে ═══ */}
-                  {order.size && (
-                    <div className="mt-0.5 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
-                      Size: {order.size}
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 text-zeluxe-black">{order.customerName}</td>
-                <td className="px-4 py-3 text-zeluxe-gray">{order.resellerName}</td>
-                <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</td>
-                <td className="px-4 py-3">
+      {/* ═══ SKELETON LOADING UI ═══ */}
+      {loading ? (
+        <div className="space-y-4">
+          {/* Desktop Skeleton */}
+          <div className="hidden overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white md:block">
+            <div className="bg-zeluxe-fieldbg px-4 py-3">
+              <div className="h-4 w-1/3 animate-pulse rounded bg-gray-300"></div>
+            </div>
+            <div className="divide-y divide-zeluxe-lightgray">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-4 animate-pulse">
+                  <div className="h-4 w-24 rounded bg-gray-200"></div>
+                  <div className="h-4 w-32 rounded bg-gray-200"></div>
+                  <div className="h-4 w-20 rounded bg-gray-200"></div>
+                  <div className="h-6 w-16 rounded-full bg-gray-200"></div>
+                  <div className="h-4 w-16 rounded bg-gray-200"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Mobile Skeleton */}
+          <div className="space-y-3 md:hidden">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-zeluxe-lightgray bg-white p-4 animate-pulse">
+                <div className="flex justify-between">
+                  <div className="h-4 w-20 rounded bg-gray-200"></div>
+                  <div className="h-4 w-10 rounded bg-gray-200"></div>
+                </div>
+                <div className="mt-3 h-5 w-1/2 rounded bg-gray-200"></div>
+                <div className="mt-2 h-4 w-1/3 rounded bg-gray-200"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : displayedOrders.length > 0 ? (
+        <>
+          {/* Desktop table */}
+          <div className="hidden overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-zeluxe-fieldbg">
+                <tr>
+                  <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Order ID</th>
+                  <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Customer</th>
+                  <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Reseller</th>
+                  <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Total</th>
+                  <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Status</th>
+                  <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Date</th>
+                  <th className="px-4 py-3 text-xs font-bold uppercase text-zeluxe-gray">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedOrders.map((order) => (
+                  <tr key={order.id} className="border-b border-zeluxe-lightgray last:border-0">
+                    <td className="px-4 py-3">
+                      <div className="font-mono text-xs text-zeluxe-black">{order.orderId}</div>
+                      {order.size && (
+                        <div className="mt-0.5 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
+                          Size: {order.size}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-zeluxe-black">{order.customerName}</td>
+                    <td className="px-4 py-3 text-zeluxe-gray">{order.resellerName}</td>
+                    <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      <select
+                        value={order.status}
+                        onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                        className={`rounded-full px-2 py-1 text-xs font-bold capitalize border-0 focus:outline-none ${getStatusClass(order.status)}`}
+                      >
+                        {STATUS_OPTIONS.map((status) => (
+                          <option key={status} value={status} className="bg-white text-zeluxe-black capitalize">
+                            {status}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-4 py-3 text-zeluxe-gray">{formatDate(order.createdAt?.seconds)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => navigate(`/orders/${order.id}`)}
+                          className="rounded-lg p-1.5 text-zeluxe-gold transition hover:bg-zeluxe-fieldbg"
+                        >
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(order)}
+                          className="rounded-lg p-1.5 text-red-600 transition hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {displayedOrders.map((order) => (
+              <div key={order.id} className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-mono text-xs text-zeluxe-gray">{order.orderId}</p>
+                    {order.size && (
+                      <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
+                        Size: {order.size}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => navigate(`/orders/${order.id}`)}
+                      className="rounded-lg p-1 text-zeluxe-gold"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(order)}
+                      className="rounded-lg p-1 text-red-600"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                </div>
+                <p className="mt-2 font-medium text-zeluxe-black">{order.customerName}</p>
+                <p className="text-xs text-zeluxe-gray">{order.resellerName}</p>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</span>
                   <select
                     value={order.status}
                     onChange={(e) => handleStatusChange(order.id, e.target.value)}
@@ -227,81 +335,25 @@ export default function AdminOrders() {
                       </option>
                     ))}
                   </select>
-                </td>
-                <td className="px-4 py-3 text-zeluxe-gray">{formatDate(order.createdAt?.seconds)}</td>
-                <td className="px-4 py-3">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => navigate(`/orders/${order.id}`)}
-                      className="rounded-lg p-1.5 text-zeluxe-gold transition hover:bg-zeluxe-fieldbg"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(order)}
-                      className="rounded-lg p-1.5 text-red-600 transition hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
+                </div>
+                <p className="mt-1 text-xs text-gray-400">{formatDate(order.createdAt?.seconds)}</p>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="space-y-3 md:hidden">
-        {filtered.map((order) => (
-          <div key={order.id} className="rounded-xl border border-zeluxe-lightgray bg-white p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-mono text-xs text-zeluxe-gray">{order.orderId}</p>
-                {/* ═══ Size ব্যাজ মোবাইলে ═══ */}
-                {order.size && (
-                  <span className="mt-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-600">
-                    Size: {order.size}
-                  </span>
-                )}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => navigate(`/orders/${order.id}`)}
-                  className="rounded-lg p-1 text-zeluxe-gold"
-                >
-                  <Eye className="h-4 w-4" />
-                </button>
-                <button
-                  onClick={() => handleDelete(order)}
-                  className="rounded-lg p-1 text-red-600"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <p className="mt-2 font-medium text-zeluxe-black">{order.customerName}</p>
-            <p className="text-xs text-zeluxe-gray">{order.resellerName}</p>
-            <div className="mt-2 flex items-center justify-between">
-              <span className="font-bold text-zeluxe-gold">Tk {order.total.toLocaleString()}</span>
-              <select
-                value={order.status}
-                onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                className={`rounded-full px-2 py-1 text-xs font-bold capitalize border-0 focus:outline-none ${getStatusClass(order.status)}`}
-              >
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status} value={status} className="bg-white text-zeluxe-black capitalize">
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <p className="mt-1 text-xs text-gray-400">{formatDate(order.createdAt?.seconds)}</p>
           </div>
-        ))}
-      </div>
 
-      {filtered.length === 0 && (
+          {/* ═══ LOAD MORE BUTTON ═══ */}
+          {visibleCount < filtered.length && (
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + LOAD_MORE_COUNT)}
+                className="rounded-xl border border-zeluxe-black bg-white px-8 py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 active:scale-95"
+              >
+                আরো অর্ডার দেখুন (Load More)
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
         <div className="mt-6 rounded-xl bg-zeluxe-fieldbg p-8 text-center text-zeluxe-gray">
           No orders found.
         </div>
