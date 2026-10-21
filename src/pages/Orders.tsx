@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Loader2, ShoppingBag } from 'lucide-react';
+import { ShoppingBag } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
@@ -15,6 +15,8 @@ type Order = {
 };
 
 const STATUS_FILTERS = ['All', 'Pending', 'Shipped', 'Delivered', 'Cancelled'];
+const INITIAL_VISIBLE_COUNT = 20;
+const LOAD_MORE_COUNT = 20;
 
 function getStatusClass(status: string) {
   switch (status.toLowerCase()) {
@@ -33,6 +35,19 @@ function getStatusClass(status: string) {
   }
 }
 
+function getStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    pending: 'অপেক্ষমাণ',
+    confirmed: 'কনফার্মড',
+    shipped: 'শিপড',
+    delivered: 'ডেলিভারড',
+    cancelled: 'বাতিল',
+    returned: 'ফেরত',
+    all: 'সব'
+  };
+  return labels[status.toLowerCase()] || status;
+}
+
 function formatDate(seconds?: number) {
   if (!seconds) return '—';
   return new Date(seconds * 1000).toLocaleDateString('en-GB', {
@@ -47,6 +62,7 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeFilter, setActiveFilter] = useState('All');
   const [loading, setLoading] = useState(true);
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT); // নতুন স্টেট
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -84,15 +100,23 @@ export default function Orders() {
     void loadOrders();
   }, []);
 
+  // ফিল্টার পরিবর্তন হলে আবার ২০টি থেকে শুরু হবে
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [activeFilter]);
+
   const filteredOrders =
     activeFilter === 'All'
       ? orders
       : orders.filter((order) => order.status.toLowerCase() === activeFilter.toLowerCase());
 
+  // শুধুমাত্র visibleCount পরিমাণ ডাটা দেখাবে
+  const displayedOrders = filteredOrders.slice(0, visibleCount);
+
   return (
     <Layout>
-      <h1 className="text-2xl font-bold text-zeluxe-black">My Orders</h1>
-      <p className="mb-6 text-sm text-gray-600">Track all your customer orders</p>
+      <h1 className="text-2xl font-bold text-zeluxe-black">আমার অর্ডার</h1>
+      <p className="mb-6 text-sm text-gray-600">আপনার সব অর্ডারের তালিকা</p>
 
       <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
         {STATUS_FILTERS.map((filter) => (
@@ -105,30 +129,63 @@ export default function Orders() {
                 : 'border border-zeluxe-lightgray text-zeluxe-gray hover:bg-zeluxe-fieldbg'
             }`}
           >
-            {filter}
+            {getStatusLabel(filter)}
           </button>
         ))}
       </div>
 
+      {/* ═══ SKELETON LOADING ═══ */}
       {loading ? (
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading orders" />
+        <div className="space-y-4">
+          {/* Desktop Table Skeleton */}
+          <div className="hidden overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white md:block">
+            <div className="bg-zeluxe-fieldbg px-4 py-3">
+              <div className="h-4 w-1/3 animate-pulse rounded bg-gray-300"></div>
+            </div>
+            <div className="divide-y divide-zeluxe-lightgray">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-4 animate-pulse">
+                  <div className="h-4 w-24 rounded bg-gray-200"></div>
+                  <div className="h-4 w-32 rounded bg-gray-200"></div>
+                  <div className="h-4 w-24 rounded bg-gray-200"></div>
+                  <div className="h-4 w-16 rounded bg-gray-200"></div>
+                  <div className="h-6 w-20 rounded-full bg-gray-200"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Mobile Card Skeleton */}
+          <div className="space-y-3 md:hidden">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-zeluxe-lightgray bg-white p-4 animate-pulse">
+                <div className="flex justify-between">
+                  <div className="h-4 w-20 rounded bg-gray-200"></div>
+                  <div className="h-5 w-16 rounded-full bg-gray-200"></div>
+                </div>
+                <div className="mt-3 h-5 w-1/2 rounded bg-gray-200"></div>
+                <div className="mt-3 flex justify-between">
+                  <div className="h-4 w-24 rounded bg-gray-200"></div>
+                  <div className="h-4 w-16 rounded bg-gray-200"></div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
-      ) : filteredOrders.length > 0 ? (
+      ) : displayedOrders.length > 0 ? (
         <>
           <div className="hidden overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-zeluxe-fieldbg">
                 <tr>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">Order ID</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">Customer</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">Date</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">Total</th>
-                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">Status</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">অর্ডার আইডি</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">কাস্টমার</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">তারিখ</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">মোট বিল</th>
+                  <th className="px-4 py-3 text-left text-xs font-bold uppercase text-zeluxe-gray">স্ট্যাটাস</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredOrders.map((order) => (
+                {displayedOrders.map((order) => (
                   <tr
                     key={order.id}
                     onClick={() => navigate(`/orders/${order.id}`)}
@@ -142,7 +199,7 @@ export default function Orders() {
                       <span
                         className={`inline-block rounded-full px-2 py-1 text-xs font-bold capitalize ${getStatusClass(order.status)}`}
                       >
-                        {order.status}
+                        {getStatusLabel(order.status)}
                       </span>
                     </td>
                   </tr>
@@ -152,7 +209,7 @@ export default function Orders() {
           </div>
 
           <div className="md:hidden">
-            {filteredOrders.map((order) => (
+            {displayedOrders.map((order) => (
               <div
                 key={order.id}
                 onClick={() => navigate(`/orders/${order.id}`)}
@@ -163,7 +220,7 @@ export default function Orders() {
                   <span
                     className={`inline-block rounded-full px-2 py-1 text-xs font-bold capitalize ${getStatusClass(order.status)}`}
                   >
-                    {order.status}
+                    {getStatusLabel(order.status)}
                   </span>
                 </div>
                 <p className="mt-2 font-bold text-zeluxe-black">{order.customerName}</p>
@@ -174,16 +231,29 @@ export default function Orders() {
               </div>
             ))}
           </div>
+
+          {/* ═══ LOAD MORE BUTTON ═══ */}
+          {visibleCount < filteredOrders.length && (
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + LOAD_MORE_COUNT)}
+                className="rounded-xl border border-zeluxe-black bg-white px-8 py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 active:scale-95"
+              >
+                আরো অর্ডার দেখুন (Load More)
+              </button>
+            </div>
+          )}
         </>
       ) : (
         <div className="rounded-xl bg-zeluxe-fieldbg p-12 text-center">
           <ShoppingBag className="mx-auto h-12 w-12 text-zeluxe-gray" />
-          <p className="mt-4 text-gray-600">No orders yet. Create your first order!</p>
+          <p className="mt-4 font-medium text-gray-600">এখনো কোনো অর্ডার নেই।</p>
+          <p className="mt-1 text-xs text-gray-500">প্রথম অর্ডার তৈরি করে ব্যবসা শুরু করুন!</p>
           <button
             onClick={() => navigate('/orders/new')}
             className="mt-4 rounded-xl bg-zeluxe-black px-6 py-3 font-bold text-white transition hover:bg-[#2a2a2a]"
           >
-            Create Order
+            নতুন অর্ডার করুন
           </button>
         </div>
       )}
