@@ -72,6 +72,8 @@ const emptyForm: ProductForm = {
 };
 
 const MAX_IMAGES = 5;
+const INITIAL_VISIBLE_COUNT = 20;
+const LOAD_MORE_COUNT = 20;
 
 const CATEGORY_CODES: Record<string, string> = {
   'শার্ট': 'SHT', 'টি-শার্ট': 'TSH', 'পাঞ্জাবি': 'PNJ',
@@ -91,6 +93,8 @@ export default function AdminProducts() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
+  
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
@@ -157,6 +161,10 @@ export default function AdminProducts() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    setVisibleCount(INITIAL_VISIBLE_COUNT);
+  }, [search, categoryFilter]);
 
   const generateSKU = useCallback(async (categoryName: string): Promise<string> => {
     if (!categoryName) return '';
@@ -335,15 +343,7 @@ export default function AdminProducts() {
     return matchesSearch && matchesCategory;
   });
 
-  if (loading) {
-    return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </AdminLayout>
-    );
-  }
+  const displayedProducts = filtered.slice(0, visibleCount);
 
   const inputClass =
     'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none';
@@ -379,112 +379,175 @@ export default function AdminProducts() {
         </select>
       </div>
 
-      {/* Desktop table */}
-      <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-zeluxe-cream">
-            <tr>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Image</th>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Name</th>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">SKU</th>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Category</th>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Stock</th>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Price</th>
-              <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Active</th>
-              <th className="px-4 py-3"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((product) => (
-              <tr key={product.id} className="border-b border-zeluxe-lightgray last:border-0">
-                <td className="px-4 py-3">
-                  {product.imageUrl ? (
-                    <div className="relative">
-                      <img src={product.imageUrl} alt={product.name} className="h-10 w-10 rounded-md object-cover" />
-                      {product.imageUrls.length > 1 && (
-                        <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
-                          {product.imageUrls.length}
-                        </span>
+      {/* ═══ SKELETON LOADING ═══ */}
+      {loading ? (
+        <div className="space-y-4">
+          {/* Desktop Table Skeleton */}
+          <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
+            <div className="bg-zeluxe-cream px-4 py-3">
+              <div className="h-4 w-1/4 animate-pulse rounded bg-gray-300"></div>
+            </div>
+            <div className="divide-y divide-zeluxe-lightgray">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between px-4 py-4 animate-pulse">
+                  <div className="h-10 w-10 rounded-md bg-gray-200"></div>
+                  <div className="h-4 w-1/4 rounded bg-gray-200"></div>
+                  <div className="h-4 w-20 rounded bg-gray-200"></div>
+                  <div className="h-4 w-16 rounded bg-gray-200"></div>
+                  <div className="h-4 w-10 rounded bg-gray-200"></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Mobile Card Skeleton */}
+          <div className="space-y-3 md:hidden">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-lg border border-zeluxe-lightgray bg-white p-4 animate-pulse">
+                <div className="flex gap-3">
+                  <div className="h-12 w-12 rounded-md bg-gray-200"></div>
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 w-3/4 rounded bg-gray-200"></div>
+                    <div className="h-3 w-1/2 rounded bg-gray-200"></div>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-between">
+                  <div className="h-4 w-20 rounded bg-gray-200"></div>
+                  <div className="h-4 w-16 rounded bg-gray-200"></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : displayedProducts.length > 0 ? (
+        <>
+          {/* Desktop table */}
+          <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-zeluxe-cream">
+                <tr>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Image</th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Name</th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">SKU</th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Category</th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Stock</th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Price</th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Active</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {displayedProducts.map((product) => (
+                  <tr key={product.id} className="border-b border-zeluxe-lightgray last:border-0">
+                    <td className="px-4 py-3">
+                      {product.imageUrl ? (
+                        <div className="relative">
+                          <img 
+                            src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_100/') : product.imageUrl} 
+                            alt={product.name} 
+                            loading="lazy"
+                            className="h-10 w-10 rounded-md object-cover" 
+                          />
+                          {product.imageUrls.length > 1 && (
+                            <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
+                              {product.imageUrls.length}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zeluxe-cream">
+                          <Package className="h-5 w-5 text-gray-400" />
+                        </div>
                       )}
+                    </td>
+                    <td className="px-4 py-3 font-medium text-zeluxe-black">{product.name}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{product.category}</td>
+                    <td className="px-4 py-3 text-zeluxe-black">{product.stock}</td>
+                    <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      <input
+                        type="checkbox"
+                        checked={product.active}
+                        onChange={() => toggleActive(product)}
+                        className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
+                      />
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-2">
+                        <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold hover:bg-zeluxe-cream">
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600 hover:bg-red-50">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <div className="space-y-3 md:hidden">
+            {displayedProducts.map((product) => (
+              <div key={product.id} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex gap-3">
+                    {product.imageUrl ? (
+                      <img 
+                        src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : product.imageUrl} 
+                        alt={product.name} 
+                        loading="lazy"
+                        className="h-12 w-12 rounded-md object-cover" 
+                      />
+                    ) : (
+                      <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zeluxe-cream">
+                        <Package className="h-6 w-6 text-gray-400" />
+                      </div>
+                    )}
+                    <div>
+                      <p className="font-medium text-zeluxe-black">{product.name}</p>
+                      <p className="font-mono text-[10px] text-gray-500">{product.sku}</p>
                     </div>
-                  ) : (
-                    <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zeluxe-cream">
-                      <Package className="h-5 w-5 text-gray-400" />
-                    </div>
-                  )}
-                </td>
-                <td className="px-4 py-3 font-medium text-zeluxe-black">{product.name}</td>
-                <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
-                <td className="px-4 py-3 text-xs text-gray-500">{product.category}</td>
-                <td className="px-4 py-3 text-zeluxe-black">{product.stock}</td>
-                <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</td>
-                <td className="px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={product.active}
-                    onChange={() => toggleActive(product)}
-                    className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
-                  />
-                </td>
-                <td className="px-4 py-3">
+                  </div>
                   <div className="flex gap-2">
-                    <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold hover:bg-zeluxe-cream">
+                    <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold">
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600 hover:bg-red-50">
+                    <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile cards */}
-      <div className="space-y-3 md:hidden">
-        {filtered.map((product) => (
-          <div key={product.id} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex gap-3">
-                {product.imageUrl ? (
-                  <img src={product.imageUrl} alt={product.name} className="h-12 w-12 rounded-md object-cover" />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zeluxe-cream">
-                    <Package className="h-6 w-6 text-gray-400" />
-                  </div>
-                )}
-                <div>
-                  <p className="font-medium text-zeluxe-black">{product.name}</p>
-                  <p className="font-mono text-[10px] text-gray-500">{product.sku}</p>
+                </div>
+                <div className="mt-3 flex items-center justify-between text-xs">
+                  <span className="text-gray-500">{product.category} · Stock: {product.stock}</span>
+                  <span className="font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</span>
                 </div>
               </div>
-              <div className="flex gap-2">
-                <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold">
-                  <Pencil className="h-4 w-4" />
-                </button>
-                <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600">
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-            <div className="mt-3 flex items-center justify-between text-xs">
-              <span className="text-gray-500">{product.category} · Stock: {product.stock}</span>
-              <span className="font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</span>
-            </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {filtered.length === 0 && (
+          {/* Load More Button */}
+          {visibleCount < filtered.length && (
+            <div className="mt-8 flex justify-center">
+              <button
+                onClick={() => setVisibleCount((prev) => prev + LOAD_MORE_COUNT)}
+                className="rounded-md border border-zeluxe-black bg-white px-8 py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 active:scale-95"
+              >
+                আরো প্রোডাক্ট দেখুন (Load More)
+              </button>
+            </div>
+          )}
+        </>
+      ) : (
         <div className="mt-6 rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-8 text-center">
           <Package className="mx-auto h-10 w-10 text-gray-300" />
           <p className="mt-3 text-sm text-gray-500">কোনো প্রোডাক্ট নেই</p>
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modal - same as before */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6">
@@ -554,7 +617,6 @@ export default function AdminProducts() {
                 />
               </div>
 
-              {/* Source URL */}
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <LinkIcon size={14} className="text-zeluxe-gold" />
@@ -567,12 +629,8 @@ export default function AdminProducts() {
                   placeholder="যেমন: https://lifegood.com/product/27480"
                   className={inputClass}
                 />
-                <p className="mt-1 text-[11px] text-gray-400">
-                  এই লিংকটি শুধুমাত্র অ্যাডমিন অর্ডার ডিটেইলসে দেখতে পাবে। (কোনো লিংক না থাকলে ফাঁকা রাখুন)
-                </p>
               </div>
 
-              {/* Sizes */}
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <Ruler size={14} className="text-zeluxe-gold" />
@@ -584,12 +642,8 @@ export default function AdminProducts() {
                   placeholder="যেমন: S, M, L, XL, XXL"
                   className={inputClass}
                 />
-                <p className="mt-1 text-[11px] text-gray-400">
-                  কমা (,) দিয়ে একাধিক সাইজ আলাদা করুন। খালি রাখলে কোনো সাইজ অপশন দেখাবে না।
-                </p>
               </div>
 
-              {/* Colors */}
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <Palette size={14} className="text-zeluxe-gold" />
@@ -601,12 +655,8 @@ export default function AdminProducts() {
                   placeholder="যেমন: Red, Blue, Green, Black"
                   className={inputClass}
                 />
-                <p className="mt-1 text-[11px] text-gray-400">
-                  কমা (,) দিয়ে একাধিক কালার আলাদা করুন।
-                </p>
               </div>
 
-              {/* Images */}
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
                   <span>প্রোডাক্টের ছবি</span>
@@ -685,45 +735,44 @@ export default function AdminProducts() {
                 />
               </div>
 
-              {/* ═══ Prices & Stock (সমস্যা সমাধান করা হয়েছে) ═══ */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">স্টক</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value })}
-                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    onChange={(e) => setForm({ ...form, stock: e.target.value.replace(/[^0-9]/g, '') })}
                     className={inputClass}
                   />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ক্রয় মূল্য (Tk)</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={form.purchaseCost}
-                    onChange={(e) => setForm({ ...form, purchaseCost: e.target.value })}
-                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    onChange={(e) => setForm({ ...form, purchaseCost: e.target.value.replace(/[^0-9]/g, '') })}
                     className={inputClass}
                   />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">রিসেলার মূল্য (Tk)</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={form.resellerPrice}
-                    onChange={(e) => setForm({ ...form, resellerPrice: e.target.value })}
-                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    onChange={(e) => setForm({ ...form, resellerPrice: e.target.value.replace(/[^0-9]/g, '') })}
                     className={inputClass}
                   />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">সাজেস্টেড মূল্য (Tk)</label>
                   <input
-                    type="number"
+                    type="text"
+                    inputMode="numeric"
                     value={form.suggestedPrice}
-                    onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value })}
-                    onFocus={(e) => e.target.select()} // ক্লিক করলেই ০ হাইলাইট হবে
+                    onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value.replace(/[^0-9]/g, '') })}
                     className={inputClass}
                   />
                 </div>
