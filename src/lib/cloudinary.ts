@@ -24,5 +24,12 @@ export async function uploadImageToCloudinary(file: File): Promise<string> {
   }
 
   const data = await response.json();
-  return data.secure_url as string;
+  
+  // ═══ অটোমেটিক অপটিমাইজেশন লজিক ═══
+  const originalUrl = data.secure_url as string;
+  
+  // লিংকের ভেতরে অটোমেটিক 'q_auto,f_auto,w_800' যোগ হয়ে যাবে
+  const optimizedUrl = originalUrl.replace('/upload/', '/upload/q_auto,f_auto,w_800/');
+  
+  return optimizedUrl; 
 }
