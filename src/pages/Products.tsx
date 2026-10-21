@@ -66,7 +66,6 @@ export default function Products() {
     void loadProducts();
   }, []);
 
-  // ফিল্টার পরিবর্তন হলে visibleCount আবার ২০ এ রিসেট হবে
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [searchTerm, selectedCategory]);
@@ -89,7 +88,6 @@ export default function Products() {
     });
   }, [products, searchTerm, selectedCategory]);
 
-  // শুধুমাত্র visibleCount পরিমাণ প্রোডাক্ট দেখাবে
   const displayedProducts = filteredProducts.slice(0, visibleCount);
 
   const handleCopy = async (e: React.MouseEvent, product: Product) => {
@@ -148,7 +146,6 @@ export default function Products() {
 
         {/* Filters */}
         <div className="mb-5 space-y-3">
-          {/* Search row */}
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
@@ -180,10 +177,28 @@ export default function Products() {
           </div>
         </div>
 
-        {/* Products Grid */}
+        {/* ═══ SKELETON LOADING GRID ═══ */}
         {loading ? (
-          <div className="flex min-h-40 items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
+            {Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
+                {/* Image Skeleton */}
+                <div className="aspect-square w-full animate-pulse bg-gray-200" />
+                {/* Content Skeleton */}
+                <div className="p-3">
+                  <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
+                  <div className="mt-1.5 h-3 w-1/2 animate-pulse rounded bg-gray-200" />
+                  <div className="mt-4 space-y-1.5">
+                    <div className="h-3 w-full animate-pulse rounded bg-gray-200" />
+                    <div className="h-3 w-5/6 animate-pulse rounded bg-gray-200" />
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <div className="h-8 animate-pulse rounded bg-gray-200" />
+                    <div className="h-8 animate-pulse rounded bg-gray-200" />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         ) : displayedProducts.length > 0 ? (
           <>
@@ -194,14 +209,11 @@ export default function Products() {
                   to={`/products/${product.id}`}
                   className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold hover:shadow-sm"
                 >
-                  {/* Image */}
                   <div className="relative aspect-square overflow-hidden bg-zeluxe-cream">
                     {product.imageUrl ? (
                       <img
-                        // অটোমেটিক ইমেজ অপটিমাইজেশন
                         src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_400/') : product.imageUrl}
                         alt={product.name}
-                        // Lazy loading যুক্ত করা হয়েছে
                         loading="lazy"
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
@@ -211,14 +223,12 @@ export default function Products() {
                       </div>
                     )}
 
-                    {/* Image count badge */}
                     {product.imageUrls.length > 1 && (
                       <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
                         {product.imageUrls.length} ছবি
                       </span>
                     )}
 
-                    {/* Stock badge */}
                     {product.stock === 0 && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/50">
                         <span className="rounded bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
@@ -228,7 +238,6 @@ export default function Products() {
                     )}
                   </div>
 
-                  {/* Content */}
                   <div className="p-3">
                     <h3 className="line-clamp-2 text-sm font-bold text-zeluxe-black">
                       {product.name}
@@ -254,13 +263,11 @@ export default function Products() {
                       </div>
                     </div>
 
-                    {/* Action buttons */}
                     <div className="mt-3 grid grid-cols-2 gap-2">
                       <button
                         onClick={(e) => handleDownloadAll(e, product)}
                         disabled={downloadingId === product.id || product.imageUrls.length === 0}
                         className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-40"
-                        title="সব ছবি ডাউনলোড"
                       >
                         {downloadingId === product.id ? (
                           <Loader2 size={13} className="animate-spin" />
@@ -272,7 +279,6 @@ export default function Products() {
                       <button
                         onClick={(e) => handleCopy(e, product)}
                         className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110"
-                        title="তথ্য কপি করুন"
                       >
                         {copiedId === product.id ? (
                           <>
@@ -292,7 +298,6 @@ export default function Products() {
               ))}
             </div>
 
-            {/* Load More Button */}
             {visibleCount < filteredProducts.length && (
               <div className="mt-8 flex justify-center">
                 <button
@@ -304,7 +309,6 @@ export default function Products() {
               </div>
             )}
 
-            {/* Results count */}
             <p className="mt-6 text-center text-xs text-gray-400">
               {displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে (মোট {filteredProducts.length}টি)
             </p>
