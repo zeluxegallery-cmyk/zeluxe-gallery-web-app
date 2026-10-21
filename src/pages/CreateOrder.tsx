@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   where,
 } from 'firebase/firestore';
-import { Loader2, Search, Package, X, ChevronDown, Plus, Trash2, Copy, Check } from 'lucide-react';
+import { Loader2, Search, Package, X, ChevronDown, Plus, Trash2, Copy, Check, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
@@ -21,7 +21,7 @@ type Product = {
   imageUrl: string;
   suggestedPrice: number;
   resellerPrice: number;
-  purchaseCost: number; // ═══ নতুন যোগ করা হয়েছে ═══
+  purchaseCost: number;
   sizes: string[];
   sourceUrl?: string;
 };
@@ -35,13 +35,19 @@ type CartItem = {
   quantity: number;
   sellingPrice: number;
   resellerPrice: number;
-  purchaseCost: number; // ═══ নতুন যোগ করা হয়েছে ═══
+  purchaseCost: number;
   sourceUrl?: string;
+};
+
+type PastCustomer = {
+  name: string;
+  address: string;
+  district: string;
 };
 
 const DISTRICTS = ['ঢাকার ভিতরে', 'ঢাকার বাইরে'];
 const PAYMENT_METHODS = ['Cash on Delivery', 'bKash Advance', 'Full Advance'];
-const PAYMENT_NUMBER = '01603226151'; // অ্যাডমিনের নাম্বার
+const PAYMENT_NUMBER = '01603226151';
 
 const inputClass =
   'w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold';
@@ -59,6 +65,8 @@ export default function CreateOrder() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('ঢাকার ভিতরে');
+  const [pastCustomers, setPastCustomers] = useState<Record<string, PastCustomer>>({});
+  const [isAutofilled, setIsAutofilled] = useState(false); // নতুন স্টেট
 
   // Cart State
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -83,11 +91,18 @@ export default function CreateOrder() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadData = async () => {
+      const user = auth.currentUser;
+      if (!user) return;
+
       try {
-        const productsQuery = query(collection(db, 'products'), where('active', '==', true));
-        const snapshot = await getDocs(productsQuery);
-        const fetchedProducts: Product[] = snapshot.docs.map((doc) => {
+        const [productsSnap, ordersSnap] = await Promise.all([
+          getDocs(query(collection(db, 'products'), where('active', '==', true))),
+          getDocs(query(collection(db, 'orders'), where('resellerId', '==', user.uid)))
+        ]);
+
+        // ১. প্রোডাক্ট লোড করা
+        const fetchedProducts: Product[] = productsSnap.docs.map((doc) => {
           const data = doc.data();
           let sizes: string[] = [];
           if (Array.isArray(data.sizes)) sizes = data.sizes;
@@ -99,7 +114,7 @@ export default function CreateOrder() {
             imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
             suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
             resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
-            purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0, // ═══ নতুন যোগ করা হয়েছে ═══
+            purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
             sizes,
             sourceUrl: typeof data.sourceUrl === 'string' ? data.sourceUrl : '',
           };
@@ -114,14 +129,28 @@ export default function CreateOrder() {
             if (preset.sizes.length > 0) setCurrentSize(preset.sizes[0]);
           }
         }
+
+        // ২. কাস্টমার অটোফিলের জন্য আগের অর্ডার থেকে ডাটা তৈরি
+        const customers: Record<string, PastCustomer> = {};
+        ordersSnap.docs.forEach((doc) => {
+          const data = doc.data();
+          if (data.customerPhone && data.customerName) {
+            customers[data.customerPhone] = {
+              name: data.customerName,
+              address: data.address || '',
+              district: data.district || 'ঢাকার ভিতরে'
+            };
+          }
+        });
+        setPastCustomers(customers);
+
       } finally {
         setLoading(false);
       }
     };
 
-    void loadProducts();
+    void loadData();
 
-    // localStorage থেকে কার্ট লোড
     try {
       const savedCart = localStorage.getItem('zeluxe_cart');
       if (savedCart) {
@@ -134,6 +163,21 @@ export default function CreateOrder() {
       console.error('Failed to load cart', e);
     }
   }, [presetProductId]);
+
+  // ═══ ফোন নাম্বার টাইপ করার সময় অটোফিল লজিক ═══
+  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const phone = e.target.value.replace(/[^0-9]/g, '');
+    setCustomerPhone(phone);
+    setIsAutofilled(false);
+
+    if (phone.length === 11 && pastCustomers[phone]) {
+      setCustomerName(pastCustomers[phone].name);
+      setAddress(pastCustomers[phone].address);
+      setDistrict(pastCustomers[phone].district);
+      setIsAutofilled(true);
+      toast.info('কাস্টমারের আগের তথ্য অটো-ফিল করা হয়েছে।');
+    }
+  };
 
   const selectedProduct = products.find((p) => p.id === currentProductId);
 
@@ -190,7 +234,7 @@ export default function CreateOrder() {
       quantity: qty,
       sellingPrice: price,
       resellerPrice: selectedProduct.resellerPrice,
-      purchaseCost: selectedProduct.purchaseCost || 0, // ═══ নতুন যোগ করা হয়েছে ═══
+      purchaseCost: selectedProduct.purchaseCost || 0,
       sourceUrl: selectedProduct.sourceUrl || '',
     };
 
@@ -232,7 +276,6 @@ export default function CreateOrder() {
       return;
     }
     
-    // ═══ পেমেন্ট ভ্যালিডেশন ═══
     const isAdvancePayment = paymentMethod === 'bKash Advance' || paymentMethod === 'Full Advance';
     if (isAdvancePayment && !transactionId.trim()) {
       toast.error('অনুগ্রহ করে ট্রানজেকশন আইডি (Transaction ID) দিন।');
@@ -301,16 +344,29 @@ export default function CreateOrder() {
         <form onSubmit={handleSubmit} className="space-y-6">
           
           {/* কাস্টমার ইনফরমেশন */}
-          <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
+          <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5 relative overflow-hidden">
+            {isAutofilled && (
+              <div className="absolute top-0 right-0 rounded-bl-lg bg-green-100 px-3 py-1 text-[10px] font-bold text-green-700 flex items-center gap-1">
+                <UserCheck size={12} /> Autofilled
+              </div>
+            )}
             <h2 className="mb-4 text-lg font-bold text-zeluxe-black">কাস্টমারের তথ্য</h2>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">কাস্টমারের নাম *</label>
-                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className={inputClass} placeholder="যেমন: রফিকুল ইসলাম" />
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">মোবাইল নাম্বার *</label>
+                <input 
+                  type="tel" 
+                  value={customerPhone} 
+                  onChange={handlePhoneChange} 
+                  required 
+                  className={inputClass} 
+                  placeholder="01XXXXXXXXX" 
+                />
+                <p className="mt-1 text-[11px] text-gray-500">পুরনো কাস্টমারের নাম্বার দিলে তথ্য অটো বসে যাবে।</p>
               </div>
               <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">মোবাইল নাম্বার *</label>
-                <input type="tel" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} required className={inputClass} placeholder="01XXXXXXXXX" />
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">কাস্টমারের নাম *</label>
+                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className={inputClass} placeholder="যেমন: রফিকুল ইসলাম" />
               </div>
               <div>
                 <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি ঠিকানা *</label>
@@ -427,7 +483,6 @@ export default function CreateOrder() {
               </select>
             </div>
 
-            {/* ═══ অ্যাডভান্স পেমেন্ট অপশন ═══ */}
             {(paymentMethod === 'bKash Advance' || paymentMethod === 'Full Advance') && (
               <div className="mb-4 rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-4 animate-in fade-in slide-in-from-top-2">
                 <p className="text-sm font-medium text-zeluxe-black mb-2">
@@ -518,7 +573,7 @@ export default function CreateOrder() {
                   {filteredProducts.map((p) => (
                     <button key={p.id} onClick={() => handleProductSelect(p)} className="flex w-full items-center gap-3 rounded-xl p-3 text-left transition hover:bg-zeluxe-fieldbg">
                       <div className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-gray-50">
-                        {p.imageUrl ? <img src={p.imageUrl} alt={p.name} className="h-full w-full object-cover" /> : <Package className="m-auto h-full text-gray-300" size={20} />}
+                        {p.imageUrl ? <img src={p.imageUrl.includes('res.cloudinary.com') ? p.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : p.imageUrl} alt={p.name} className="h-full w-full object-cover" /> : <Package className="m-auto h-full text-gray-300" size={20} />}
                       </div>
                       <div className="flex-1 overflow-hidden">
                         <p className="truncate text-sm font-bold text-zeluxe-black">{p.name}</p>
