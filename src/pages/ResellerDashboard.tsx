@@ -15,7 +15,6 @@ import {
   CheckCircle,
   Sparkles,
   BarChart3,
-  Calendar,
   Users,
 } from 'lucide-react';
 import Layout from '../components/Layout';
@@ -110,21 +109,6 @@ function formatDate(seconds?: number) {
   const d = new Date(seconds * 1000);
   const months = ['জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে'];
   return `${d.getDate()} ${months[d.getMonth()]}`;
-}
-
-function getGreeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'শুভ সকাল';
-  if (hour < 17) return 'শুভ অপরাহ্ন';
-  if (hour < 20) return 'শুভ সন্ধ্যা';
-  return 'শুভ রাত্রি';
-}
-
-function getTodayFormatted() {
-  const d = new Date();
-  const months = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
-  const days = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
-  return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
 }
 
 export default function ResellerDashboard() {
@@ -312,15 +296,14 @@ export default function ResellerDashboard() {
     <Layout>
       <div className="mx-auto max-w-2xl pb-10">
         
-        {/* ═══ COMPACT HEADER ═══ */}
-        <div className="mb-5 flex items-center justify-between">
-          <h1 className="text-xl font-bold capitalize text-zeluxe-black">
-            {getGreeting()}, {resellerName}
+        {/* ═══ CLEAN PREMIUM HEADER (No Date, Full Name) ═══ */}
+        <div className="mb-5">
+          <h1 className="text-xl font-bold text-zeluxe-black capitalize leading-snug break-words">
+            স্বাগতম, {resellerName}
           </h1>
-          <div className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400">
-            <Calendar size={12} />
-            <span>{getTodayFormatted()}</span>
-          </div>
+          <p className="mt-1 text-xs text-gray-500">
+            আজকের ব্যবসার আপডেট দেখুন
+          </p>
         </div>
 
         {/* ═══ TODAY'S SNAPSHOT ═══ */}
@@ -339,7 +322,7 @@ export default function ResellerDashboard() {
           </div>
         )}
 
-        {/* ═══ WELCOME BONUS (আগের মতো বড়) ═══ */}
+        {/* ═══ WELCOME BONUS ═══ */}
         {bonusAchieved ? (
           <div className="mb-5 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-5 shadow-card border border-green-100">
             <div className="flex items-start gap-4">
@@ -475,7 +458,7 @@ export default function ResellerDashboard() {
           </div>
         </div>
 
-        {/* ═══ MY PROGRESS (Fixed Layout) ═══ */}
+        {/* ═══ MY PROGRESS ═══ */}
         <div className="mb-6">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
