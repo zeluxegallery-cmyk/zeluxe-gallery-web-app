@@ -136,32 +136,32 @@ export default function Products() {
       <div className="mx-auto max-w-6xl pb-20">
         {/* Header */}
         <div className="mb-5">
-          <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
+          <h1 className="text-2xl font-bold text-zeluxe-black md:text-3xl tracking-tight">
             প্রোডাক্ট ক্যাটালগ
           </h1>
-          <p className="mt-1 text-xs text-gray-500 md:text-sm">
+          <p className="mt-1 text-sm text-gray-500">
             সব প্রোডাক্ট দেখুন এবং কাস্টমারের জন্য অর্ডার তৈরি করুন
           </p>
         </div>
 
         {/* Filters */}
-        <div className="mb-5 space-y-3">
+        <div className="mb-6 space-y-3">
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="প্রোডাক্ট কোড বা নাম দিয়ে খুঁজুন..."
-                className="w-full rounded-md border border-zeluxe-lightgray bg-white py-3 pl-10 pr-4 text-sm text-zeluxe-black placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none"
+                className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-12 pr-4 text-sm text-zeluxe-black shadow-sm placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold transition"
               />
             </div>
             <div className="relative sm:w-64">
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 pr-10 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+                className="w-full appearance-none rounded-2xl border border-gray-200 bg-white px-4 py-3.5 pr-10 text-sm font-medium text-zeluxe-black shadow-sm focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold transition"
               >
                 {categories.map((category) => (
                   <option key={category} value={category}>
@@ -170,8 +170,8 @@ export default function Products() {
                 ))}
               </select>
               <ChevronDown
-                size={14}
-                className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                size={16}
+                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
               />
             </div>
           </div>
@@ -181,20 +181,18 @@ export default function Products() {
         {loading ? (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
             {Array.from({ length: 8 }).map((_, index) => (
-              <div key={index} className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
-                {/* Image Skeleton */}
+              <div key={index} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-card">
                 <div className="aspect-square w-full animate-pulse bg-gray-200" />
-                {/* Content Skeleton */}
-                <div className="p-3">
+                <div className="p-4">
                   <div className="h-4 w-3/4 animate-pulse rounded bg-gray-200" />
-                  <div className="mt-1.5 h-3 w-1/2 animate-pulse rounded bg-gray-200" />
-                  <div className="mt-4 space-y-1.5">
+                  <div className="mt-2 h-3 w-1/2 animate-pulse rounded bg-gray-200" />
+                  <div className="mt-4 space-y-2">
                     <div className="h-3 w-full animate-pulse rounded bg-gray-200" />
                     <div className="h-3 w-5/6 animate-pulse rounded bg-gray-200" />
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2">
-                    <div className="h-8 animate-pulse rounded bg-gray-200" />
-                    <div className="h-8 animate-pulse rounded bg-gray-200" />
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <div className="h-9 animate-pulse rounded-xl bg-gray-200" />
+                    <div className="h-9 animate-pulse rounded-xl bg-gray-200" />
                   </div>
                 </div>
               </div>
@@ -207,7 +205,7 @@ export default function Products() {
                 <Link
                   key={product.id}
                   to={`/products/${product.id}`}
-                  className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold hover:shadow-sm"
+                  className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <div className="relative aspect-square overflow-hidden bg-zeluxe-cream">
                     {product.imageUrl ? (
@@ -223,75 +221,78 @@ export default function Products() {
                       </div>
                     )}
 
+                    {/* Modern Badges */}
                     {product.imageUrls.length > 1 && (
-                      <span className="absolute right-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                      <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
                         {product.imageUrls.length} ছবি
                       </span>
                     )}
 
                     {product.stock === 0 && (
-                      <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-                        <span className="rounded bg-red-600 px-2 py-1 text-[11px] font-bold text-white">
+                      <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm">
+                        <span className="rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
                           স্টক নেই
                         </span>
                       </div>
                     )}
                   </div>
 
-                  <div className="p-3">
-                    <h3 className="line-clamp-2 text-sm font-bold text-zeluxe-black">
+                  <div className="flex flex-1 flex-col p-4">
+                    <h3 className="line-clamp-2 text-sm font-bold text-zeluxe-black leading-snug">
                       {product.name}
                     </h3>
-                    <p className="mt-0.5 font-mono text-[10px] text-gray-500">
+                    <p className="mt-1 font-mono text-[10px] text-gray-400">
                       {product.sku}
                     </p>
 
-                    <div className="mt-2.5 space-y-0.5">
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] text-gray-500">Price:</span>
-                        <span className="text-sm font-bold text-zeluxe-black">
-                          Tk {product.resellerPrice.toLocaleString()}
-                        </span>
+                    {/* ═══ প্রাইস লেআউট ফিক্স ═══ */}
+                    <div className="mt-auto pt-3">
+                      <div className="space-y-1.5 border-t border-gray-100 pt-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500">Price:</span>
+                          <span className="font-number text-sm font-bold text-zeluxe-black">
+                            Tk {product.resellerPrice.toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] text-gray-400">Retail Price:</span>
+                          <span className="font-number text-xs font-bold text-zeluxe-gold">
+                            Tk {product.suggestedPrice.toLocaleString()}
+                          </span>
+                        </div>
                       </div>
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-[11px] text-gray-500">
-                          Customer / Retail Price:
-                        </span>
-                        <span className="text-xs font-bold text-zeluxe-gold">
-                          Tk {product.suggestedPrice.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={(e) => handleDownloadAll(e, product)}
-                        disabled={downloadingId === product.id || product.imageUrls.length === 0}
-                        className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-40"
-                      >
-                        {downloadingId === product.id ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : (
-                          <Download size={13} />
-                        )}
-                        ছবি
-                      </button>
-                      <button
-                        onClick={(e) => handleCopy(e, product)}
-                        className="flex items-center justify-center gap-1 rounded-md bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110"
-                      >
-                        {copiedId === product.id ? (
-                          <>
-                            <Check size={13} />
-                            কপি হয়েছে
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={13} />
-                            কপি
-                          </>
-                        )}
-                      </button>
+                      {/* ═══ বাটন ডিজাইন (হায়ারার্কি) ═══ */}
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <button
+                          onClick={(e) => handleDownloadAll(e, product)}
+                          disabled={downloadingId === product.id || product.imageUrls.length === 0}
+                          className="flex items-center justify-center gap-1.5 rounded-lg border border-gray-200 bg-gray-50 py-2 text-[11px] font-bold text-gray-700 transition hover:bg-gray-100 disabled:opacity-40"
+                        >
+                          {downloadingId === product.id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Download size={13} />
+                          )}
+                          ছবি
+                        </button>
+                        <button
+                          onClick={(e) => handleCopy(e, product)}
+                          className="flex items-center justify-center gap-1.5 rounded-lg bg-zeluxe-gold py-2 text-[11px] font-bold text-zeluxe-black transition hover:brightness-110"
+                        >
+                          {copiedId === product.id ? (
+                            <>
+                              <Check size={13} />
+                              কপি
+                            </>
+                          ) : (
+                            <>
+                              <Copy size={13} />
+                              কপি
+                            </>
+                          )}
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </Link>
@@ -302,21 +303,21 @@ export default function Products() {
               <div className="mt-8 flex justify-center">
                 <button
                   onClick={() => setVisibleCount((prev) => prev + LOAD_MORE_COUNT)}
-                  className="rounded-xl border border-zeluxe-black bg-white px-8 py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 active:scale-95"
+                  className="rounded-xl border border-gray-200 bg-white px-8 py-3 text-sm font-bold text-zeluxe-black shadow-sm transition hover:bg-gray-50 active:scale-95"
                 >
                   আরো দেখুন (Load More)
                 </button>
               </div>
             )}
 
-            <p className="mt-6 text-center text-xs text-gray-400">
+            <p className="mt-6 text-center text-xs font-medium text-gray-400">
               {displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে (মোট {filteredProducts.length}টি)
             </p>
           </>
         ) : (
-          <div className="rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-12 text-center">
+          <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow-sm">
             <Package className="mx-auto h-12 w-12 text-gray-300" />
-            <p className="mt-4 text-sm text-gray-600">
+            <p className="mt-4 text-sm font-bold text-gray-600">
               কোনো প্রোডাক্ট পাওয়া যায়নি
             </p>
             {searchTerm || selectedCategory !== 'সব ক্যাটাগরি' ? (
@@ -325,7 +326,7 @@ export default function Products() {
                   setSearchTerm('');
                   setSelectedCategory('সব ক্যাটাগরি');
                 }}
-                className="mt-3 text-xs font-medium text-zeluxe-gold hover:underline"
+                className="mt-3 text-sm font-bold text-zeluxe-gold hover:underline"
               >
                 ফিল্টার রিসেট করুন
               </button>
