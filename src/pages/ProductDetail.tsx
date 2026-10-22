@@ -62,7 +62,6 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState('');
 
   const [quantity, setQuantity] = useState(1);
-  const [sellingPrice, setSellingPrice] = useState(''); // ═══ নতুন স্টেট কার্টের জন্য ═══
   const [copied, setCopied] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
@@ -76,7 +75,7 @@ export default function ProductDetail() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('ঢাকার ভিতরে');
-  const [modalSellingPrice, setModalSellingPrice] = useState('');
+  const [sellingPrice, setSellingPrice] = useState('');
   const [deliveryCharge, setDeliveryCharge] = useState('70');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
@@ -100,7 +99,6 @@ export default function ProductDetail() {
     } catch (e) {}
   };
 
-  // Load product
   useEffect(() => {
     const loadProduct = async () => {
       if (!id) return;
@@ -139,11 +137,9 @@ export default function ProductDetail() {
 
           setProduct(loadedProduct);
           setSellingPrice(String(loadedProduct.suggestedPrice));
-          setModalSellingPrice(String(loadedProduct.suggestedPrice));
           if (colors.length > 0) setSelectedColor(colors[0]);
           if (sizes.length > 0) setSelectedSize(sizes[0]);
 
-          // Load related products
           if (loadedProduct.category) {
             try {
               const relQ = query(
@@ -191,7 +187,6 @@ export default function ProductDetail() {
     updateCartState();
   }, [id]);
 
-  // ═══ কার্টে যোগ করার ফাংশন ═══
   const handleAddToCart = () => {
     if (!product) return;
     
@@ -213,7 +208,7 @@ export default function ProductDetail() {
       imageUrl: product.imageUrl,
       size: selectedSize || 'N/A',
       quantity: quantity,
-      sellingPrice: price, // ═══ এখানে ইউজারের দেওয়া দাম যাচ্ছে ═══
+      sellingPrice: price,
       resellerPrice: product.resellerPrice,
     };
 
@@ -230,21 +225,21 @@ export default function ProductDetail() {
       
       if (existingIdx > -1) {
         existingCart[existingIdx].quantity += newItem.quantity;
-        existingCart[existingIdx].sellingPrice = price; // দাম আপডেট হবে
+        existingCart[existingIdx].sellingPrice = price;
       } else {
         existingCart.push(newItem);
       }
 
       localStorage.setItem('zeluxe_cart', JSON.stringify(existingCart));
       toast.success('✓ কার্টে যোগ হয়েছে!');
-      updateCartState(); // ফ্লোটিং বাটন আপডেট হবে
+      updateCartState();
     } catch (err) {
       toast.error('কার্টে যোগ করতে সমস্যা হয়েছে');
     }
   };
 
   const numQty = Number(quantity) || 0;
-  const numSelling = Number(modalSellingPrice) || 0; // মডালের জন্য
+  const numSelling = Number(sellingPrice) || 0;
   const numDiscount = Number(discount) || 0;
   const numDelivery = Number(deliveryCharge) || 0;
 
@@ -252,7 +247,6 @@ export default function ProductDetail() {
   const itemTotal = numQty * numSelling;
   const total = itemTotal + numDelivery - numDiscount;
 
-  // Copy details
   const handleCopyDetails = async () => {
     if (!product) return;
     const colorLine = selectedColor ? `\nকালার: ${selectedColor}` : '';
@@ -268,16 +262,27 @@ export default function ProductDetail() {
     }
   };
 
-  // Download all images
+  // ═══ আপডেটেড ডাউনলোড ফাংশন (CORS ও ডিলে সহ) ═══
   const handleDownloadAll = async () => {
     if (!product || product.imageUrls.length === 0) return;
     setDownloading(true);
     try {
       for (let i = 0; i < product.imageUrls.length; i++) {
         const url = product.imageUrls[i];
-        const response = await fetch(url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+        });
+
+        if (!response.ok) throw new Error('Image fetch failed');
+
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
         const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
+        const finalBlob = new Blob([blob], { type: contentType });
+        
+        const blobUrl = window.URL.createObjectURL(finalBlob);
         const a = document.createElement('a');
         a.href = blobUrl;
         a.download = `${product.sku || 'product'}-${i + 1}.jpg`;
@@ -285,25 +290,26 @@ export default function ProductDetail() {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(blobUrl);
-        await new Promise((r) => setTimeout(r, 300));
+
+        // প্রতিটি ছবির মাঝে ৫০০ মিলি-সেকেন্ড বিরতি
+        await new Promise((r) => setTimeout(r, 500));
       }
       toast.success('✓ সব ছবি ডাউনলোড হয়েছে!');
     } catch (err) {
       console.error('Download failed:', err);
-      toast.error('ছবি ডাউনলোড করতে সমস্যা হয়েছে।');
+      toast.error('ছবি ডাউনলোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
     } finally {
       setDownloading(false);
     }
   };
 
-  // Submit order from Modal
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     const user = auth.currentUser;
     if (!user) return navigate('/login');
     if (!product) return;
 
-    if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !modalSellingPrice) {
+    if (!customerName.trim() || !customerPhone.trim() || !address.trim() || !sellingPrice) {
       toast.error('সব প্রয়োজনীয় তথ্য দিন');
       return;
     }
@@ -419,6 +425,7 @@ export default function ProductDetail() {
                     <img
                       src={product.imageUrls[activeImage]}
                       alt={product.name}
+                      crossOrigin="anonymous" // ═══ CORS ফিক্স ═══
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -442,6 +449,7 @@ export default function ProductDetail() {
                       <img
                         src={url}
                         alt={`${product.name} ${idx + 1}`}
+                        crossOrigin="anonymous" // ═══ CORS ফিক্স ═══
                         className="h-16 w-16 object-cover"
                       />
                     </button>
@@ -512,7 +520,6 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* ═══ কার্টে যোগ করার আগে দাম পরিবর্তন করার ইনপুট ═══ */}
               <div className="mt-4">
                 <label className="block text-sm font-medium text-zeluxe-black mb-1.5">আপনার বিক্রয় মূল্য (Tk)</label>
                 <input
@@ -527,7 +534,6 @@ export default function ProductDetail() {
                 </p>
               </div>
 
-              {/* Quantity & Buttons */}
               <div className="mt-4">
                 <div className="mb-3 flex items-center gap-2">
                   <span className="text-sm font-medium text-zeluxe-black">পরিমাণ:</span>
@@ -553,7 +559,6 @@ export default function ProductDetail() {
                   </button>
                   <button
                     onClick={() => {
-                      setModalSellingPrice(sellingPrice); // দাম মডালে পাঠানো হলো
                       setOrderModalOpen(true);
                     }}
                     disabled={product.stock === 0}
@@ -565,7 +570,6 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              {/* Copy + Download */}
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button onClick={handleCopyDetails} className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold">
                   {copied ? <><Check size={14} className="text-green-600" /> কপি হয়েছে</> : <><Copy size={14} /> Copy Details</>}
@@ -577,7 +581,7 @@ export default function ProductDetail() {
 
               <div className="mt-6">
                 <h3 className="mb-2 text-sm font-bold text-zeluxe-black">Description</h3>
-                <p className="text-sm leading-relaxed text-gray-700">{product.description || 'প্রোডাক্টের কোনো বিবরণ নেই।'}</p>
+                <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{product.description || 'প্রোডাক্টের কোনো বিবরণ নেই।'}</p>
               </div>
             </div>
           </div>
@@ -590,7 +594,7 @@ export default function ProductDetail() {
               {relatedProducts.map((rp) => (
                 <Link key={rp.id} to={`/products/${rp.id}`} className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold">
                   <div className="aspect-square bg-zeluxe-cream">
-                    {rp.imageUrl ? <img src={rp.imageUrl} alt={rp.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-10 w-10 text-gray-300" /></div>}
+                    {rp.imageUrl ? <img src={rp.imageUrl} alt={rp.name} crossOrigin="anonymous" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-10 w-10 text-gray-300" /></div>}
                   </div>
                   <div className="p-3">
                     <p className="line-clamp-2 text-xs font-bold text-zeluxe-black">{rp.name}</p>
@@ -630,7 +634,7 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* ═══ ORDER MODAL (Order Now) ═══ */}
+      {/* ═══ ORDER MODAL ═══ */}
       {orderModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6">
@@ -642,7 +646,7 @@ export default function ProductDetail() {
             <form onSubmit={handleSubmitOrder} className="space-y-4">
               <div className="flex items-start gap-3 rounded-md border border-zeluxe-lightgray bg-white p-3 shadow-sm">
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-zeluxe-lightgray bg-zeluxe-cream">
-                  {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><Package size={20} className="text-gray-400" /></div>}
+                  {product.imageUrl ? <img src={product.imageUrl} alt={product.name} crossOrigin="anonymous" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><Package size={20} className="text-gray-400" /></div>}
                   <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zeluxe-black text-[10px] font-bold text-white shadow-sm">{quantity}</span>
                 </div>
                 <div className="flex-1">
@@ -680,7 +684,7 @@ export default function ProductDetail() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">বিক্রয় মূল্য (Tk)</label>
-                  <input type="number" value={modalSellingPrice} onChange={(e) => setModalSellingPrice(e.target.value)} onFocus={(e) => e.target.select()} required className={inputClass} />
+                  <input type="number" value={sellingPrice} onChange={(e) => setSellingPrice(e.target.value)} onFocus={(e) => e.target.select()} required className={inputClass} />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ডিসকাউন্ট (Tk)</label>
