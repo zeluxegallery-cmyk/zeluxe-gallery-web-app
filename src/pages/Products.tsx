@@ -103,6 +103,7 @@ export default function Products() {
     }
   };
 
+  // ═══ আপডেটেড ডাউনলোড ফাংশন (CORS ও ডিলে সহ) ═══
   const handleDownloadAll = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -112,9 +113,20 @@ export default function Products() {
     try {
       for (let i = 0; i < product.imageUrls.length; i++) {
         const url = product.imageUrls[i];
-        const response = await fetch(url);
+        
+        const response = await fetch(url, {
+          method: 'GET',
+          mode: 'cors',
+          credentials: 'omit',
+        });
+
+        if (!response.ok) throw new Error('Image fetch failed');
+
+        const contentType = response.headers.get('content-type') || 'image/jpeg';
         const blob = await response.blob();
-        const blobUrl = window.URL.createObjectURL(blob);
+        const finalBlob = new Blob([blob], { type: contentType });
+
+        const blobUrl = window.URL.createObjectURL(finalBlob);
         const a = document.createElement('a');
         a.href = blobUrl;
         a.download = `${product.sku || 'product'}-${i + 1}.jpg`;
@@ -122,10 +134,14 @@ export default function Products() {
         a.click();
         document.body.removeChild(a);
         window.URL.revokeObjectURL(blobUrl);
-        await new Promise((r) => setTimeout(r, 300));
+
+        // প্রতিটি ছবির মাঝে ৫০০ মিলি-সেকেন্ড বিরতি
+        await new Promise((r) => setTimeout(r, 500));
       }
+      toast.success('সব ছবি ডাউনলোড হয়েছে!');
     } catch (err) {
       console.error('Download failed:', err);
+      toast.error('ছবি ডাউনলোড করতে সমস্যা হয়েছে।');
     } finally {
       setDownloadingId(null);
     }
@@ -134,7 +150,6 @@ export default function Products() {
   return (
     <Layout>
       <div className="mx-auto max-w-6xl pb-20">
-        {/* Header */}
         <div className="mb-5">
           <h1 className="text-2xl font-bold text-zeluxe-black md:text-3xl tracking-tight">
             প্রোডাক্ট ক্যাটালগ
@@ -212,6 +227,7 @@ export default function Products() {
                       <img
                         src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_400/') : product.imageUrl}
                         alt={product.name}
+                        crossOrigin="anonymous" // ═══ CORS ফিক্স ═══
                         loading="lazy"
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
