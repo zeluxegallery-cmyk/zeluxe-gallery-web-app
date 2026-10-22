@@ -1,5 +1,8 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react'; // ═══ নতুন ইমপোর্ট ═══
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'; // useLocation যোগ করুন
 import { Toaster } from 'sonner';
+
+// আপনার পেজগুলো ইমপোর্ট করুন (যেমনটা আগে ছিল)
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Membership from './pages/Membership';
@@ -29,10 +32,24 @@ import AdminNotifications from './pages/admin/AdminNotifications';
 import AdminWithdrawals from './pages/admin/AdminWithdrawals';
 import AdminReports from './pages/admin/AdminReports';
 
+// ═══ নতুন ফাইল ছাড়াই স্ক্রল ফিক্স করার কম্পোনেন্ট ═══
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   return (
     <>
       <BrowserRouter>
+        {/* ═══ এখানে যুক্ত করা হলো ═══ */}
+        <ScrollToTop /> 
+        
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
