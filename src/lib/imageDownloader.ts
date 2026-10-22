@@ -7,85 +7,82 @@ export async function saveImagesToGallery(imageUrls: string[], productName: stri
     return;
   }
 
+  const safeName = productName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
   const toastId = toast.loading('ছবি প্রস্তুত হচ্ছে...');
 
   try {
     const files: File[] = [];
-
-    // ১. সব ছবি ফেচ করা এবং File অবজেক্টে কনভার্ট করা
+    
+    // ═══ ১. ছবিগুলো ফেচ করে ফাইল তৈরি করা ═══
     for (let i = 0; i < imageUrls.length; i++) {
-      // ক্লাউডিনারিতে ফোর্স করে JPEG ফরম্যাটে আনা হচ্ছে (যাতে কালো না দেখায়)
       let url = imageUrls[i];
+      
+      // Cloudinary-তে JPEG ফরম্যাটে কনভার্ট করা হচ্ছে
       if (url.includes('res.cloudinary.com')) {
-        url = url.replace('/upload/', '/upload/f_jpg/');
+        url = url.replace('/upload/', '/upload/f_jpg,q_auto,w_1000/');
       }
 
-      const response = await fetch(url, { mode: 'cors' });
-      if (!response.ok) continue;
-
-      const blob = await response.blob();
-      // ফাইলের নাম তৈরি
-      const fileName = `${productName.replace(/[^a-zA-Z0-9]/g, '-')}-${i + 1}.jpg`;
-      
-      // ফাইল তৈরি (সঠিক টাইপ দিয়ে)
-      const file = new File([blob], fileName, { type: 'image/jpeg' });
-      files.push(file);
+      try {
+        const response = await fetch(url, { mode: 'cors' });
+        if (!response.ok) continue;
+        
+        const blob = await response.blob();
+        const file = new File([blob], `${safeName}-${i + 1}.jpg`, { type: 'image/jpeg' });
+        files.push(file);
+      } catch (err) {
+        console.warn('Fetch failed for:', url);
+        // একটি ছবি ফেইল করলেও বাকিগুলো লোড হবে
+      }
     }
 
     toast.dismiss(toastId);
 
-    if (files.length === 0) {
-      toast.error('ছবিগুলো প্রসেস করা যায়নি।');
-      return;
-    }
-
-    // ২. Web Share API চেক করা
+    // ═══ ২. Web Share API চেক করা ═══
     const canShareFiles = 
       typeof navigator.share === 'function' && 
       typeof navigator.canShare === 'function' && 
+      files.length > 0 &&
       navigator.canShare({ files });
 
-    // ৩. শেয়ার করা অথবা ফলব্যাক করা
     if (canShareFiles) {
       try {
-        await navigator.share({
-          files: files,
-          title: `${productName} - Images`,
-        });
+        // শেয়ার মেনু ওপেন করা
+        await navigator.share({ files });
         toast.success('ছবি শেয়ার করা হয়েছে! গ্যালারিতে সেভ করুন।');
       } catch (err: any) {
-        // ইউজার ক্যানসেল করলে বা এরর হলে
+        // ইউজার ক্যানসেল করলে বা এরর হলে ফলব্যাক
         if (err.name !== 'AbortError') {
-          fallbackDownload(files);
+          console.warn('Share API failed, using fallback');
+          fallbackDownload(imageUrls, safeName);
         }
       }
     } else {
-      // ৪. যদি Web Share API সাপোর্ট না করে (পুরনো ব্রাউজার), তবে ফলব্যাক ডাউনলোড
-      fallbackDownload(files);
+      // ═══ ৩. যদি Web Share API কাজ না করে (পুরনো ব্রাউজার বা CORS ব্লক) ═══
+      fallbackDownload(imageUrls, safeName);
     }
 
   } catch (error) {
     toast.dismiss(toastId);
     console.error(error);
-    toast.error('ছবি ডাউনলোডে সমস্যা হয়েছে।');
+    // একদম শেষ উপায়: সরাসরি ডাউনলোড
+    fallbackDownload(imageUrls, safeName);
   }
 }
 
 // ═══ ফলব্যাক ডাউনলোড (যদি শেয়ার মেনু কাজ না করে) ═══
-async function fallbackDownload(files: File[]) {
+function fallbackDownload(imageUrls: string[], safeName: string) {
   toast.info('ছবি ডাউনলোড শুরু হচ্ছে... Chrome ব্লক করলে "Allow" দিন।');
   
-  for (let i = 0; i < files.length; i++) {
-    const url = URL.createObjectURL(files[i]);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = files[i].name;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    
-    // প্রতিটির মাঝে ১ সেকেন্ড বিরতি
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    URL.revokeObjectURL(url);
-  }
+  imageUrls.forEach((url, i) => {
+    setTimeout(() => {
+      // ব্রাউজারের ডিফল্ট ডাউনলোড ব্যবহার করা হচ্ছে (CORS লাগে না)
+      const a = document.createElement('a');
+      a.href = url; // অরিজিনাল লিংক ব্যবহার করা হচ্ছে
+      a.download = `${safeName}-${i + 1}.jpg`;
+      a.target = '_blank'; // নতুন ট্যাবে ওপেন করবে, যা ব্রাউজারকে ডাউনলোড করতে বাধ্য করে
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }, i * 1000); // প্রতিটি ছবির মাঝে ১ সেকেন্ড বিরতি
+  });
 }
