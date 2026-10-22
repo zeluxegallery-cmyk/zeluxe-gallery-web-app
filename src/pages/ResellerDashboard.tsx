@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, where, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import {
   Loader2,
   Package,
@@ -16,6 +16,9 @@ import {
   Sparkles,
   BarChart3,
   Users,
+  Bell,
+  X,
+  BellOff,
 } from 'lucide-react';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
@@ -44,6 +47,14 @@ type Product = {
   name: string;
   imageUrl: string;
   resellerPrice: number;
+};
+
+type Notification = {
+  id: string;
+  title: string;
+  message: string;
+  read: boolean;
+  createdAt?: { seconds?: number };
 };
 
 type Stats = {
@@ -116,11 +127,15 @@ export default function ResellerDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
   const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [bonusProgress, setBonusProgress] = useState(0);
   const [bonusAchieved, setBonusAchieved] = useState(false);
   const [bonusDaysLeft, setBonusDaysLeft] = useState(0);
   const [bonusStartDate, setBonusStartDate] = useState<number>(0);
+  
+  // নোটিফিকেশন মডাল স্টেট
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -131,12 +146,13 @@ export default function ResellerDashboard() {
       }
 
       try {
-        const [userDoc, refStatsResult, productsSnap, ordersSnapshot, withdrawSnap] = await Promise.all([
+        const [userDoc, refStatsResult, productsSnap, ordersSnapshot, withdrawSnap, notifSnap] = await Promise.all([
           getDoc(doc(db, 'users', uid)),
           getReferralStats(uid),
           getDocs(collection(db, 'products')),
           getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid))),
-          getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid)))
+          getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid))),
+          getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)))
         ]);
 
         const userInfo = userDoc.exists() ? userDoc.data() : null;
@@ -162,6 +178,21 @@ export default function ResellerDashboard() {
 
         if (refStats) setReferralInfo(refStats);
 
+        // ─── নোটিফিকেশন লোড ও সর্ট ───
+        const fetchedNotifs: Notification[] = notifSnap.docs.map((d) => {
+          const data = d.data();
+          return {
+            id: d.id,
+            title: typeof data.title === 'string' ? data.title : 'নোটিফিকেশন',
+            message: typeof data.message === 'string' ? data.message : '',
+            read: typeof data.read === 'boolean' ? data.read : false,
+            createdAt: data.createdAt,
+          };
+        });
+        fetchedNotifs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+        setNotifications(fetchedNotifs);
+
+        // প্রোডাক্ট ও অন্যান্য ডাটা
         const productMap: Record<string, number> = {};
         productsSnap.docs.forEach((p) => {
           const data = p.data();
@@ -185,6 +216,7 @@ export default function ResellerDashboard() {
           });
         setFeaturedProducts(activeProducts);
 
+        // অর্ডার প্রসেসিং
         const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
           const data = orderDocument.data();
           const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
@@ -271,6 +303,24 @@ export default function ResellerDashboard() {
     void loadData();
   }, []);
 
+  // নোটিফিকেশন রিড হিসেবে মার্ক করা
+  const handleOpenNotifications = async () => {
+    setIsNotifOpen(true);
+    const unreadNotifs = notifications.filter(n => !n.read);
+    if (unreadNotifs.length === 0) return;
+
+    try {
+      const batch = writeBatch(db);
+      unreadNotifs.forEach((n) => {
+        batch.update(doc(db, 'notifications', n.id), { read: true });
+      });
+      await batch.commit();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (err) {
+      console.error("Failed to mark notifications as read", err);
+    }
+  };
+
   const recentOrders = [...orders]
     .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
     .slice(0, 5);
@@ -281,6 +331,7 @@ export default function ResellerDashboard() {
     'Reseller';
 
   const bonusPercent = Math.round((bonusProgress / WELCOME_BONUS_TARGET) * 100);
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   if (loading) {
     return (
@@ -296,14 +347,30 @@ export default function ResellerDashboard() {
     <Layout>
       <div className="mx-auto max-w-2xl pb-10">
         
-        {/* ═══ CLEAN PREMIUM HEADER (No Date, Full Name) ═══ */}
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-zeluxe-black capitalize leading-snug break-words">
-            স্বাগতম, {resellerName}
-          </h1>
-          <p className="mt-1 text-xs text-gray-500">
-            আজকের ব্যবসার আপডেট দেখুন
-          </p>
+        {/* ═══ PREMIUM HEADER WITH NOTIFICATIONS ═══ */}
+        <div className="mb-5 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-xl font-bold text-zeluxe-black capitalize leading-snug break-words">
+              স্বাগতম, {resellerName}
+            </h1>
+            <p className="mt-1 text-xs text-gray-500">
+              আজকের ব্যবসার আপডেট দেখুন
+            </p>
+          </div>
+          
+          {/* বেল আইকন বাটন */}
+          <button 
+            onClick={handleOpenNotifications}
+            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-card border border-gray-50 text-zeluxe-black transition hover:-translate-y-0.5 hover:text-zeluxe-gold"
+          >
+            <Bell size={20} />
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white"></span>
+              </span>
+            )}
+          </button>
         </div>
 
         {/* ═══ TODAY'S SNAPSHOT ═══ */}
@@ -637,6 +704,63 @@ export default function ResellerDashboard() {
           )}
         </section>
       </div>
+
+      {/* ═══ NOTIFICATION MODAL (Bottom Sheet Style) ═══ */}
+      {isNotifOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md max-h-[85vh] rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300">
+            
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-gray-100 p-4 sm:p-5">
+              <div className="flex items-center gap-2">
+                <Bell className="text-zeluxe-gold" size={20} />
+                <h2 className="text-lg font-bold text-zeluxe-black">নোটিফিকেশন</h2>
+              </div>
+              <button 
+                onClick={() => setIsNotifOpen(false)}
+                className="rounded-full p-2 bg-gray-50 text-gray-500 hover:bg-gray-100 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {notifications.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-50 mb-4">
+                    <BellOff size={28} className="text-gray-400" />
+                  </div>
+                  <p className="text-sm font-bold text-zeluxe-black">কোনো নোটিফিকেশন নেই</p>
+                  <p className="mt-1 text-xs text-gray-500">নতুন অফার বা আপডেট এখানে দেখা যাবে</p>
+                </div>
+              ) : (
+                notifications.map((notif) => (
+                  <div key={notif.id} className={`rounded-xl border p-4 transition ${notif.read ? 'bg-white border-gray-100' : 'bg-zeluxe-gold/5 border-zeluxe-gold/30'}`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${notif.read ? 'bg-gray-100 text-gray-500' : 'bg-zeluxe-gold/20 text-zeluxe-gold'}`}>
+                        <Sparkles size={14} />
+                      </div>
+                      <div>
+                        <p className={`text-sm ${notif.read ? 'font-medium text-gray-700' : 'font-bold text-zeluxe-black'}`}>
+                          {notif.title}
+                        </p>
+                        <p className="mt-1 text-xs text-gray-600 leading-relaxed">
+                          {notif.message}
+                        </p>
+                        <p className="mt-2 text-[10px] font-medium text-gray-400">
+                          {formatDate(notif.createdAt?.seconds)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
+          </div>
+        </div>
+      )}
     </Layout>
   );
 }
