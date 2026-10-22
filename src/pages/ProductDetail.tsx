@@ -28,7 +28,7 @@ import {
 import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
-import { saveImagesToGallery } from '../lib/imageDownloader'; // ═══ নতুন ইমপোর্ট ═══
+import { downloadSingleImage } from '../lib/imageDownloader'; // ═══ নতুন ইমপোর্ট ═══
 
 type Product = {
   id: string;
@@ -64,7 +64,7 @@ export default function ProductDetail() {
 
   const [quantity, setQuantity] = useState(1);
   const [copied, setCopied] = useState(false);
-  const [downloading, setDownloading] = useState(false);
+  const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
 
   // ═══ কার্ট স্টেট ═══
   const [cartCount, setCartCount] = useState(0);
@@ -83,7 +83,6 @@ export default function ProductDetail() {
   const [note, setNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  // ═══ কার্ট আপডেট ফাংশন ═══
   const updateCartState = () => {
     try {
       const cartStr = localStorage.getItem('zeluxe_cart');
@@ -263,12 +262,12 @@ export default function ProductDetail() {
     }
   };
 
-  // ═══ নতুন আপডেটেড ডাউনলোড ফাংশন ═══
-  const handleDownloadAll = async () => {
-    if (!product || product.imageUrls.length === 0) return;
-    setDownloading(true);
-    await saveImagesToGallery(product.imageUrls, product.name);
-    setDownloading(false);
+  // ═══ একক ছবি ডাউনলোড ফাংশন ═══
+  const handleDownloadSingle = async (url: string, idx: number) => {
+    if (!product) return;
+    setDownloadingIdx(idx);
+    await downloadSingleImage(url, `${product.sku}-${idx + 1}.jpg`);
+    setDownloadingIdx(null);
   };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -387,15 +386,25 @@ export default function ProductDetail() {
           <div className="grid gap-6 md:grid-cols-2 md:gap-8">
             {/* LEFT — Images */}
             <div>
-              <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream">
-                <div className="aspect-square">
+              <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream relative group">
+                <div className="aspect-square relative">
                   {product.imageUrls.length > 0 ? (
-                    <img
-                      src={product.imageUrls[activeImage]}
-                      alt={product.name}
-                      crossOrigin="anonymous"
-                      className="h-full w-full object-cover"
-                    />
+                    <>
+                      <img
+                        src={product.imageUrls[activeImage]}
+                        alt={product.name}
+                        className="h-full w-full object-cover"
+                      />
+                      {/* মেইন ছবির ডাউনলোড বাটন */}
+                      <button
+                        onClick={() => handleDownloadSingle(product.imageUrls[activeImage], activeImage)}
+                        disabled={downloadingIdx === activeImage}
+                        className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-md text-zeluxe-black transition hover:bg-white active:scale-95 disabled:opacity-50 backdrop-blur-sm"
+                        title="এই ছবিটি ডাউনলোড করুন"
+                      >
+                        {downloadingIdx === activeImage ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+                      </button>
+                    </>
                   ) : (
                     <div className="flex h-full items-center justify-center">
                       <Package className="h-16 w-16 text-gray-300" />
@@ -404,23 +413,38 @@ export default function ProductDetail() {
                 </div>
               </div>
 
+              {/* ═══ থাম্বনেইল লিস্ট এবং ডাউনলোড আইকন ═══ */}
               {product.imageUrls.length > 1 && (
-                <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                <div className="mt-4 grid grid-cols-4 gap-2">
                   {product.imageUrls.map((url, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setActiveImage(idx)}
-                      className={`shrink-0 overflow-hidden rounded-md border-2 transition ${
-                        activeImage === idx ? 'border-zeluxe-gold' : 'border-transparent'
-                      }`}
-                    >
-                      <img
-                        src={url}
-                        alt={`${product.name} ${idx + 1}`}
-                        crossOrigin="anonymous"
-                        className="h-16 w-16 object-cover"
-                      />
-                    </button>
+                    <div key={idx} className="relative group">
+                      <button
+                        onClick={() => setActiveImage(idx)}
+                        className={`w-full aspect-square overflow-hidden rounded-md border-2 transition ${
+                          activeImage === idx ? 'border-zeluxe-gold' : 'border-transparent'
+                        }`}
+                      >
+                        <img
+                          src={url}
+                          alt={`${product.name} ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      </button>
+                      
+                      {/* ছোট ডাউনলোড আইকন */}
+                      <button
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleDownloadSingle(url, idx);
+                        }}
+                        disabled={downloadingIdx === idx}
+                        className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-zeluxe-black/70 text-white backdrop-blur-sm transition hover:bg-zeluxe-black disabled:opacity-50"
+                        title="এই ছবিটি ডাউনলোড করুন"
+                      >
+                        {downloadingIdx === idx ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                      </button>
+                    </div>
                   ))}
                 </div>
               )}
@@ -538,12 +562,9 @@ export default function ProductDetail() {
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button onClick={handleCopyDetails} className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold">
+              <div className="mt-3">
+                <button onClick={handleCopyDetails} className="w-full flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold">
                   {copied ? <><Check size={14} className="text-green-600" /> কপি হয়েছে</> : <><Copy size={14} /> Copy Details</>}
-                </button>
-                <button onClick={handleDownloadAll} disabled={downloading || product.imageUrls.length === 0} className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold disabled:opacity-40">
-                  {downloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} Download Images
                 </button>
               </div>
 
@@ -562,7 +583,7 @@ export default function ProductDetail() {
               {relatedProducts.map((rp) => (
                 <Link key={rp.id} to={`/products/${rp.id}`} className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold">
                   <div className="aspect-square bg-zeluxe-cream">
-                    {rp.imageUrl ? <img src={rp.imageUrl} alt={rp.name} crossOrigin="anonymous" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-10 w-10 text-gray-300" /></div>}
+                    {rp.imageUrl ? <img src={rp.imageUrl} alt={rp.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-10 w-10 text-gray-300" /></div>}
                   </div>
                   <div className="p-3">
                     <p className="line-clamp-2 text-xs font-bold text-zeluxe-black">{rp.name}</p>
@@ -614,7 +635,7 @@ export default function ProductDetail() {
             <form onSubmit={handleSubmitOrder} className="space-y-4">
               <div className="flex items-start gap-3 rounded-md border border-zeluxe-lightgray bg-white p-3 shadow-sm">
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-zeluxe-lightgray bg-zeluxe-cream">
-                  {product.imageUrl ? <img src={product.imageUrl} alt={product.name} crossOrigin="anonymous" className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><Package size={20} className="text-gray-400" /></div>}
+                  {product.imageUrl ? <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center"><Package size={20} className="text-gray-400" /></div>}
                   <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zeluxe-black text-[10px] font-bold text-white shadow-sm">{quantity}</span>
                 </div>
                 <div className="flex-1">
