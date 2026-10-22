@@ -28,6 +28,7 @@ import {
 import { toast } from 'sonner';
 import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
+import { saveImagesToGallery } from '../lib/imageDownloader'; // ═══ নতুন ইমপোর্ট ═══
 
 type Product = {
   id: string;
@@ -262,45 +263,12 @@ export default function ProductDetail() {
     }
   };
 
-  // ═══ আপডেটেড ডাউনলোড ফাংশন (CORS ও ডিলে সহ) ═══
+  // ═══ নতুন আপডেটেড ডাউনলোড ফাংশন ═══
   const handleDownloadAll = async () => {
     if (!product || product.imageUrls.length === 0) return;
     setDownloading(true);
-    try {
-      for (let i = 0; i < product.imageUrls.length; i++) {
-        const url = product.imageUrls[i];
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          mode: 'cors',
-          credentials: 'omit',
-        });
-
-        if (!response.ok) throw new Error('Image fetch failed');
-
-        const contentType = response.headers.get('content-type') || 'image/jpeg';
-        const blob = await response.blob();
-        const finalBlob = new Blob([blob], { type: contentType });
-        
-        const blobUrl = window.URL.createObjectURL(finalBlob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `${product.sku || 'product'}-${i + 1}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(blobUrl);
-
-        // প্রতিটি ছবির মাঝে ৫০০ মিলি-সেকেন্ড বিরতি
-        await new Promise((r) => setTimeout(r, 500));
-      }
-      toast.success('✓ সব ছবি ডাউনলোড হয়েছে!');
-    } catch (err) {
-      console.error('Download failed:', err);
-      toast.error('ছবি ডাউনলোড করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
-    } finally {
-      setDownloading(false);
-    }
+    await saveImagesToGallery(product.imageUrls, product.name);
+    setDownloading(false);
   };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
@@ -425,7 +393,7 @@ export default function ProductDetail() {
                     <img
                       src={product.imageUrls[activeImage]}
                       alt={product.name}
-                      crossOrigin="anonymous" // ═══ CORS ফিক্স ═══
+                      crossOrigin="anonymous"
                       className="h-full w-full object-cover"
                     />
                   ) : (
@@ -449,7 +417,7 @@ export default function ProductDetail() {
                       <img
                         src={url}
                         alt={`${product.name} ${idx + 1}`}
-                        crossOrigin="anonymous" // ═══ CORS ফিক্স ═══
+                        crossOrigin="anonymous"
                         className="h-16 w-16 object-cover"
                       />
                     </button>
