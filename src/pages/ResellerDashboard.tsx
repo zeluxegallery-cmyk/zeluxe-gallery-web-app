@@ -84,18 +84,12 @@ const WELCOME_BONUS_DAYS = 30;
 
 function getStatusBadgeClass(status: string) {
   switch (status.toLowerCase()) {
-    case 'pending':
-      return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
-    case 'confirmed':
-      return 'bg-blue-50 text-blue-700 border border-blue-200';
-    case 'shipped':
-      return 'bg-purple-50 text-purple-700 border border-purple-200';
-    case 'delivered':
-      return 'bg-green-50 text-green-700 border border-green-200';
-    case 'cancelled':
-      return 'bg-red-50 text-red-700 border border-red-200';
-    default:
-      return 'bg-gray-50 text-gray-700 border border-gray-200';
+    case 'pending': return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
+    case 'confirmed': return 'bg-blue-50 text-blue-700 border border-blue-200';
+    case 'shipped': return 'bg-purple-50 text-purple-700 border border-purple-200';
+    case 'delivered': return 'bg-green-50 text-green-700 border border-green-200';
+    case 'cancelled': return 'bg-red-50 text-red-700 border border-red-200';
+    default: return 'bg-gray-50 text-gray-700 border border-gray-200';
   }
 }
 
@@ -114,10 +108,7 @@ function getStatusLabel(status: string) {
 function formatDate(seconds?: number) {
   if (!seconds) return '—';
   const d = new Date(seconds * 1000);
-  const months = [
-    'জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
-    'জুলাই', 'আগস্ট', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে',
-  ];
+  const months = ['জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে'];
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
@@ -131,10 +122,7 @@ function getGreeting() {
 
 function getTodayFormatted() {
   const d = new Date();
-  const months = [
-    'জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন',
-    'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর',
-  ];
+  const months = ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর'];
   const days = ['রবিবার', 'সোমবার', 'মঙ্গলবার', 'বুধবার', 'বৃহস্পতিবার', 'শুক্রবার', 'শনিবার'];
   return `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`;
 }
@@ -159,14 +147,7 @@ export default function ResellerDashboard() {
       }
 
       try {
-        // ═══ প্যারালাল ডাটা ফেচিং (Promise.all) ═══
-        const [
-          userDoc, 
-          refStatsResult, 
-          productsSnap, 
-          ordersSnapshot, 
-          withdrawSnap
-        ] = await Promise.all([
+        const [userDoc, refStatsResult, productsSnap, ordersSnapshot, withdrawSnap] = await Promise.all([
           getDoc(doc(db, 'users', uid)),
           getReferralStats(uid),
           getDocs(collection(db, 'products')),
@@ -177,7 +158,6 @@ export default function ResellerDashboard() {
         const userInfo = userDoc.exists() ? userDoc.data() : null;
         let refStats = refStatsResult;
 
-        // রেফারেল কোড না থাকলে জেনারেট করা
         if (refStats && !refStats.referralCode) {
           try {
             const newCode = await generateUniqueReferralCode();
@@ -198,14 +178,12 @@ export default function ResellerDashboard() {
 
         if (refStats) setReferralInfo(refStats);
 
-        // প্রোডাক্ট ম্যাপ তৈরি (প্রফিট ক্যালকুলেশনের জন্য)
         const productMap: Record<string, number> = {};
         productsSnap.docs.forEach((p) => {
           const data = p.data();
           productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
         });
 
-        // ফিচার্ড প্রোডাক্ট (শুধু ছবি আছে যেগুলোর)
         const activeProducts: Product[] = productsSnap.docs
           .filter((d) => {
             const data = d.data();
@@ -223,14 +201,12 @@ export default function ResellerDashboard() {
           });
         setFeaturedProducts(activeProducts);
 
-        // অর্ডার প্রসেসিং
         const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
           const data = orderDocument.data();
           const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
           const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
           
-          // নতুন সিস্টেমে items থাকলে সেখান থেকে প্রফিট বের করা, নাহলে পুরনো পদ্ধতিতে
           let actualProfit = 0;
           if (Array.isArray(data.items) && data.items.length > 0) {
              actualProfit = data.items.reduce((sum: number, item: any) => {
@@ -258,7 +234,6 @@ export default function ResellerDashboard() {
           };
         });
 
-        // উইথড্র প্রসেসিং
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
           .filter((d) => d.status === 'approved' || d.status === 'paid')
@@ -268,7 +243,6 @@ export default function ResellerDashboard() {
         const pendingOrders = fetchedOrders.filter((order) => PENDING_STATUSES.includes(order.status)).length;
         const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered').length;
         
-        // প্রফিট শুধুমাত্র ডেলিভারি হওয়া অর্ডার থেকে
         const actualProfit = fetchedOrders
           .filter((order) => order.status === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
@@ -337,41 +311,35 @@ export default function ResellerDashboard() {
   return (
     <Layout>
       <div className="mx-auto max-w-2xl pb-10">
-        {/* ═══ GREETING ═══ */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
-            <Calendar size={14} />
-            <span>{getTodayFormatted()}</span>
-          </div>
-          <h1 className="mt-2 text-2xl font-bold capitalize text-zeluxe-black">
+        
+        {/* ═══ COMPACT HEADER ═══ */}
+        <div className="mb-5 flex items-center justify-between">
+          <h1 className="text-xl font-bold capitalize text-zeluxe-black">
             {getGreeting()}, {resellerName}
           </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            আজ আপনার ব্যবসার অবস্থা দেখে নিন
-          </p>
+          <div className="flex items-center gap-1.5 text-[10px] font-medium text-gray-400">
+            <Calendar size={12} />
+            <span>{getTodayFormatted()}</span>
+          </div>
         </div>
 
         {/* ═══ TODAY'S SNAPSHOT ═══ */}
         {(stats.todayOrders > 0 || stats.todaySales > 0) && (
-          <div className="mb-5 rounded-2xl bg-white p-4 shadow-card border border-gray-50">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles size={16} className="text-zeluxe-gold" />
-                <span className="text-xs font-bold uppercase tracking-widest text-zeluxe-gold">
-                  আজকের হিসাব
-                </span>
-              </div>
-              <div className="flex items-center gap-4 text-sm font-number">
-                <span className="text-gray-600">{stats.todayOrders}টি অর্ডার</span>
-                <span className="font-bold text-zeluxe-black">
-                  Tk {stats.todaySales.toLocaleString()}
-                </span>
-              </div>
+          <div className="mb-4 rounded-xl bg-white p-3 shadow-card border border-gray-50 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Sparkles size={14} className="text-zeluxe-gold" />
+              <span className="text-[11px] font-bold uppercase tracking-widest text-zeluxe-gold">
+                আজকের হিসাব
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-xs font-number">
+              <span className="text-gray-500">{stats.todayOrders}টি অর্ডার</span>
+              <span className="font-bold text-zeluxe-black">Tk {stats.todaySales.toLocaleString()}</span>
             </div>
           </div>
         )}
 
-        {/* ═══ WELCOME BONUS ═══ */}
+        {/* ═══ WELCOME BONUS (আগের মতো বড়) ═══ */}
         {bonusAchieved ? (
           <div className="mb-5 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-5 shadow-card border border-green-100">
             <div className="flex items-start gap-4">
@@ -443,28 +411,27 @@ export default function ResellerDashboard() {
         ) : null}
 
         {/* ═══ BALANCE ═══ */}
-        <div className="mb-6 rounded-2xl bg-white p-6 shadow-card border border-gray-50">
+        <div className="mb-5 rounded-2xl bg-white p-5 shadow-card border border-gray-50">
           <div className="flex items-start justify-between">
             <div>
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10">
-                  <Wallet size={16} className="text-zeluxe-gold" />
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zeluxe-gold/10">
+                  <Wallet size={14} className="text-zeluxe-gold" />
                 </span>
-                <p className="text-[11px] font-bold uppercase tracking-widest text-gray-500">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                   Available Balance
                 </p>
               </div>
-              <p className="mt-3 text-4xl font-bold tracking-tight text-zeluxe-black font-number">
+              <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black font-number">
                 Tk {stats.availableBalance.toLocaleString()}
               </p>
               
-              {/* প্রফেশনাল ব্রেকডাউন ব্যাজ */}
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-100">
-                  Order Profit: <strong className="text-zeluxe-black font-number">Tk {stats.actualProfit.toLocaleString()}</strong>
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
+                  Profit: <strong className="text-zeluxe-black font-number">Tk {stats.actualProfit.toLocaleString()}</strong>
                 </span>
                 {stats.referralBonus > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700 border border-green-100">
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
                     Referral: <strong className="text-green-800 font-number">+Tk {stats.referralBonus.toLocaleString()}</strong>
                   </span>
                 )}
@@ -472,20 +439,20 @@ export default function ResellerDashboard() {
             </div>
             <Link
               to="/withdraw"
-              className="flex shrink-0 items-center gap-1.5 rounded-xl bg-zeluxe-black px-4 py-2.5 text-xs font-bold text-white transition hover:bg-gray-800"
+              className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
             >
               Withdraw
-              <ArrowRight size={14} />
+              <ArrowRight size={12} />
             </Link>
           </div>
         </div>
 
         {/* ═══ QUICK ACTIONS ═══ */}
         <div className="mb-6">
-          <p className="mb-3 text-xs font-bold uppercase tracking-widest text-gray-500">
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
             Quick Actions
           </p>
-          <div className="grid grid-cols-4 gap-3">
+          <div className="grid grid-cols-4 gap-2.5">
             {[
               { label: 'প্রোডাক্ট', path: '/products', icon: Package },
               { label: 'নতুন অর্ডার', path: '/orders/new', icon: Plus },
@@ -495,12 +462,12 @@ export default function ResellerDashboard() {
               <Link
                 key={path}
                 to={path}
-                className="group flex flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-card border border-gray-50 transition-all hover:-translate-y-0.5 hover:shadow-md"
+                className="group flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition-all hover:-translate-y-0.5 hover:shadow-md"
               >
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-zeluxe-cream transition group-hover:bg-zeluxe-gold/20">
-                  <Icon className="text-zeluxe-gold" size={20} />
+                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-cream transition group-hover:bg-zeluxe-gold/20">
+                  <Icon className="text-zeluxe-gold" size={18} />
                 </span>
-                <span className="text-center text-[11px] font-bold text-zeluxe-black">
+                <span className="text-center text-[10px] font-bold text-zeluxe-black">
                   {label}
                 </span>
               </Link>
@@ -508,46 +475,46 @@ export default function ResellerDashboard() {
           </div>
         </div>
 
-        {/* ═══ MY PROGRESS ═══ */}
+        {/* ═══ MY PROGRESS (Fixed Layout) ═══ */}
         <div className="mb-6">
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               My Progress
             </p>
-            <Link to="/earnings" className="flex items-center gap-1 text-xs font-bold text-zeluxe-gold hover:underline">
-              বিস্তারিত <ChevronRight size={14} />
+            <Link to="/earnings" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+              বিস্তারিত <ChevronRight size={12} />
             </Link>
           </div>
 
-          <div className="grid grid-cols-3 gap-3">
-            <Link to="/orders" className="rounded-2xl bg-white p-4 shadow-card border border-gray-50 transition hover:shadow-md">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-3">
+          <div className="grid grid-cols-3 gap-2.5">
+            <Link to="/orders" className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:shadow-md flex flex-col items-center justify-center text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-2">
                 <ShoppingBag size={16} />
               </div>
-              <p className="text-2xl font-bold tracking-tight text-zeluxe-black font-number">
+              <p className="text-lg font-bold tracking-tight text-zeluxe-black font-number">
                 {stats.totalOrders}
               </p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Orders</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Orders</p>
             </Link>
 
-            <div className="rounded-2xl bg-white p-4 shadow-card border border-gray-50">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 mb-3">
+            <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 mb-2">
                 <TrendingUp size={16} />
               </div>
-              <p className="text-xl font-bold tracking-tight text-zeluxe-black font-number truncate">
-                Tk {stats.totalSales.toLocaleString()}
+              <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
+                Tk {stats.totalSales > 9999 ? (stats.totalSales / 1000).toFixed(1) + 'k' : stats.totalSales.toLocaleString()}
               </p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Sales</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Sales</p>
             </div>
 
-            <div className="rounded-2xl bg-white p-4 shadow-card border border-gray-50">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10 text-zeluxe-gold mb-3">
+            <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10 text-zeluxe-gold mb-2">
                 <Wallet size={16} />
               </div>
-              <p className="text-xl font-bold tracking-tight text-zeluxe-black font-number truncate">
-                Tk {stats.actualProfit.toLocaleString()}
+              <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
+                Tk {stats.actualProfit > 9999 ? (stats.actualProfit / 1000).toFixed(1) + 'k' : stats.actualProfit.toLocaleString()}
               </p>
-              <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500 mt-1">Profit</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Profit</p>
             </div>
           </div>
         </div>
@@ -555,21 +522,21 @@ export default function ResellerDashboard() {
         {/* ═══ FEATURED PRODUCTS ═══ */}
         {featuredProducts.length > 0 && (
           <div className="mb-6">
-            <div className="mb-3 flex items-center justify-between">
-              <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                 Featured Products
               </p>
-              <Link to="/products" className="flex items-center gap-1 text-xs font-bold text-zeluxe-gold hover:underline">
-                সব দেখুন <ChevronRight size={14} />
+              <Link to="/products" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+                সব দেখুন <ChevronRight size={12} />
               </Link>
             </div>
 
-            <div className="-mx-5 flex gap-3 overflow-x-auto px-5 pb-3 snap-x hide-scrollbar">
+            <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-2 snap-x hide-scrollbar">
               {featuredProducts.map((product) => (
                 <Link
                   key={product.id}
                   to={`/products/${product.id}`}
-                  className="min-w-[140px] snap-start overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="min-w-[130px] snap-start overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
                 >
                   <div className="aspect-square bg-zeluxe-cream">
                     <img
@@ -579,11 +546,11 @@ export default function ResellerDashboard() {
                       className="h-full w-full object-cover"
                     />
                   </div>
-                  <div className="p-3">
-                    <p className="line-clamp-2 text-xs font-bold text-zeluxe-black">
+                  <div className="p-2.5">
+                    <p className="line-clamp-2 text-[11px] font-bold text-zeluxe-black leading-tight">
                       {product.name}
                     </p>
-                    <p className="mt-1 text-sm font-bold text-zeluxe-gold font-number">
+                    <p className="mt-1 text-[12px] font-bold text-zeluxe-gold font-number">
                       Tk {product.resellerPrice.toLocaleString()}
                     </p>
                   </div>
@@ -593,23 +560,23 @@ export default function ResellerDashboard() {
           </div>
         )}
 
-        {/* ═══ REFER & EARN (Compact Card) ═══ */}
+        {/* ═══ REFER & EARN ═══ */}
         {referralInfo && referralInfo.referralCode && (
           <Link
             to="/refer"
-            className="mb-6 flex items-center gap-4 overflow-hidden rounded-2xl bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-5 shadow-card border border-zeluxe-gold/20 transition hover:border-zeluxe-gold"
+            className="mb-6 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 shadow-card border border-zeluxe-gold/20 transition hover:border-zeluxe-gold"
           >
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
-              <Users className="text-zeluxe-black" size={22} />
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
+              <Users className="text-zeluxe-black" size={18} />
             </span>
             <div className="flex-1">
-              <p className="text-[11px] font-bold uppercase tracking-widest text-zeluxe-gold">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
                 Refer & Earn
               </p>
-              <p className="mt-1 text-sm font-bold text-zeluxe-black">
+              <p className="mt-0.5 text-xs font-bold text-zeluxe-black">
                 বন্ধুকে রিসেলার বানান, Tk {REFERRAL_BONUS_AMOUNT} পান
               </p>
-              <div className="mt-2 flex items-center gap-3 text-xs font-number">
+              <div className="mt-1 flex items-center gap-2 text-[10px] font-number">
                 <span className="text-gray-600">
                   {referralInfo.referralCount}টি referral
                 </span>
@@ -618,47 +585,47 @@ export default function ResellerDashboard() {
                 </span>
               </div>
             </div>
-            <ArrowRight size={20} className="shrink-0 text-zeluxe-gold" />
+            <ArrowRight size={16} className="shrink-0 text-zeluxe-gold" />
           </Link>
         )}
 
         {/* ═══ RECENT ORDERS ═══ */}
         <section>
-          <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-bold uppercase tracking-widest text-gray-500">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               Recent Orders
             </p>
-            <Link to="/orders" className="flex items-center gap-1 text-xs font-bold text-zeluxe-gold hover:underline">
-              সব দেখুন <ChevronRight size={14} />
+            <Link to="/orders" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+              সব দেখুন <ChevronRight size={12} />
             </Link>
           </div>
 
           {recentOrders.length > 0 ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentOrders.map((order) => (
                 <Link
                   key={order.id}
                   to={`/orders/${order.id}`}
-                  className="block rounded-2xl bg-white p-4 shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
+                  className="block rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
                 >
-                  <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <p className="font-mono text-xs font-bold text-zeluxe-black">
+                      <p className="font-mono text-[11px] font-bold text-zeluxe-black">
                         {order.orderId}
                       </p>
-                      <p className="mt-1 truncate text-sm font-medium text-gray-700">
+                      <p className="mt-0.5 truncate text-xs font-medium text-gray-700">
                         {order.productName}
                       </p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${getStatusBadgeClass(order.status)}`}>
+                      <div className="mt-1.5 flex items-center gap-2">
+                        <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(order.status)}`}>
                           {getStatusLabel(order.status)}
                         </span>
-                        <span className="text-[10px] font-medium text-gray-400">
+                        <span className="text-[9px] font-medium text-gray-400">
                           {formatDate(order.createdAt?.seconds)}
                         </span>
                       </div>
                     </div>
-                    <p className="shrink-0 text-base font-bold text-zeluxe-gold font-number">
+                    <p className="shrink-0 text-sm font-bold text-zeluxe-gold font-number">
                       Tk {order.total.toLocaleString()}
                     </p>
                   </div>
@@ -666,11 +633,11 @@ export default function ResellerDashboard() {
               ))}
             </div>
           ) : (
-            <div className="rounded-2xl bg-white p-8 text-center shadow-card border border-gray-50">
-              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-zeluxe-cream">
-                <Package className="h-7 w-7 text-zeluxe-gold" />
+            <div className="rounded-2xl bg-white p-6 text-center shadow-card border border-gray-50">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
+                <Package className="h-6 w-6 text-zeluxe-gold" />
               </div>
-              <p className="mt-4 text-sm font-bold text-zeluxe-black">
+              <p className="mt-3 text-sm font-bold text-zeluxe-black">
                 এখনো কোনো অর্ডার নেই
               </p>
               <p className="mt-1 text-xs text-gray-500">
@@ -678,10 +645,10 @@ export default function ResellerDashboard() {
               </p>
               <Link
                 to="/products"
-                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-zeluxe-black px-5 py-2.5 text-xs font-bold text-white transition hover:bg-gray-800"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
               >
                 প্রোডাক্ট দেখুন
-                <ArrowRight size={14} />
+                <ArrowRight size={12} />
               </Link>
             </div>
           )}
