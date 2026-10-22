@@ -4,6 +4,8 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Copy, Download, Loader2, Package, Search, ChevronDown, Check } from 'lucide-react';
 import Layout from '../components/Layout';
 import { db } from '../firebase';
+import { saveImagesToGallery } from '../lib/imageDownloader'; // ═══ নতুন ইমপোর্ট ═══
+import { toast } from 'sonner';
 
 type Product = {
   id: string;
@@ -103,48 +105,14 @@ export default function Products() {
     }
   };
 
-  // ═══ আপডেটেড ডাউনলোড ফাংশন (CORS ও ডিলে সহ) ═══
+  // ═══ নতুন আপডেটেড ডাউনলোড ফাংশন ═══
   const handleDownloadAll = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
-    if (product.imageUrls.length === 0) return;
-
+    
     setDownloadingId(product.id);
-    try {
-      for (let i = 0; i < product.imageUrls.length; i++) {
-        const url = product.imageUrls[i];
-        
-        const response = await fetch(url, {
-          method: 'GET',
-          mode: 'cors',
-          credentials: 'omit',
-        });
-
-        if (!response.ok) throw new Error('Image fetch failed');
-
-        const contentType = response.headers.get('content-type') || 'image/jpeg';
-        const blob = await response.blob();
-        const finalBlob = new Blob([blob], { type: contentType });
-
-        const blobUrl = window.URL.createObjectURL(finalBlob);
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `${product.sku || 'product'}-${i + 1}.jpg`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(blobUrl);
-
-        // প্রতিটি ছবির মাঝে ৫০০ মিলি-সেকেন্ড বিরতি
-        await new Promise((r) => setTimeout(r, 500));
-      }
-      toast.success('সব ছবি ডাউনলোড হয়েছে!');
-    } catch (err) {
-      console.error('Download failed:', err);
-      toast.error('ছবি ডাউনলোড করতে সমস্যা হয়েছে।');
-    } finally {
-      setDownloadingId(null);
-    }
+    await saveImagesToGallery(product.imageUrls, product.name);
+    setDownloadingId(null);
   };
 
   return (
@@ -227,7 +195,7 @@ export default function Products() {
                       <img
                         src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_400/') : product.imageUrl}
                         alt={product.name}
-                        crossOrigin="anonymous" // ═══ CORS ফিক্স ═══
+                        crossOrigin="anonymous"
                         loading="lazy"
                         className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                       />
@@ -237,7 +205,6 @@ export default function Products() {
                       </div>
                     )}
 
-                    {/* Modern Badges */}
                     {product.imageUrls.length > 1 && (
                       <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
                         {product.imageUrls.length} ছবি
@@ -261,7 +228,6 @@ export default function Products() {
                       {product.sku}
                     </p>
 
-                    {/* ═══ প্রাইস লেআউট ফিক্স ═══ */}
                     <div className="mt-auto pt-3">
                       <div className="space-y-1.5 border-t border-gray-100 pt-3">
                         <div className="flex items-center justify-between">
@@ -278,7 +244,6 @@ export default function Products() {
                         </div>
                       </div>
 
-                      {/* ═══ বাটন ডিজাইন (হায়ারার্কি) ═══ */}
                       <div className="mt-4 grid grid-cols-2 gap-2">
                         <button
                           onClick={(e) => handleDownloadAll(e, product)}
