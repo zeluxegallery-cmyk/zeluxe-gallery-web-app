@@ -4,7 +4,7 @@ import { collection, getDocs, query, where } from 'firebase/firestore';
 import { Copy, Download, Loader2, Package, Search, ChevronDown, Check } from 'lucide-react';
 import Layout from '../components/Layout';
 import { db } from '../firebase';
-import { saveImagesToGallery } from '../lib/imageDownloader'; // ═══ নতুন ইমপোর্ট ═══
+import { downloadSingleImage } from '../lib/imageDownloader'; // ═══ নতুন ফাংশন ইমপোর্ট ═══
 import { toast } from 'sonner';
 
 type Product = {
@@ -105,13 +105,21 @@ export default function Products() {
     }
   };
 
-  // ═══ নতুন আপডেটেড ডাউনলোড ফাংশন ═══
+  // ═══ আপডেটেড ডাউনলোড ফাংশন (শুধু প্রাইমারি ছবি ডাউনলোড হবে) ═══
   const handleDownloadAll = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
     
+    // প্রোডাক্টের প্রথম (প্রাইমারি) ছবিটি নেওয়া হচ্ছে
+    const primaryImg = product.imageUrls[0] || product.imageUrl;
+    if (!primaryImg) {
+      toast.error('কোনো ছবি পাওয়া যায়নি');
+      return;
+    }
+
     setDownloadingId(product.id);
-    await saveImagesToGallery(product.imageUrls, product.name);
+    // নতুন ফাংশন দিয়ে ছবি ডাউনলোড
+    await downloadSingleImage(primaryImg, `${product.sku || 'product'}-1.jpg`);
     setDownloadingId(null);
   };
 
