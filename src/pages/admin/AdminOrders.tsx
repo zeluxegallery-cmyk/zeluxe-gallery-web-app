@@ -11,7 +11,6 @@ import {
 } from 'firebase/firestore';
 import { Eye, Search, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
 type Order = {
@@ -27,8 +26,8 @@ type Order = {
 
 const STATUS_FILTERS = ['All', 'Pending', 'Confirmed', 'Shipped', 'Delivered', 'Cancelled', 'Returned'];
 const STATUS_OPTIONS = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'returned'];
-const INITIAL_VISIBLE_COUNT = 20; // প্রথমে ২০টি অর্ডার দেখাবে
-const LOAD_MORE_COUNT = 20; // ক্লিক করলে ২০টি করে বাড়বে
+const INITIAL_VISIBLE_COUNT = 20; 
+const LOAD_MORE_COUNT = 20; 
 
 function formatDate(seconds?: number) {
   if (!seconds) return '—';
@@ -64,7 +63,7 @@ export default function AdminOrders() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT); // নতুন স্টেট
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT); 
 
   const loadData = useCallback(async () => {
     try {
@@ -116,7 +115,6 @@ export default function AdminOrders() {
     void loadData();
   }, [loadData]);
 
-  // সার্চ বা ফিল্টার পরিবর্তন হলে আবার ২০টি থেকে শুরু হবে
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [search, statusFilter]);
@@ -152,11 +150,11 @@ export default function AdminOrders() {
     return matchesSearch && matchesStatus;
   });
 
-  // শুধুমাত্র visibleCount পরিমাণ ডাটা দেখাবে
   const displayedOrders = filtered.slice(0, visibleCount);
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   return (
-    <AdminLayout>
+    <div className="mx-auto max-w-5xl pb-10">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-zeluxe-black">সব অর্ডার</h1>
         <span className="rounded-full bg-zeluxe-gold/20 px-3 py-1 text-sm font-bold text-zeluxe-black">
@@ -176,7 +174,7 @@ export default function AdminOrders() {
       </div>
 
       {/* Status filter */}
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
         {STATUS_FILTERS.map((filter) => (
           <button
             key={filter}
@@ -358,6 +356,6 @@ export default function AdminOrders() {
           No orders found.
         </div>
       )}
-    </AdminLayout>
+    </div>
   );
 }
