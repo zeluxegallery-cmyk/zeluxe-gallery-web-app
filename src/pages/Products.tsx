@@ -26,6 +26,13 @@ type Category = {
   imageUrl?: string;
 };
 
+// ═══ আপনার দেওয়া নির্দিষ্ট সিরিয়াল (Custom Order) ═══
+const customOrder = [
+  'T-Shirt', '3 Piece', 'Panjabi', 'Polo Shirt', 'Gadget', 'Watch',
+  'Airpods', 'Hoodie', 'Sharee', '2 Piece', 'Baby Fashion', 'Borka',
+  'Hijab', 'Smart Watch', 'Neckband', 'Microphone', 'Pant', 'Shirt'
+];
+
 // ═══ বাংলা থেকে ইংরেজি নামের অভিধান ═══
 const categoryTranslations: Record<string, string> = {
   'পাওয়ার ব্যাংক': 'Power Bank',
@@ -40,18 +47,18 @@ const categoryTranslations: Record<string, string> = {
   'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo Set',
   'কিডস আইটেম': 'Kids Items',
   'পারফিউম': 'Perfume',
-  'ইয়ারবাডস (ব্রুটুথ)': 'Earbuds',
+  'ইয়ারবাডস (ব্রুটুথ)': 'Airpods', // আপনার লিস্ট অনুযায়ী
   'টি-শার্ট': 'T-Shirt',
-  'থ্রি-পিস': 'Three Piece',
+  'থ্রি-পিস': '3 Piece',
   'স্কিন কেয়ার': 'Skin Care',
-  'হুডি & জ্যাকেট': 'Hoodie & Jacket',
-  'শাড়ি': 'Saree',
-  'প্যান্ট & ট্রাউজার': 'Pant & Trouser',
+  'হুডি & জ্যাকেট': 'Hoodie',
+  'শাড়ি': 'Sharee', // আপনার লিস্ট অনুযায়ী
+  'প্যান্ট & ট্রাউজার': 'Pant',
   'স্মার্ট ওয়াচ': 'Smart Watch',
   'ঘড়ি': 'Watch',
   'ড্রেস': 'Dress',
   'খেলনা': 'Toys',
-  'বেবি ড্রেস': 'Baby Dress',
+  'বেবি ড্রেস': 'Baby Fashion',
   'হেডফোন': 'Headphone',
   'কুর্তি': 'Kurti',
   'ওয়েস্টার্ন ড্রেস': 'Western Dress',
@@ -60,6 +67,12 @@ const categoryTranslations: Record<string, string> = {
 
 const getDisplayCategoryName = (name: string) => {
   return categoryTranslations[name] || name;
+};
+
+// ═══ কাস্টম অর্ডার অনুযায়ী ইনডেক্স বের করার ফাংশন ═══
+const getOrderIndex = (name: string) => {
+  const index = customOrder.indexOf(name);
+  return index === -1 ? 9999 : index; // লিস্টে না থাকলে সবার শেষে যাবে
 };
 
 const INITIAL_VISIBLE_COUNT = 20;
@@ -116,10 +129,17 @@ export default function Products() {
           };
         });
 
-        // ═══ বর্ণানুক্রমিক (A-Z) ভাবে সাজানো হচ্ছে ═══
+        // ═══ কাস্টম অর্ডার অনুযায়ী সাজানো ═══
         fetchedCategories.sort((a, b) => {
-          const nameA = getDisplayCategoryName(a.name).toLowerCase();
-          const nameB = getDisplayCategoryName(b.name).toLowerCase();
+          const nameA = getDisplayCategoryName(a.name);
+          const nameB = getDisplayCategoryName(b.name);
+          const indexA = getOrderIndex(nameA);
+          const indexB = getOrderIndex(nameB);
+
+          if (indexA !== indexB) {
+            return indexA - indexB;
+          }
+          // দুটোই লিস্টের বাইরে থাকলে বর্ণানুক্রমিকভাবে সাজাবে
           return nameA.localeCompare(nameB);
         });
 
