@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { BarChart3, TrendingUp, Loader2, Calendar, ShoppingBag, CheckCircle, XCircle, Clock, Wallet } from 'lucide-react';
-import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
 type OrderItem = {
@@ -18,19 +17,19 @@ type Order = {
   total: number;
   status: string;
   createdAt?: any;
-  items?: OrderItem[]; // ═══ নতুন যোগ করা হয়েছে ═══
+  items?: OrderItem[]; 
 };
 
 type MonthlyReport = {
-  monthKey: string;      // "2610"
-  monthLabel: string;    // "অক্টোবর ২০২৬"
+  monthKey: string;      
+  monthLabel: string;    
   totalOrders: number;
   delivered: number;
   pending: number;
   cancelled: number;
   totalSales: number;
   deliveredSales: number;
-  totalProfit: number;   // ═══ নতুন যোগ করা হয়েছে ═══
+  totalProfit: number;   
 };
 
 export default function AdminReports() {
@@ -73,12 +72,11 @@ export default function AdminReports() {
             total: typeof data.total === 'number' ? data.total : 0,
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
-            items: Array.isArray(data.items) ? data.items : undefined, // ═══ নতুন যোগ করা হয়েছে ═══
+            items: Array.isArray(data.items) ? data.items : undefined, 
           };
         });
         setOrders(list);
 
-        // Group by month
         const grouped: Record<string, MonthlyReport> = {};
 
         list.forEach((order) => {
@@ -95,7 +93,7 @@ export default function AdminReports() {
               cancelled: 0,
               totalSales: 0,
               deliveredSales: 0,
-              totalProfit: 0, // ═══ নতুন যোগ করা হয়েছে ═══
+              totalProfit: 0, 
             };
           }
 
@@ -103,7 +101,6 @@ export default function AdminReports() {
           report.totalOrders += 1;
           report.totalSales += order.total;
 
-          // ═══ অ্যাডমিন প্রফিট ক্যালকুলেশন ═══
           let orderProfit = 0;
           if (order.items && order.items.length > 0) {
             orderProfit = order.items.reduce((sum, item) => {
@@ -114,7 +111,6 @@ export default function AdminReports() {
             }, 0);
           }
           report.totalProfit += orderProfit;
-          // ═══════════════════════════════════
 
           if (order.status === 'delivered') {
             report.delivered += 1;
@@ -126,7 +122,6 @@ export default function AdminReports() {
           }
         });
 
-        // Sort by month descending
         const sorted = Object.values(grouped).sort((a, b) =>
           b.monthKey.localeCompare(a.monthKey)
         );
@@ -142,13 +137,12 @@ export default function AdminReports() {
     void loadOrders();
   }, []);
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </AdminLayout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+      </div>
     );
   }
 
@@ -156,10 +150,10 @@ export default function AdminReports() {
   const grandTotalSales = monthlyReports.reduce((s, r) => s + r.totalSales, 0);
   const grandTotalDelivered = monthlyReports.reduce((s, r) => s + r.delivered, 0);
   const grandTotalCancelled = monthlyReports.reduce((s, r) => s + r.cancelled, 0);
-  const grandTotalProfit = monthlyReports.reduce((s, r) => s + r.totalProfit, 0); // ═══ নতুন ═══
+  const grandTotalProfit = monthlyReports.reduce((s, r) => s + r.totalProfit, 0); 
 
   return (
-    <AdminLayout>
+    <>
       <h1 className="mb-1 text-2xl font-bold text-zeluxe-black">Monthly Reports</h1>
       <p className="mb-6 text-sm text-gray-500">মাসিক অর্ডার ও বিক্রয় রিপোর্ট</p>
 
@@ -175,7 +169,6 @@ export default function AdminReports() {
           <p className="mt-2 text-xs uppercase text-gray-500">Total Sales</p>
           <p className="mt-1 text-xl font-bold text-zeluxe-black">Tk {grandTotalSales.toLocaleString()}</p>
         </div>
-        {/* ═══ নতুন প্রফিট কার্ড ═══ */}
         <div className="rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-4">
           <Wallet className="text-zeluxe-gold" size={20} />
           <p className="mt-2 text-xs uppercase text-zeluxe-gold font-bold">Admin Profit</p>
@@ -234,7 +227,6 @@ export default function AdminReports() {
                     Tk {report.deliveredSales.toLocaleString()}
                   </p>
                 </div>
-                {/* ═══ নতুন প্রফিট ডিসপ্লে ═══ */}
                 <div>
                   <p className="text-xs uppercase text-zeluxe-gold font-bold">Admin Profit</p>
                   <p className="mt-1 text-lg font-bold text-zeluxe-gold">
@@ -296,6 +288,6 @@ export default function AdminReports() {
       <p className="mt-8 text-center text-xs text-gray-400">
         রিপোর্ট Order ID থেকে month বের করে তৈরি করা হয়েছে
       </p>
-    </AdminLayout>
+    </>
   );
 }
