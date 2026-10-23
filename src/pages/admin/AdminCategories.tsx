@@ -32,15 +32,28 @@ const emptyForm: CategoryForm = {
 };
 
 const DEFAULT_CATEGORIES = [
-  "Men's Fashion", "Women's Fashion", 'Panjabi', 'Three Piece', 'Saree', 'Shirt', 'T-Shirt', 'Pant & Trouser', 'Watch', 'Smart Watch', 'Earbuds', 'Power Bank', 'Dress', 'Borka', 'Hijab', 'Cosmetics', 'Skin Care', 'Perfume', 'Bag', 'Hoodie & Jacket', 'Kids Items', 'Gift Items',
+  'T-Shirt', '3 Piece', 'Panjabi', 'Polo Shirt', 'Gadget', 'Watch',
+  'Airpods', 'Hoodie', 'Sharee', '2 Piece', 'Baby Fashion', 'Borka',
+  'Hijab', 'Smart Watch', 'Neckband', 'Microphone', 'Pant', 'Shirt'
 ];
 
 const categoryTranslations: Record<string, string> = {
-  'পাওয়ার ব্যাংক': 'Power Bank', 'পাঞ্জাবি': 'Panjabi', 'হিজাব': 'Hijab', 'গিফট আইটেম': 'Gift Items', 'কসমেটিক্স': 'Cosmetics', 'কাপল আইটেম': 'Couple Items', 'ব্যাগ': 'Bag', 'বোরকা': 'Borka', 'শার্ট': 'Shirt', 'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo Set', 'কিডস আইটেম': 'Kids Items', 'পারফিউম': 'Perfume', 'ইয়ারবাডস (ব্রুটুথ)': 'Earbuds', 'টি-শার্ট': 'T-Shirt', 'থ্রি-পিস': 'Three Piece', 'স্কিন কেয়ার': 'Skin Care', 'হুডি & জ্যাকেট': 'Hoodie & Jacket', 'শাড়ি': 'Saree', 'প্যান্ট & ট্রাউজার': 'Pant & Trouser', 'স্মার্ট ওয়াচ': 'Smart Watch', 'ঘড়ি': 'Watch', 'ড্রেস': 'Dress', 'খেলনা': 'Toys', 'বেবি ড্রেস': 'Baby Dress', 'হেডফোন': 'Headphone', 'কুর্তি': 'Kurti', 'ওয়েস্টার্ন ড্রেস': 'Western Dress', 'ইন্টেরিয়র': 'Interior',
+  'পাওয়ার ব্যাংক': 'Power Bank', 'পাঞ্জাবি': 'Panjabi', 'হিজাব': 'Hijab', 'গিফট আইটেম': 'Gift Items', 'কসমেটিক্স': 'Cosmetics', 'কাপল আইটেম': 'Couple Items', 'ব্যাগ': 'Bag', 'বোরকা': 'Borka', 'শার্ট': 'Shirt', 'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo Set', 'কিডস আইটেম': 'Kids Items', 'পারফিউম': 'Perfume', 'ইয়ারবাডস (ব্রুটুথ)': 'Airpods', 'টি-শার্ট': 'T-Shirt', 'থ্রি-পিস': '3 Piece', 'স্কিন কেয়ার': 'Skin Care', 'হুডি & জ্যাকেট': 'Hoodie', 'শাড়ি': 'Sharee', 'প্যান্ট & ট্রাউজার': 'Pant', 'স্মার্ট ওয়াচ': 'Smart Watch', 'ঘড়ি': 'Watch', 'ড্রেস': 'Dress', 'খেলনা': 'Toys', 'বেবি ড্রেস': 'Baby Fashion', 'হেডফোন': 'Headphone', 'কুর্তি': 'Kurti', 'ওয়েস্টার্ন ড্রেস': 'Western Dress', 'ইন্টেরিয়র': 'Interior',
 };
+
+const customOrder = [
+  'T-Shirt', '3 Piece', 'Panjabi', 'Polo Shirt', 'Gadget', 'Watch',
+  'Airpods', 'Hoodie', 'Sharee', '2 Piece', 'Baby Fashion', 'Borka',
+  'Hijab', 'Smart Watch', 'Neckband', 'Microphone', 'Pant', 'Shirt'
+];
 
 const getDisplayCategoryName = (name: string) => {
   return categoryTranslations[name] || name;
+};
+
+const getOrderIndex = (name: string) => {
+  const index = customOrder.indexOf(name);
+  return index === -1 ? 9999 : index;
 };
 
 export default function AdminCategories() {
@@ -79,8 +92,14 @@ export default function AdminCategories() {
             return { id: catDoc.id, name, imageUrl, productCount };
         });
         
-        // ═══ বর্ণানুক্রমিক (A-Z) ভাবে সাজানো ═══
-        newCats.sort((a, b) => getDisplayCategoryName(a.name).toLowerCase().localeCompare(getDisplayCategoryName(b.name).toLowerCase()));
+        newCats.sort((a, b) => {
+          const nameA = getDisplayCategoryName(a.name);
+          const nameB = getDisplayCategoryName(b.name);
+          const indexA = getOrderIndex(nameA);
+          const indexB = getOrderIndex(nameB);
+          if (indexA !== indexB) return indexA - indexB;
+          return nameA.localeCompare(nameB);
+        });
         
         setCategories(newCats);
         return;
@@ -95,8 +114,14 @@ export default function AdminCategories() {
           return { id: catDoc.id, name, imageUrl, productCount };
       });
       
-      // ═══ বর্ণানুক্রমিক (A-Z) ভাবে সাজানো ═══
-      cats.sort((a, b) => getDisplayCategoryName(a.name).toLowerCase().localeCompare(getDisplayCategoryName(b.name).toLowerCase()));
+      cats.sort((a, b) => {
+        const nameA = getDisplayCategoryName(a.name);
+        const nameB = getDisplayCategoryName(b.name);
+        const indexA = getOrderIndex(nameA);
+        const indexB = getOrderIndex(nameB);
+        if (indexA !== indexB) return indexA - indexB;
+        return nameA.localeCompare(nameB);
+      });
       
       setCategories(cats);
     } catch (err) {
