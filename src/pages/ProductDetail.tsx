@@ -26,9 +26,8 @@ import {
   ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
-import { downloadSingleImage } from '../lib/imageDownloader'; // ═══ নতুন ইমপোর্ট ═══
+import { downloadSingleImage } from '../lib/imageDownloader';
 
 type Product = {
   id: string;
@@ -349,252 +348,246 @@ export default function ProductDetail() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </Layout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+      </div>
     );
   }
 
   if (!product) {
     return (
-      <Layout>
-        <div className="rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-12 text-center">
-          <Package className="mx-auto h-12 w-12 text-gray-300" />
-          <p className="mt-4 text-sm text-gray-600">প্রোডাক্ট পাওয়া যায়নি</p>
-          <Link to="/products" className="mt-4 inline-block text-sm font-bold text-zeluxe-gold hover:underline">
-            ← প্রোডাক্টে ফিরে যান
-          </Link>
-        </div>
-      </Layout>
+      <div className="rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-12 text-center">
+        <Package className="mx-auto h-12 w-12 text-gray-300" />
+        <p className="mt-4 text-sm text-gray-600">প্রোডাক্ট পাওয়া যায়নি</p>
+        <Link to="/products" className="mt-4 inline-block text-sm font-bold text-zeluxe-gold hover:underline">
+          ← প্রোডাক্টে ফিরে যান
+        </Link>
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-5xl pb-24">
-        <Link
-          to="/products"
-          className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-zeluxe-gold"
-        >
-          <ArrowLeft size={16} />
-          সব প্রোডাক্ট
-        </Link>
+    <div className="mx-auto max-w-5xl pb-24">
+      <Link
+        to="/products"
+        className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-zeluxe-gold"
+      >
+        <ArrowLeft size={16} />
+        সব প্রোডাক্ট
+      </Link>
 
-        <div className="rounded-lg border border-zeluxe-lightgray bg-white p-5 md:p-6">
-          <div className="grid gap-6 md:grid-cols-2 md:gap-8">
-            {/* LEFT — Images */}
-            <div>
-              <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream relative group">
-                <div className="aspect-square relative">
-                  {product.imageUrls.length > 0 ? (
-                    <>
-                      <img
-                        src={product.imageUrls[activeImage]}
-                        alt={product.name}
-                        className="h-full w-full object-cover"
-                      />
-                      {/* মেইন ছবির ডাউনলোড বাটন */}
-                      <button
-                        onClick={() => handleDownloadSingle(product.imageUrls[activeImage], activeImage)}
-                        disabled={downloadingIdx === activeImage}
-                        className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-md text-zeluxe-black transition hover:bg-white active:scale-95 disabled:opacity-50 backdrop-blur-sm"
-                        title="এই ছবিটি ডাউনলোড করুন"
-                      >
-                        {downloadingIdx === activeImage ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
-                      </button>
-                    </>
-                  ) : (
-                    <div className="flex h-full items-center justify-center">
-                      <Package className="h-16 w-16 text-gray-300" />
-                    </div>
-                  )}
-                </div>
+      <div className="rounded-lg border border-zeluxe-lightgray bg-white p-5 md:p-6">
+        <div className="grid gap-6 md:grid-cols-2 md:gap-8">
+          {/* LEFT — Images */}
+          <div>
+            <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream relative group">
+              <div className="aspect-square relative">
+                {product.imageUrls.length > 0 ? (
+                  <>
+                    <img
+                      src={product.imageUrls[activeImage]}
+                      alt={product.name}
+                      className="h-full w-full object-cover"
+                    />
+                    {/* মেইন ছবির ডাউনলোড বাটন */}
+                    <button
+                      onClick={() => handleDownloadSingle(product.imageUrls[activeImage], activeImage)}
+                      disabled={downloadingIdx === activeImage}
+                      className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow-md text-zeluxe-black transition hover:bg-white active:scale-95 disabled:opacity-50 backdrop-blur-sm"
+                      title="এই ছবিটি ডাউনলোড করুন"
+                    >
+                      {downloadingIdx === activeImage ? <Loader2 size={20} className="animate-spin" /> : <Download size={20} />}
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center">
+                    <Package className="h-16 w-16 text-gray-300" />
+                  </div>
+                )}
               </div>
-
-              {/* ═══ থাম্বনেইল লিস্ট এবং ডাউনলোড আইকন ═══ */}
-              {product.imageUrls.length > 1 && (
-                <div className="mt-4 grid grid-cols-4 gap-2">
-                  {product.imageUrls.map((url, idx) => (
-                    <div key={idx} className="relative group">
-                      <button
-                        onClick={() => setActiveImage(idx)}
-                        className={`w-full aspect-square overflow-hidden rounded-md border-2 transition ${
-                          activeImage === idx ? 'border-zeluxe-gold' : 'border-transparent'
-                        }`}
-                      >
-                        <img
-                          src={url}
-                          alt={`${product.name} ${idx + 1}`}
-                          className="h-full w-full object-cover"
-                        />
-                      </button>
-                      
-                      {/* ছোট ডাউনলোড আইকন */}
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          handleDownloadSingle(url, idx);
-                        }}
-                        disabled={downloadingIdx === idx}
-                        className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-zeluxe-black/70 text-white backdrop-blur-sm transition hover:bg-zeluxe-black disabled:opacity-50"
-                        title="এই ছবিটি ডাউনলোড করুন"
-                      >
-                        {downloadingIdx === idx ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
-            {/* RIGHT — Info */}
-            <div>
-              <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
-                {product.name}
-              </h1>
-              <p className="mt-1 font-mono text-xs text-gray-500">
-                SKU: {product.sku}
+            {/* ═══ থাম্বনেইল লিস্ট এবং ডাউনলোড আইকন ═══ */}
+            {product.imageUrls.length > 1 && (
+              <div className="mt-4 grid grid-cols-4 gap-2">
+                {product.imageUrls.map((url, idx) => (
+                  <div key={idx} className="relative group">
+                    <button
+                      onClick={() => setActiveImage(idx)}
+                      className={`w-full aspect-square overflow-hidden rounded-md border-2 transition ${
+                        activeImage === idx ? 'border-zeluxe-gold' : 'border-transparent'
+                      }`}
+                    >
+                      <img
+                        src={url}
+                        alt={`${product.name} ${idx + 1}`}
+                        className="h-full w-full object-cover"
+                      />
+                    </button>
+                    
+                    {/* ছোট ডাউনলোড আইকন */}
+                    <button
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleDownloadSingle(url, idx);
+                      }}
+                      disabled={downloadingIdx === idx}
+                      className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-zeluxe-black/70 text-white backdrop-blur-sm transition hover:bg-zeluxe-black disabled:opacity-50"
+                      title="এই ছবিটি ডাউনলোড করুন"
+                    >
+                      {downloadingIdx === idx ? <Loader2 size={12} className="animate-spin" /> : <Download size={12} />}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT — Info */}
+          <div>
+            <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
+              {product.name}
+            </h1>
+            <p className="mt-1 font-mono text-xs text-gray-500">
+              SKU: {product.sku}
+            </p>
+
+            <div className="mt-4 rounded-md border border-zeluxe-lightgray bg-zeluxe-cream p-4">
+              <label className="mb-2 block text-xs font-medium text-gray-600">
+                Variation & Price:
+              </label>
+
+              {product.colors.length > 0 && (
+                <div className="relative mb-3">
+                  <select
+                    value={selectedColor}
+                    onChange={(e) => setSelectedColor(e.target.value)}
+                    className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-3 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+                  >
+                    {product.colors.map((c) => (
+                      <option key={c} value={c}>Color: {c}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
+              )}
+
+              {product.sizes.length > 0 && (
+                <div className="relative mb-3">
+                  <select
+                    value={selectedSize}
+                    onChange={(e) => setSelectedSize(e.target.value)}
+                    className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-3 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+                  >
+                    {product.sizes.map((s) => (
+                      <option key={s} value={s}>Size: {s}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                </div>
+              )}
+
+              <div className="flex justify-between text-xs">
+                <span className="text-gray-500">Color:</span>
+                <span className="font-medium text-zeluxe-black">{selectedColor || '—'}</span>
+              </div>
+              <div className="mt-1.5 flex justify-between text-xs">
+                <span className="text-gray-500">Size:</span>
+                <span className="font-medium text-zeluxe-black">{selectedSize || '—'}</span>
+              </div>
+              <div className="mt-1.5 flex justify-between text-xs">
+                <span className="text-gray-500">Price:</span>
+                <span className="font-bold text-zeluxe-black">Tk {product.resellerPrice.toLocaleString()}</span>
+              </div>
+              <div className="mt-1.5 flex justify-between text-xs">
+                <span className="text-gray-500">Customer / Retail Price:</span>
+                <span className="font-bold text-zeluxe-gold">Tk {product.suggestedPrice.toLocaleString()}</span>
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">আপনার বিক্রয় মূল্য (Tk)</label>
+              <input
+                type="text"
+                inputMode="numeric"
+                value={sellingPrice}
+                onChange={(e) => setSellingPrice(e.target.value.replace(/[^0-9]/g, ''))}
+                className="w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                আপনার ক্রয় মূল্য: <span className="font-bold text-zeluxe-black">Tk {product.resellerPrice}</span>
               </p>
+            </div>
 
-              <div className="mt-4 rounded-md border border-zeluxe-lightgray bg-zeluxe-cream p-4">
-                <label className="mb-2 block text-xs font-medium text-gray-600">
-                  Variation & Price:
-                </label>
-
-                {product.colors.length > 0 && (
-                  <div className="relative mb-3">
-                    <select
-                      value={selectedColor}
-                      onChange={(e) => setSelectedColor(e.target.value)}
-                      className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-3 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
-                    >
-                      {product.colors.map((c) => (
-                        <option key={c} value={c}>Color: {c}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  </div>
-                )}
-
-                {product.sizes.length > 0 && (
-                  <div className="relative mb-3">
-                    <select
-                      value={selectedSize}
-                      onChange={(e) => setSelectedSize(e.target.value)}
-                      className="w-full appearance-none rounded-md border border-zeluxe-lightgray bg-white px-3 py-2.5 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
-                    >
-                      {product.sizes.map((s) => (
-                        <option key={s} value={s}>Size: {s}</option>
-                      ))}
-                    </select>
-                    <ChevronDown size={16} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                  </div>
-                )}
-
-                <div className="flex justify-between text-xs">
-                  <span className="text-gray-500">Color:</span>
-                  <span className="font-medium text-zeluxe-black">{selectedColor || '—'}</span>
-                </div>
-                <div className="mt-1.5 flex justify-between text-xs">
-                  <span className="text-gray-500">Size:</span>
-                  <span className="font-medium text-zeluxe-black">{selectedSize || '—'}</span>
-                </div>
-                <div className="mt-1.5 flex justify-between text-xs">
-                  <span className="text-gray-500">Price:</span>
-                  <span className="font-bold text-zeluxe-black">Tk {product.resellerPrice.toLocaleString()}</span>
-                </div>
-                <div className="mt-1.5 flex justify-between text-xs">
-                  <span className="text-gray-500">Customer / Retail Price:</span>
-                  <span className="font-bold text-zeluxe-gold">Tk {product.suggestedPrice.toLocaleString()}</span>
-                </div>
-              </div>
-
-              <div className="mt-4">
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">আপনার বিক্রয় মূল্য (Tk)</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={sellingPrice}
-                  onChange={(e) => setSellingPrice(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black focus:border-zeluxe-gold focus:outline-none"
-                />
-                <p className="mt-1 text-[11px] text-gray-500">
-                  আপনার ক্রয় মূল্য: <span className="font-bold text-zeluxe-black">Tk {product.resellerPrice}</span>
-                </p>
-              </div>
-
-              <div className="mt-4">
-                <div className="mb-3 flex items-center gap-2">
-                  <span className="text-sm font-medium text-zeluxe-black">পরিমাণ:</span>
-                  <div className="flex items-center rounded-md border border-zeluxe-lightgray bg-white">
-                    <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="p-2 text-zeluxe-black transition hover:bg-zeluxe-cream">
-                      <Minus size={16} />
-                    </button>
-                    <span className="min-w-[32px] text-center text-sm font-bold text-zeluxe-black">{quantity}</span>
-                    <button type="button" onClick={() => setQuantity((q) => q + 1)} className="p-2 text-zeluxe-black transition hover:bg-zeluxe-cream">
-                      <Plus size={16} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  <button
-                    onClick={handleAddToCart}
-                    disabled={product.stock === 0}
-                    className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-black bg-white py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 disabled:opacity-50"
-                  >
-                    <ShoppingCart size={16} />
-                    Add to Cart
+            <div className="mt-4">
+              <div className="mb-3 flex items-center gap-2">
+                <span className="text-sm font-medium text-zeluxe-black">পরিমাণ:</span>
+                <div className="flex items-center rounded-md border border-zeluxe-lightgray bg-white">
+                  <button type="button" onClick={() => setQuantity((q) => Math.max(1, q - 1))} className="p-2 text-zeluxe-black transition hover:bg-zeluxe-cream">
+                    <Minus size={16} />
                   </button>
-                  <button
-                    onClick={() => {
-                      setOrderModalOpen(true);
-                    }}
-                    disabled={product.stock === 0}
-                    className="flex items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
-                  >
-                    <Package size={16} />
-                    Order Now
+                  <span className="min-w-[32px] text-center text-sm font-bold text-zeluxe-black">{quantity}</span>
+                  <button type="button" onClick={() => setQuantity((q) => q + 1)} className="p-2 text-zeluxe-black transition hover:bg-zeluxe-cream">
+                    <Plus size={16} />
                   </button>
                 </div>
               </div>
 
-              <div className="mt-3">
-                <button onClick={handleCopyDetails} className="w-full flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold">
-                  {copied ? <><Check size={14} className="text-green-600" /> কপি হয়েছে</> : <><Copy size={14} /> Copy Details</>}
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <button
+                  onClick={handleAddToCart}
+                  disabled={product.stock === 0}
+                  className="flex items-center justify-center gap-2 rounded-md border border-zeluxe-black bg-white py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 disabled:opacity-50"
+                >
+                  <ShoppingCart size={16} />
+                  Add to Cart
+                </button>
+                <button
+                  onClick={() => {
+                    setOrderModalOpen(true);
+                  }}
+                  disabled={product.stock === 0}
+                  className="flex items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
+                >
+                  <Package size={16} />
+                  Order Now
                 </button>
               </div>
+            </div>
 
-              <div className="mt-6">
-                <h3 className="mb-2 text-sm font-bold text-zeluxe-black">Description</h3>
-                <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{product.description || 'প্রোডাক্টের কোনো বিবরণ নেই।'}</p>
-              </div>
+            <div className="mt-3">
+              <button onClick={handleCopyDetails} className="w-full flex items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold">
+                {copied ? <><Check size={14} className="text-green-600" /> কপি হয়েছে</> : <><Copy size={14} /> Copy Details</>}
+              </button>
+            </div>
+
+            <div className="mt-6">
+              <h3 className="mb-2 text-sm font-bold text-zeluxe-black">Description</h3>
+              <p className="text-sm leading-relaxed text-gray-700 whitespace-pre-wrap">{product.description || 'প্রোডাক্টের কোনো বিবরণ নেই।'}</p>
             </div>
           </div>
         </div>
-
-        {relatedProducts.length > 0 && (
-          <div className="mt-8">
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">Related Products</h2>
-            <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-              {relatedProducts.map((rp) => (
-                <Link key={rp.id} to={`/products/${rp.id}`} className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold">
-                  <div className="aspect-square bg-zeluxe-cream">
-                    {rp.imageUrl ? <img src={rp.imageUrl} alt={rp.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-10 w-10 text-gray-300" /></div>}
-                  </div>
-                  <div className="p-3">
-                    <p className="line-clamp-2 text-xs font-bold text-zeluxe-black">{rp.name}</p>
-                    <p className="mt-1.5 text-[11px] text-gray-500">Price: <span className="font-bold text-zeluxe-black">Tk {rp.resellerPrice.toLocaleString()}</span></p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
+
+      {relatedProducts.length > 0 && (
+        <div className="mt-8">
+          <h2 className="mb-4 text-lg font-bold text-zeluxe-black">Related Products</h2>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            {relatedProducts.map((rp) => (
+              <Link key={rp.id} to={`/products/${rp.id}`} className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold">
+                <div className="aspect-square bg-zeluxe-cream">
+                  {rp.imageUrl ? <img src={rp.imageUrl} alt={rp.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center"><Package className="h-10 w-10 text-gray-300" /></div>}
+                </div>
+                <div className="p-3">
+                  <p className="line-clamp-2 text-xs font-bold text-zeluxe-black">{rp.name}</p>
+                  <p className="mt-1.5 text-[11px] text-gray-500">Price: <span className="font-bold text-zeluxe-black">Tk {rp.resellerPrice.toLocaleString()}</span></p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ═══ ফ্লোটিং কার্ট বাটন ═══ */}
       {cartCount > 0 && (
@@ -717,6 +710,6 @@ export default function ProductDetail() {
           </div>
         </div>
       )}
-    </Layout>
+    </div>
   );
 }
