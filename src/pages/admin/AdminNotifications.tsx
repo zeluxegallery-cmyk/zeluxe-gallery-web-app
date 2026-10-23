@@ -11,7 +11,6 @@ import {
 } from 'firebase/firestore';
 import { Bell, Loader2, Send } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
 type Reseller = {
@@ -149,18 +148,17 @@ export default function AdminNotifications() {
     }
   };
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
-        </div>
-      </AdminLayout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
+      </div>
     );
   }
 
   return (
-    <AdminLayout>
+    <>
       <h1 className="mb-6 text-2xl font-bold text-zeluxe-black">নোটিফিকেশন পাঠান</h1>
 
       {/* Send form */}
@@ -257,6 +255,6 @@ export default function AdminNotifications() {
           No notifications sent yet.
         </div>
       )}
-    </AdminLayout>
+    </>
   );
 }
