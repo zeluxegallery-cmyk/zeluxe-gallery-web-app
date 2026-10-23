@@ -20,7 +20,7 @@ import {
   X,
   BellOff,
 } from 'lucide-react';
-import Layout from '../components/Layout';
+// ═══ Layout ইমপোর্ট মুছে ফেলা হয়েছে ═══
 import { auth, db } from '../firebase';
 import {
   getReferralStats,
@@ -333,377 +333,375 @@ export default function ResellerDashboard() {
   const bonusPercent = Math.round((bonusProgress / WELCOME_BONUS_TARGET) * 100);
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  // ═══ লোডিং অবস্থায় Layout ট্যাগ বাদ দেওয়া হয়েছে ═══
   if (loading) {
     return (
-      <Layout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </Layout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-2xl pb-10">
-        
-        {/* ═══ PREMIUM HEADER WITH NOTIFICATIONS ═══ */}
-        <div className="mb-5 flex items-start justify-between gap-3">
-          <div>
-            <h1 className="text-xl font-bold text-zeluxe-black capitalize leading-snug break-words">
-              স্বাগতম, {resellerName}
-            </h1>
-            <p className="mt-1 text-xs text-gray-500">
-              আজকের ব্যবসার আপডেট দেখুন
-            </p>
-          </div>
-          
-          {/* বেল আইকন বাটন */}
-          <button 
-            onClick={handleOpenNotifications}
-            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-card border border-gray-50 text-zeluxe-black transition hover:-translate-y-0.5 hover:text-zeluxe-gold"
-          >
-            <Bell size={20} />
-            {unreadCount > 0 && (
-              <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white"></span>
-              </span>
-            )}
-          </button>
-        </div>
-
-        {/* ═══ TODAY'S SNAPSHOT ═══ */}
-        {(stats.todayOrders > 0 || stats.todaySales > 0) && (
-          <div className="mb-4 rounded-xl bg-white p-3 shadow-card border border-gray-50 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles size={14} className="text-zeluxe-gold" />
-              <span className="text-[11px] font-bold uppercase tracking-widest text-zeluxe-gold">
-                আজকের হিসাব
-              </span>
-            </div>
-            <div className="flex items-center gap-3 text-xs font-number">
-              <span className="text-gray-500">{stats.todayOrders}টি অর্ডার</span>
-              <span className="font-bold text-zeluxe-black">Tk {stats.todaySales.toLocaleString()}</span>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ WELCOME BONUS ═══ */}
-        {bonusAchieved ? (
-          <div className="mb-5 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-5 shadow-card border border-green-100">
-            <div className="flex items-start gap-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500 shadow-sm">
-                <CheckCircle className="text-white" size={24} />
-              </span>
-              <div className="flex-1">
-                <p className="text-xs font-bold uppercase tracking-widest text-green-700">
-                  Welcome Bonus Unlocked
-                </p>
-                <p className="mt-1 text-lg font-bold text-green-900 font-number">
-                  Tk {WELCOME_BONUS_AMOUNT} বোনাস পেয়েছেন
-                </p>
-                <p className="mt-0.5 text-xs text-green-700">
-                  প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার সফলভাবে ডেলিভার হয়েছে
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : bonusDaysLeft > 0 && bonusStartDate > 0 ? (
-          <div className="mb-5 rounded-2xl bg-zeluxe-black p-5 text-white shadow-card">
-            <div className="flex items-start gap-4">
-              <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold/20">
-                <Gift className="text-zeluxe-gold" size={22} />
-              </span>
-              <div className="flex-1">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs font-bold uppercase tracking-widest text-zeluxe-gold">
-                      Welcome Bonus
-                    </p>
-                    <p className="mt-1 text-sm font-medium text-white">
-                      প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার ডেলিভার করলেই বোনাস
-                    </p>
-                  </div>
-                  <p className="shrink-0 text-xl font-bold text-zeluxe-gold font-number">
-                    Tk {WELCOME_BONUS_AMOUNT}
-                  </p>
-                </div>
-
-                <div className="mt-4">
-                  <div className="flex items-center justify-between text-xs font-number">
-                    <span className="text-gray-300">
-                      {bonusProgress}/{WELCOME_BONUS_TARGET} সম্পন্ন
-                    </span>
-                    <span className="font-bold text-zeluxe-gold">
-                      {bonusPercent}%
-                    </span>
-                  </div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                    <div
-                      className="h-full bg-zeluxe-gold transition-all duration-500"
-                      style={{ width: `${bonusPercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-xs font-number">
-                  <span className="text-gray-400">
-                    শুরু: {formatDate(bonusStartDate)}
-                  </span>
-                  <span className="text-zeluxe-gold">
-                    বাকি <strong>{bonusDaysLeft} দিন</strong>
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* ═══ BALANCE ═══ */}
-        <div className="mb-5 rounded-2xl bg-white p-5 shadow-card border border-gray-50">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zeluxe-gold/10">
-                  <Wallet size={14} className="text-zeluxe-gold" />
-                </span>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                  Available Balance
-                </p>
-              </div>
-              <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black font-number">
-                Tk {stats.availableBalance.toLocaleString()}
-              </p>
-              
-              <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
-                  Profit: <strong className="text-zeluxe-black font-number">Tk {stats.actualProfit.toLocaleString()}</strong>
-                </span>
-                {stats.referralBonus > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
-                    Referral: <strong className="text-green-800 font-number">+Tk {stats.referralBonus.toLocaleString()}</strong>
-                  </span>
-                )}
-              </div>
-            </div>
-            <Link
-              to="/withdraw"
-              className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
-            >
-              Withdraw
-              <ArrowRight size={12} />
-            </Link>
-          </div>
-        </div>
-
-        {/* ═══ QUICK ACTIONS ═══ */}
-        <div className="mb-6">
-          <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            Quick Actions
+    // ═══ মেইন রিটার্ন থেকেও Layout ট্যাগ বাদ দেওয়া হয়েছে ═══
+    <div className="mx-auto max-w-2xl pb-10">
+      
+      {/* ═══ PREMIUM HEADER WITH NOTIFICATIONS ═══ */}
+      <div className="mb-5 flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-zeluxe-black capitalize leading-snug break-words">
+            স্বাগতম, {resellerName}
+          </h1>
+          <p className="mt-1 text-xs text-gray-500">
+            আজকের ব্যবসার আপডেট দেখুন
           </p>
-          <div className="grid grid-cols-4 gap-2.5">
-            {[
-              { label: 'প্রোডাক্ট', path: '/products', icon: Package },
-              { label: 'নতুন অর্ডার', path: '/orders/new', icon: Plus },
-              { label: 'আর্নিংস', path: '/earnings', icon: BarChart3 },
-              { label: 'সাপোর্ট', path: '/support', icon: Headphones },
-            ].map(({ label, path, icon: Icon }) => (
-              <Link
-                key={path}
-                to={path}
-                className="group flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition-all hover:-translate-y-0.5 hover:shadow-md"
-              >
-                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-cream transition group-hover:bg-zeluxe-gold/20">
-                  <Icon className="text-zeluxe-gold" size={18} />
-                </span>
-                <span className="text-center text-[10px] font-bold text-zeluxe-black">
-                  {label}
-                </span>
-              </Link>
-            ))}
+        </div>
+        
+        {/* বেল আইকন বাটন */}
+        <button 
+          onClick={handleOpenNotifications}
+          className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-card border border-gray-50 text-zeluxe-black transition hover:-translate-y-0.5 hover:text-zeluxe-gold"
+        >
+          <Bell size={20} />
+          {unreadCount > 0 && (
+            <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-white"></span>
+            </span>
+          )}
+        </button>
+      </div>
+
+      {/* ═══ TODAY'S SNAPSHOT ═══ */}
+      {(stats.todayOrders > 0 || stats.todaySales > 0) && (
+        <div className="mb-4 rounded-xl bg-white p-3 shadow-card border border-gray-50 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} className="text-zeluxe-gold" />
+            <span className="text-[11px] font-bold uppercase tracking-widest text-zeluxe-gold">
+              আজকের হিসাব
+            </span>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-number">
+            <span className="text-gray-500">{stats.todayOrders}টি অর্ডার</span>
+            <span className="font-bold text-zeluxe-black">Tk {stats.todaySales.toLocaleString()}</span>
           </div>
         </div>
+      )}
 
-        {/* ═══ MY PROGRESS ═══ */}
-        <div className="mb-6">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-              My Progress
-            </p>
-            <Link to="/earnings" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
-              বিস্তারিত <ChevronRight size={12} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2.5">
-            <Link to="/orders" className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:shadow-md flex flex-col items-center justify-center text-center">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-2">
-                <ShoppingBag size={16} />
-              </div>
-              <p className="text-lg font-bold tracking-tight text-zeluxe-black font-number">
-                {stats.totalOrders}
-              </p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Orders</p>
-            </Link>
-
-            <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 mb-2">
-                <TrendingUp size={16} />
-              </div>
-              <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
-                Tk {stats.totalSales > 9999 ? (stats.totalSales / 1000).toFixed(1) + 'k' : stats.totalSales.toLocaleString()}
-              </p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Sales</p>
-            </div>
-
-            <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
-              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10 text-zeluxe-gold mb-2">
-                <Wallet size={16} />
-              </div>
-              <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
-                Tk {stats.actualProfit > 9999 ? (stats.actualProfit / 1000).toFixed(1) + 'k' : stats.actualProfit.toLocaleString()}
-              </p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Profit</p>
-            </div>
-          </div>
-        </div>
-
-        {/* ═══ FEATURED PRODUCTS ═══ */}
-        {featuredProducts.length > 0 && (
-          <div className="mb-6">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                Featured Products
-              </p>
-              <Link to="/products" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
-                সব দেখুন <ChevronRight size={12} />
-              </Link>
-            </div>
-
-            <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-2 snap-x hide-scrollbar">
-              {featuredProducts.map((product) => (
-                <Link
-                  key={product.id}
-                  to={`/products/${product.id}`}
-                  className="min-w-[130px] snap-start overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="aspect-square bg-zeluxe-cream">
-                    <img
-                      src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_300/') : product.imageUrl}
-                      alt={product.name}
-                      loading="lazy"
-                      className="h-full w-full object-cover"
-                    />
-                  </div>
-                  <div className="p-2.5">
-                    <p className="line-clamp-2 text-[11px] font-bold text-zeluxe-black leading-tight">
-                      {product.name}
-                    </p>
-                    <p className="mt-1 text-[12px] font-bold text-zeluxe-gold font-number">
-                      Tk {product.resellerPrice.toLocaleString()}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* ═══ REFER & EARN ═══ */}
-        {referralInfo && referralInfo.referralCode && (
-          <Link
-            to="/refer"
-            className="mb-6 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 shadow-card border border-zeluxe-gold/20 transition hover:border-zeluxe-gold"
-          >
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
-              <Users className="text-zeluxe-black" size={18} />
+      {/* ═══ WELCOME BONUS ═══ */}
+      {bonusAchieved ? (
+        <div className="mb-5 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-5 shadow-card border border-green-100">
+          <div className="flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500 shadow-sm">
+              <CheckCircle className="text-white" size={24} />
             </span>
             <div className="flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
-                Refer & Earn
+              <p className="text-xs font-bold uppercase tracking-widest text-green-700">
+                Welcome Bonus Unlocked
               </p>
-              <p className="mt-0.5 text-xs font-bold text-zeluxe-black">
-                বন্ধুকে রিসেলার বানান, Tk {REFERRAL_BONUS_AMOUNT} পান
+              <p className="mt-1 text-lg font-bold text-green-900 font-number">
+                Tk {WELCOME_BONUS_AMOUNT} বোনাস পেয়েছেন
               </p>
-              <div className="mt-1 flex items-center gap-2 text-[10px] font-number">
-                <span className="text-gray-600">
-                  {referralInfo.referralCount}টি referral
+              <p className="mt-0.5 text-xs text-green-700">
+                প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার সফলভাবে ডেলিভার হয়েছে
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : bonusDaysLeft > 0 && bonusStartDate > 0 ? (
+        <div className="mb-5 rounded-2xl bg-zeluxe-black p-5 text-white shadow-card">
+          <div className="flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold/20">
+              <Gift className="text-zeluxe-gold" size={22} />
+            </span>
+            <div className="flex-1">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest text-zeluxe-gold">
+                    Welcome Bonus
+                  </p>
+                  <p className="mt-1 text-sm font-medium text-white">
+                    প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার ডেলিভার করলেই বোনাস
+                  </p>
+                </div>
+                <p className="shrink-0 text-xl font-bold text-zeluxe-gold font-number">
+                  Tk {WELCOME_BONUS_AMOUNT}
+                </p>
+              </div>
+
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-xs font-number">
+                  <span className="text-gray-300">
+                    {bonusProgress}/{WELCOME_BONUS_TARGET} সম্পন্ন
+                  </span>
+                  <span className="font-bold text-zeluxe-gold">
+                    {bonusPercent}%
+                  </span>
+                </div>
+                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full bg-zeluxe-gold transition-all duration-500"
+                    style={{ width: `${bonusPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-white/10 pt-3 text-xs font-number">
+                <span className="text-gray-400">
+                  শুরু: {formatDate(bonusStartDate)}
                 </span>
-                <span className="font-bold text-green-600">
-                  Tk {referralInfo.referralBonusEarned.toLocaleString()} earned
+                <span className="text-zeluxe-gold">
+                  বাকি <strong>{bonusDaysLeft} দিন</strong>
                 </span>
               </div>
             </div>
-            <ArrowRight size={16} className="shrink-0 text-zeluxe-gold" />
-          </Link>
-        )}
+          </div>
+        </div>
+      ) : null}
 
-        {/* ═══ RECENT ORDERS ═══ */}
-        <section>
+      {/* ═══ BALANCE ═══ */}
+      <div className="mb-5 rounded-2xl bg-white p-5 shadow-card border border-gray-50">
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zeluxe-gold/10">
+                <Wallet size={14} className="text-zeluxe-gold" />
+              </span>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                Available Balance
+              </p>
+            </div>
+            <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black font-number">
+              Tk {stats.availableBalance.toLocaleString()}
+            </p>
+            
+            <div className="mt-2.5 flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
+                Profit: <strong className="text-zeluxe-black font-number">Tk {stats.actualProfit.toLocaleString()}</strong>
+              </span>
+              {stats.referralBonus > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
+                  Referral: <strong className="text-green-800 font-number">+Tk {stats.referralBonus.toLocaleString()}</strong>
+                </span>
+              )}
+            </div>
+          </div>
+          <Link
+            to="/withdraw"
+            className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
+          >
+            Withdraw
+            <ArrowRight size={12} />
+          </Link>
+        </div>
+      </div>
+
+      {/* ═══ QUICK ACTIONS ═══ */}
+      <div className="mb-6">
+        <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+          Quick Actions
+        </p>
+        <div className="grid grid-cols-4 gap-2.5">
+          {[
+            { label: 'প্রোডাক্ট', path: '/products', icon: Package },
+            { label: 'নতুন অর্ডার', path: '/orders/new', icon: Plus },
+            { label: 'আর্নিংস', path: '/earnings', icon: BarChart3 },
+            { label: 'সাপোর্ট', path: '/support', icon: Headphones },
+          ].map(({ label, path, icon: Icon }) => (
+            <Link
+              key={path}
+              to={path}
+              className="group flex flex-col items-center gap-1.5 rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition-all hover:-translate-y-0.5 hover:shadow-md"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-cream transition group-hover:bg-zeluxe-gold/20">
+                <Icon className="text-zeluxe-gold" size={18} />
+              </span>
+              <span className="text-center text-[10px] font-bold text-zeluxe-black">
+                {label}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══ MY PROGRESS ═══ */}
+      <div className="mb-6">
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            My Progress
+          </p>
+          <Link to="/earnings" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+            বিস্তারিত <ChevronRight size={12} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          <Link to="/orders" className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:shadow-md flex flex-col items-center justify-center text-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-2">
+              <ShoppingBag size={16} />
+            </div>
+            <p className="text-lg font-bold tracking-tight text-zeluxe-black font-number">
+              {stats.totalOrders}
+            </p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Orders</p>
+          </Link>
+
+          <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 mb-2">
+              <TrendingUp size={16} />
+            </div>
+            <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
+              Tk {stats.totalSales > 9999 ? (stats.totalSales / 1000).toFixed(1) + 'k' : stats.totalSales.toLocaleString()}
+            </p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Sales</p>
+          </div>
+
+          <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10 text-zeluxe-gold mb-2">
+              <Wallet size={16} />
+            </div>
+            <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
+              Tk {stats.actualProfit > 9999 ? (stats.actualProfit / 1000).toFixed(1) + 'k' : stats.actualProfit.toLocaleString()}
+            </p>
+            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Profit</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ═══ FEATURED PRODUCTS ═══ */}
+      {featuredProducts.length > 0 && (
+        <div className="mb-6">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-              Recent Orders
+              Featured Products
             </p>
-            <Link to="/orders" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+            <Link to="/products" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
               সব দেখুন <ChevronRight size={12} />
             </Link>
           </div>
 
-          {recentOrders.length > 0 ? (
-            <div className="space-y-2">
-              {recentOrders.map((order) => (
-                <Link
-                  key={order.id}
-                  to={`/orders/${order.id}`}
-                  className="block rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
-                >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-mono text-[11px] font-bold text-zeluxe-black">
-                        {order.orderId}
-                      </p>
-                      <p className="mt-0.5 truncate text-xs font-medium text-gray-700">
-                        {order.productName}
-                      </p>
-                      <div className="mt-1.5 flex items-center gap-2">
-                        <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(order.status)}`}>
-                          {getStatusLabel(order.status)}
-                        </span>
-                        <span className="text-[9px] font-medium text-gray-400">
-                          {formatDate(order.createdAt?.seconds)}
-                        </span>
-                      </div>
-                    </div>
-                    <p className="shrink-0 text-sm font-bold text-zeluxe-gold font-number">
-                      Tk {order.total.toLocaleString()}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="rounded-2xl bg-white p-6 text-center shadow-card border border-gray-50">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
-                <Package className="h-6 w-6 text-zeluxe-gold" />
-              </div>
-              <p className="mt-3 text-sm font-bold text-zeluxe-black">
-                এখনো কোনো অর্ডার নেই
-              </p>
-              <p className="mt-1 text-xs text-gray-500">
-                প্রথম অর্ডার দিলেই Welcome Bonus-এর পথে এগোবেন
-              </p>
+          <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-2 snap-x hide-scrollbar">
+            {featuredProducts.map((product) => (
               <Link
-                to="/products"
-                className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
+                key={product.id}
+                to={`/products/${product.id}`}
+                className="min-w-[130px] snap-start overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
               >
-                প্রোডাক্ট দেখুন
-                <ArrowRight size={12} />
+                <div className="aspect-square bg-zeluxe-cream">
+                  <img
+                    src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_300/') : product.imageUrl}
+                    alt={product.name}
+                    loading="lazy"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+                <div className="p-2.5">
+                  <p className="line-clamp-2 text-[11px] font-bold text-zeluxe-black leading-tight">
+                    {product.name}
+                  </p>
+                  <p className="mt-1 text-[12px] font-bold text-zeluxe-gold font-number">
+                    Tk {product.resellerPrice.toLocaleString()}
+                  </p>
+                </div>
               </Link>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ═══ REFER & EARN ═══ */}
+      {referralInfo && referralInfo.referralCode && (
+        <Link
+          to="/refer"
+          className="mb-6 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 shadow-card border border-zeluxe-gold/20 transition hover:border-zeluxe-gold"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
+            <Users className="text-zeluxe-black" size={18} />
+          </span>
+          <div className="flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
+              Refer & Earn
+            </p>
+            <p className="mt-0.5 text-xs font-bold text-zeluxe-black">
+              বন্ধুকে রিসেলার বানান, Tk {REFERRAL_BONUS_AMOUNT} পান
+            </p>
+            <div className="mt-1 flex items-center gap-2 text-[10px] font-number">
+              <span className="text-gray-600">
+                {referralInfo.referralCount}টি referral
+              </span>
+              <span className="font-bold text-green-600">
+                Tk {referralInfo.referralBonusEarned.toLocaleString()} earned
+              </span>
             </div>
-          )}
-        </section>
-      </div>
+          </div>
+          <ArrowRight size={16} className="shrink-0 text-zeluxe-gold" />
+        </Link>
+      )}
+
+      {/* ═══ RECENT ORDERS ═══ */}
+      <section>
+        <div className="mb-2 flex items-center justify-between">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+            Recent Orders
+          </p>
+          <Link to="/orders" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+            সব দেখুন <ChevronRight size={12} />
+          </Link>
+        </div>
+
+        {recentOrders.length > 0 ? (
+          <div className="space-y-2">
+            {recentOrders.map((order) => (
+              <Link
+                key={order.id}
+                to={`/orders/${order.id}`}
+                className="block rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-mono text-[11px] font-bold text-zeluxe-black">
+                      {order.orderId}
+                    </p>
+                    <p className="mt-0.5 truncate text-xs font-medium text-gray-700">
+                      {order.productName}
+                    </p>
+                    <div className="mt-1.5 flex items-center gap-2">
+                      <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(order.status)}`}>
+                        {getStatusLabel(order.status)}
+                      </span>
+                      <span className="text-[9px] font-medium text-gray-400">
+                        {formatDate(order.createdAt?.seconds)}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="shrink-0 text-sm font-bold text-zeluxe-gold font-number">
+                    Tk {order.total.toLocaleString()}
+                  </p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-2xl bg-white p-6 text-center shadow-card border border-gray-50">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
+              <Package className="h-6 w-6 text-zeluxe-gold" />
+            </div>
+            <p className="mt-3 text-sm font-bold text-zeluxe-black">
+              এখনো কোনো অর্ডার নেই
+            </p>
+            <p className="mt-1 text-xs text-gray-500">
+              প্রথম অর্ডার দিলেই Welcome Bonus-এর পথে এগোবেন
+            </p>
+            <Link
+              to="/products"
+              className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
+            >
+              প্রোডাক্ট দেখুন
+              <ArrowRight size={12} />
+            </Link>
+          </div>
+        )}
+      </section>
 
       {/* ═══ NOTIFICATION MODAL (Bottom Sheet Style) ═══ */}
       {isNotifOpen && (
@@ -761,6 +759,6 @@ export default function ResellerDashboard() {
           </div>
         </div>
       )}
-    </Layout>
+    </div>
   );
 }
