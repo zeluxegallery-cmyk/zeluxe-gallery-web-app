@@ -10,7 +10,6 @@ import {
 } from 'firebase/firestore';
 import { Eye, Loader2, Search, Trash2, UserCheck, Users, X } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
 type Reseller = {
@@ -143,18 +142,17 @@ export default function AdminResellers() {
     return matchesSearch && matchesFilter;
   });
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
-        </div>
-      </AdminLayout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
+      </div>
     );
   }
 
   return (
-    <AdminLayout>
+    <>
       <h1 className="mb-6 text-2xl font-bold text-zeluxe-black">রিসেলার ম্যানেজমেন্ট</h1>
 
       {/* Search */}
@@ -169,7 +167,7 @@ export default function AdminResellers() {
       </div>
 
       {/* Filter */}
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
         {FILTERS.map((f) => (
           <button
             key={f}
@@ -380,6 +378,6 @@ export default function AdminResellers() {
           </div>
         </div>
       )}
-    </AdminLayout>
+    </>
   );
 }
