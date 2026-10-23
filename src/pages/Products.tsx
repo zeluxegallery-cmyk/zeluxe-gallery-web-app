@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Copy, Download, Loader2, Package, Search, Check } from 'lucide-react';
+import { Copy, Download, Loader2, Package, Search, Check, X } from 'lucide-react';
 import Layout from '../components/Layout';
 import { db } from '../firebase';
 import { downloadSingleImage } from '../lib/imageDownloader';
@@ -26,6 +26,42 @@ type Category = {
   imageUrl?: string;
 };
 
+// ═══ বাংলা থেকে ইংরেজি নামের অভিধান ═══
+const categoryTranslations: Record<string, string> = {
+  'পাওয়ার ব্যাংক': 'Power Bank',
+  'পাঞ্জাবি': 'Panjabi',
+  'হিজাব': 'Hijab',
+  'গিফট আইটেম': 'Gift Items',
+  'কসমেটিক্স': 'Cosmetics',
+  'কাপল আইটেম': 'Couple Items',
+  'ব্যাগ': 'Bag',
+  'বোরকা': 'Borka',
+  'শার্ট': 'Shirt',
+  'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo Set',
+  'কিডস আইটেম': 'Kids Items',
+  'পারফিউম': 'Perfume',
+  'ইয়ারবাডস (ব্রুটুথ)': 'Earbuds',
+  'টি-শার্ট': 'T-Shirt',
+  'থ্রি-পিস': 'Three Piece',
+  'স্কিন কেয়ার': 'Skin Care',
+  'হুডি & জ্যাকেট': 'Hoodie & Jacket',
+  'শাড়ি': 'Saree',
+  'প্যান্ট & ট্রাউজার': 'Pant & Trouser',
+  'স্মার্ট ওয়াচ': 'Smart Watch',
+  'ঘড়ি': 'Watch',
+  'ড্রেস': 'Dress',
+  'খেলনা': 'Toys',
+  'বেবি ড্রেস': 'Baby Dress',
+  'হেডফোন': 'Headphone',
+  'কুর্তি': 'Kurti',
+  'ওয়েস্টার্ন ড্রেস': 'Western Dress',
+  'ইন্টেরিয়র': 'Interior',
+};
+
+const getDisplayCategoryName = (name: string) => {
+  return categoryTranslations[name] || name;
+};
+
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
 
@@ -38,11 +74,12 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
       try {
-        // ১. প্রোডাক্ট লোড
         const productsQuery = query(collection(db, 'products'), where('active', '==', true));
         const productSnap = await getDocs(productsQuery);
         const fetchedProducts: Product[] = productSnap.docs.map((productDocument) => {
@@ -69,9 +106,8 @@ export default function Products() {
         });
         setProducts(fetchedProducts);
 
-        // ২. ক্যাটাগরি লোড (ছবিসহ)
         const categorySnap = await getDocs(collection(db, 'categories'));
-        const fetchedCategories: Category[] = categorySnap.docs.map((doc) => {
+        let fetchedCategories: Category[] = categorySnap.docs.map((doc) => {
           const data = doc.data();
           return {
             id: doc.id,
@@ -79,6 +115,14 @@ export default function Products() {
             imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
           };
         });
+
+        // ═══ বর্ণানুক্রমিক (A-Z) ভাবে সাজানো হচ্ছে ═══
+        fetchedCategories.sort((a, b) => {
+          const nameA = getDisplayCategoryName(a.name).toLowerCase();
+          const nameB = getDisplayCategoryName(b.name).toLowerCase();
+          return nameA.localeCompare(nameB);
+        });
+
         setCategories(fetchedCategories);
       } finally {
         setLoading(false);
@@ -135,6 +179,8 @@ export default function Products() {
     setDownloadingId(null);
   };
 
+  const displayedCategories = categories.slice(0, 8);
+
   return (
     <Layout>
       <div className="mx-auto max-w-6xl pb-20">
@@ -161,29 +207,39 @@ export default function Products() {
           </div>
         </div>
 
-        {/* ═══ সুন্দর ক্যাটাগরি স্ক্রলার (গোল ছবি) ═══ */}
+        {/* ═══ ক্যাটাগরি স্ক্রলার (See All সহ) ═══ */}
         <div className="mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6">
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-sm font-bold text-zeluxe-black pl-1">Categories</h2>
+            <button 
+              onClick={() => setIsCategoryModalOpen(true)}
+              className="text-xs font-bold text-zeluxe-gold hover:underline pr-1"
+            >
+              See All
+            </button>
+          </div>
+          
           <div className="flex gap-4 overflow-x-auto pb-3 snap-x hide-scrollbar">
             
-            {/* "সব ক্যাটাগরি" অপশন */}
+            {/* "সব" অপশন */}
             <button
               onClick={() => setSelectedCategory('সব ক্যাটাগরি')}
-              className="flex flex-col items-center gap-2 min-w-[70px] snap-start group"
+              className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
             >
               <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === 'সব ক্যাটাগরি' ? 'border-zeluxe-gold bg-zeluxe-gold/10 shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
                 <Package size={24} className={selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-gold' : 'text-gray-400'} />
               </div>
-              <span className={`text-[11px] font-bold text-center ${selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-black' : 'text-gray-500'}`}>
-                সব
+              <span className={`text-[11px] font-bold text-center leading-tight ${selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                All
               </span>
             </button>
 
-            {/* ডাটাবেস থেকে আসা ক্যাটাগরি */}
-            {categories.map((cat) => (
+            {/* প্রথম ৮টি ক্যাটাগরি */}
+            {displayedCategories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.name)}
-                className="flex flex-col items-center gap-2 min-w-[70px] snap-start group"
+                className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
               >
                 <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name ? 'border-zeluxe-gold shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
                   {cat.imageUrl ? (
@@ -197,11 +253,12 @@ export default function Products() {
                     <Package size={24} className="text-gray-400" />
                   )}
                 </div>
-                <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight ${selectedCategory === cat.name ? 'text-zeluxe-black' : 'text-gray-500'}`}>
-                  {cat.name}
+                <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[72px] ${selectedCategory === cat.name ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                  {getDisplayCategoryName(cat.name)}
                 </span>
               </button>
             ))}
+
           </div>
         </div>
 
@@ -360,6 +417,66 @@ export default function Products() {
           </div>
         )}
       </div>
+
+      {/* ═══ ALL CATEGORIES MODAL (See All Popup) ═══ */}
+      {isCategoryModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg max-h-[85vh] rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300">
+            
+            <div className="flex items-center justify-between border-b border-gray-100 p-4 sm:p-5">
+              <h2 className="text-lg font-bold text-zeluxe-black">All Categories</h2>
+              <button 
+                onClick={() => setIsCategoryModalOpen(false)}
+                className="rounded-full p-2 bg-gray-50 text-gray-500 hover:bg-gray-100 transition"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="grid grid-cols-3 gap-y-6 gap-x-2">
+                <button
+                  onClick={() => { setSelectedCategory('সব ক্যাটাগরি'); setIsCategoryModalOpen(false); }}
+                  className="flex flex-col items-center gap-2 group"
+                >
+                  <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === 'সব ক্যাটাগরি' ? 'border-zeluxe-gold bg-zeluxe-gold/10' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
+                    <Package size={24} className={selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-gold' : 'text-gray-400'} />
+                  </div>
+                  <span className={`text-[11px] font-bold text-center leading-tight ${selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                    All
+                  </span>
+                </button>
+
+                {categories.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => { setSelectedCategory(cat.name); setIsCategoryModalOpen(false); }}
+                    className="flex flex-col items-center gap-2 group"
+                  >
+                    <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name ? 'border-zeluxe-gold' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
+                      {cat.imageUrl ? (
+                        <img 
+                          src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
+                          alt={cat.name} 
+                          loading="lazy"
+                          className="h-full w-full object-cover" 
+                        />
+                      ) : (
+                        <Package size={24} className="text-gray-400" />
+                      )}
+                    </div>
+                    <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[76px] ${selectedCategory === cat.name ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                      {getDisplayCategoryName(cat.name)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </Layout>
   );
 }
