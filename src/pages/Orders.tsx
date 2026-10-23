@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { ShoppingBag } from 'lucide-react';
-import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
 type Order = {
@@ -62,7 +61,7 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [activeFilter, setActiveFilter] = useState('All');
   const [loading, setLoading] = useState(true);
-  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT); // নতুন স্টেট
+  const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
 
   useEffect(() => {
     const loadOrders = async () => {
@@ -100,7 +99,6 @@ export default function Orders() {
     void loadOrders();
   }, []);
 
-  // ফিল্টার পরিবর্তন হলে আবার ২০টি থেকে শুরু হবে
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [activeFilter]);
@@ -110,15 +108,15 @@ export default function Orders() {
       ? orders
       : orders.filter((order) => order.status.toLowerCase() === activeFilter.toLowerCase());
 
-  // শুধুমাত্র visibleCount পরিমাণ ডাটা দেখাবে
   const displayedOrders = filteredOrders.slice(0, visibleCount);
 
   return (
-    <Layout>
+    // ═══ <Layout> সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
+    <div className="mx-auto max-w-2xl pb-10">
       <h1 className="text-2xl font-bold text-zeluxe-black">আমার অর্ডার</h1>
       <p className="mb-6 text-sm text-gray-600">আপনার সব অর্ডারের তালিকা</p>
 
-      <div className="mb-6 flex gap-2 overflow-x-auto pb-2">
+      <div className="mb-6 flex gap-2 overflow-x-auto pb-2 hide-scrollbar">
         {STATUS_FILTERS.map((filter) => (
           <button
             key={filter}
@@ -257,6 +255,6 @@ export default function Orders() {
           </button>
         </div>
       )}
-    </Layout>
+    </div>
   );
 }
