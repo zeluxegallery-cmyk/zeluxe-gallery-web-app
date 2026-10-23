@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'; // ═══ Outlet ইমপোর্ট করুন ═══
 import {
   BarChart3,
   Bell,
@@ -16,7 +16,8 @@ import {
   X,
 } from 'lucide-react';
 import { auth } from '../firebase';
-import logo from '../assets/zeluxe-logo.png';
+import LogoutModal from './LogoutModal'; // ═══ লগআউট মডাল ইমপোর্ট ═══
+import logo from '../assets/zeluxe-logo.png'; // চাইলে এখানে ক্লাউডিনারি লিংক ব্যবহার করতে পারেন
 
 type NavItem = {
   label: string;
@@ -36,22 +37,28 @@ const navItems: NavItem[] = [
   { label: 'Notifications', path: '/admin/notifications', icon: Bell },
 ];
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+export default function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
+  const [showLogout, setShowLogout] = useState(false); // ═══ নতুন স্টেট ═══
 
-  const handleLogout = async () => {
+  const confirmLogout = async () => {
+    setShowLogout(false);
     await signOut(auth);
     navigate('/login');
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  // সাব-রাউটে গেলেও যাতে অ্যাক্টিভ থাকে
+  const isActive = (path: string) => {
+    if (path === '/admin-dashboard') return location.pathname === path;
+    return location.pathname.startsWith(path);
+  };
 
   const activeItem = navItems.find((item) => isActive(item.path));
 
   return (
-    <div className="min-h-screen bg-zeluxe-fieldbg">
+    <div className="min-h-screen bg-zeluxe-cream">
       {/* Mobile header */}
       <header className="flex h-16 items-center justify-between border-b border-zeluxe-lightgray bg-white px-4 md:hidden">
         <button
@@ -61,8 +68,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         >
           <Menu className="h-6 w-6" />
         </button>
-        <img src={logo} alt="Zeluxe Admin" className="h-12 object-contain" />
-        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold text-sm font-bold text-white">
+        <img src={logo} alt="Zeluxe Admin" className="h-10 object-contain" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold text-sm font-bold text-zeluxe-black">
           A
         </div>
       </header>
@@ -83,7 +90,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         }`}
       >
         <div className="flex items-center justify-between md:block">
-          <img src={logo} alt="Zeluxe Admin" className="mx-auto my-4 h-16 object-contain" />
+          <img src={logo} alt="Zeluxe Admin" className="mx-auto my-4 h-14 object-contain" />
           <button
             onClick={() => setIsOpen(false)}
             className="mr-4 rounded-lg p-2 text-zeluxe-gray hover:bg-zeluxe-fieldbg md:hidden"
@@ -93,7 +100,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-2 overflow-y-auto px-3" aria-label="Admin navigation">
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3 pb-4" aria-label="Admin navigation">
           {navItems.map(({ label, path, icon: Icon }) => (
             <Link
               key={path}
@@ -113,7 +120,10 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         <div className="border-t border-zeluxe-lightgray p-3">
           <button
-            onClick={handleLogout}
+            onClick={() => {
+              setIsOpen(false);
+              setShowLogout(true); // ═══ মডাল ওপেন হবে ═══
+            }}
             className="flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sm font-medium text-red-600 transition hover:bg-red-50"
           >
             <LogOut className="h-5 w-5" />
@@ -127,13 +137,23 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         {/* Desktop topbar */}
         <header className="hidden items-center justify-between border-b border-zeluxe-lightgray bg-white px-8 py-4 md:flex">
           <h1 className="text-lg font-bold text-zeluxe-black">{activeItem?.label || 'Admin'}</h1>
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold text-sm font-bold text-white">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold text-sm font-bold text-zeluxe-black">
             A
           </div>
         </header>
 
-        <main className="mx-auto max-w-7xl p-5 pb-20 md:p-8 md:pb-8">{children}</main>
+        {/* ═══ MAIN CONTENT (এখানে পেজগুলো লোড হবে) ═══ */}
+        <main className="mx-auto max-w-7xl p-5 pb-20 md:p-8 md:pb-8">
+          <Outlet /> 
+        </main>
       </div>
+
+      {/* ═══ কাস্টম লগআউট মডাল ═══ */}
+      <LogoutModal
+        isOpen={showLogout}
+        onConfirm={confirmLogout}
+        onCancel={() => setShowLogout(false)}
+      />
     </div>
   );
 }
