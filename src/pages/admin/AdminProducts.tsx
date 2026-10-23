@@ -12,7 +12,6 @@ import {
 } from 'firebase/firestore';
 import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2, Palette, Ruler, Link as LinkIcon } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
 
@@ -427,8 +426,32 @@ export default function AdminProducts() {
   const inputClass =
     'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none';
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
+  if (loading) {
+    return (
+      <div className="space-y-4">
+        <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
+          <div className="bg-zeluxe-cream px-4 py-3">
+            <div className="h-4 w-1/4 animate-pulse rounded bg-gray-300"></div>
+          </div>
+          <div className="divide-y divide-zeluxe-lightgray">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center justify-between px-4 py-4 animate-pulse">
+                <div className="h-10 w-10 rounded-md bg-gray-200"></div>
+                <div className="h-4 w-1/4 rounded bg-gray-200"></div>
+                <div className="h-4 w-20 rounded bg-gray-200"></div>
+                <div className="h-4 w-16 rounded bg-gray-200"></div>
+                <div className="h-4 w-10 rounded bg-gray-200"></div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <AdminLayout>
+    <>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-bold text-zeluxe-black">প্রোডাক্ট ম্যানেজমেন্ট</h1>
         <button onClick={openAdd} className="rounded-md bg-zeluxe-black px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800">
@@ -458,27 +481,7 @@ export default function AdminProducts() {
         </select>
       </div>
 
-      {/* ═══ SKELETON LOADING ═══ */}
-      {loading ? (
-        <div className="space-y-4">
-          <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
-            <div className="bg-zeluxe-cream px-4 py-3">
-              <div className="h-4 w-1/4 animate-pulse rounded bg-gray-300"></div>
-            </div>
-            <div className="divide-y divide-zeluxe-lightgray">
-              {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="flex items-center justify-between px-4 py-4 animate-pulse">
-                  <div className="h-10 w-10 rounded-md bg-gray-200"></div>
-                  <div className="h-4 w-1/4 rounded bg-gray-200"></div>
-                  <div className="h-4 w-20 rounded bg-gray-200"></div>
-                  <div className="h-4 w-16 rounded bg-gray-200"></div>
-                  <div className="h-4 w-10 rounded bg-gray-200"></div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : displayedProducts.length > 0 ? (
+      {displayedProducts.length > 0 ? (
         <>
           {/* Desktop table */}
           <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
@@ -862,6 +865,6 @@ export default function AdminProducts() {
           </div>
         </div>
       )}
-    </AdminLayout>
+    </>
   );
 }
