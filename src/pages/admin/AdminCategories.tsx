@@ -14,7 +14,6 @@ import {
 } from 'firebase/firestore';
 import { FolderTree, Loader2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
 
@@ -147,7 +146,6 @@ export default function AdminCategories() {
   };
 
   const openEdit = (cat: Category) => {
-    // এডিট করার সময় আমরা সরাসরি ডাটাবেসের নামটাই দেখাবো, যাতে কনফিউশন না হয়
     setForm({ name: cat.name, imageUrl: cat.imageUrl });
     setEditingId(cat.id);
     setModalOpen(true);
@@ -181,36 +179,30 @@ export default function AdminCategories() {
       };
 
       if (editingId) {
-        // ১. আগের নামটি বের করা
         const catRef = doc(db, 'categories', editingId);
         const catSnap = await getDoc(catRef);
         
         if (catSnap.exists()) {
           const oldName = catSnap.data().name;
 
-          // ২. যদি নাম পরিবর্তন করা হয়, তবে প্রোডাক্টগুলোও আপডেট করা
           if (oldName !== newName) {
             const productsQuery = query(collection(db, 'products'), where('category', '==', oldName));
             const productSnap = await getDocs(productsQuery);
 
             if (!productSnap.empty) {
               const batch = writeBatch(db);
-              // সব প্রোডাক্টের ক্যাটাগরি নতুন নামে আপডেট হবে
               productSnap.docs.forEach((pDoc) => {
                 batch.update(doc(db, 'products', pDoc.id), { category: newName });
               });
-              // ক্যাটাগরি কালেকশনেও নতুন নাম সেভ হবে
               batch.update(catRef, payload);
               
               await batch.commit();
               toast.success('✓ ক্যাটাগরি এবং এর অধীনে থাকা সব প্রোডাক্টের নাম আপডেট হয়েছে!');
             } else {
-              // কোনো প্রোডাক্ট না থাকলে শুধু ক্যাটাগরি আপডেট হবে
               await updateDoc(catRef, payload);
               toast.success('✓ ক্যাটাগরি আপডেট হয়েছে!');
             }
           } else {
-            // নাম পরিবর্তন না হলে শুধু ছবি বা অন্যান্য আপডেট হবে
             await updateDoc(catRef, payload);
             toast.success('✓ ক্যাটাগরি আপডেট হয়েছে!');
           }
@@ -242,18 +234,17 @@ export default function AdminCategories() {
     }
   };
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
-        </div>
-      </AdminLayout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" aria-label="Loading" />
+      </div>
     );
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-zeluxe-black">ক্যাটাগরি ম্যানেজমেন্ট</h1>
         <button
@@ -285,7 +276,6 @@ export default function AdminCategories() {
                   </span>
                 )}
                 <div>
-                  {/* এখানে শুধু ইংরেজি নামটি দেখাবে */}
                   <p className="font-bold text-zeluxe-black">{getDisplayCategoryName(cat.name)}</p>
                   <p className="text-xs text-gray-500">{cat.productCount} products</p>
                 </div>
@@ -424,6 +414,6 @@ export default function AdminCategories() {
           </div>
         </div>
       )}
-    </AdminLayout>
+    </>
   );
 }
