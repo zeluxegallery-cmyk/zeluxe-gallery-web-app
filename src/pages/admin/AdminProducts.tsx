@@ -75,16 +75,82 @@ const MAX_IMAGES = 5;
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
 
+// ═══ আপনার দেওয়া নির্দিষ্ট সিরিয়াল (Custom Order) ═══
+const customOrder = [
+  'T-Shirt', '3 Piece', 'Panjabi', 'Polo Shirt', 'Gadget', 'Watch',
+  'Airpods', 'Hoodie', 'Sharee', '2 Piece', 'Baby Fashion', 'Borka',
+  'Hijab', 'Smart Watch', 'Neckband', 'Microphone', 'Pant', 'Shirt'
+];
+
+// ═══ বাংলা থেকে ইংরেজি নামের অভিধান ═══
+const categoryTranslations: Record<string, string> = {
+  'পাওয়ার ব্যাংক': 'Power Bank',
+  'পাঞ্জাবি': 'Panjabi',
+  'হিজাব': 'Hijab',
+  'গিফট আইটেম': 'Gift Items',
+  'কসমেটিক্স': 'Cosmetics',
+  'কাপল আইটেম': 'Couple Items',
+  'ব্যাগ': 'Bag',
+  'বোরকা': 'Borka',
+  'শার্ট': 'Shirt',
+  'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo',
+  'কিডস আইটেম': 'Kids Items',
+  'পারফিউম': 'Perfume',
+  'ইয়ারবাডস (ব্রুটুথ)': 'Airpods',
+  'টি-শার্ট': 'T-Shirt',
+  'থ্রি-পিস': '3 Piece',
+  'স্কিন কেয়ার': 'Skin Care',
+  'হুডি & জ্যাকেট': 'Hoodie',
+  'শাড়ি': 'Sharee',
+  'প্যান্ট & ট্রাউজার': 'Pant',
+  'স্মার্ট ওয়াচ': 'Smart Watch',
+  'ঘড়ি': 'Watch',
+  'ড্রেস': 'Dress',
+  'খেলনা': 'Toys',
+  'বেবি ড্রেস': 'Baby Fashion',
+  'হেডফোন': 'Headphone',
+  'কুর্তি': 'Kurti',
+  'ওয়েস্টার্ন ড্রেস': 'Western Dress',
+  'ইন্টেরিয়র': 'Interior',
+};
+
+const getDisplayCategoryName = (name: string) => {
+  return categoryTranslations[name] || name;
+};
+
+const getOrderIndex = (name: string) => {
+  const index = customOrder.indexOf(name);
+  return index === -1 ? 9999 : index;
+};
+
+// ═══ SKU জেনারেট করার কোড (ইংরেজি ও বাংলা দুই ভাবেই কাজ করবে) ═══
 const CATEGORY_CODES: Record<string, string> = {
-  'শার্ট': 'SHT', 'টি-শার্ট': 'TSH', 'পাঞ্জাবি': 'PNJ',
-  'প্যান্ট & ট্রাউজার': 'PNT', 'হুডি & জ্যাকেট': 'HDJ',
-  'শাড়ি': 'SAR', 'থ্রি-পিস': 'TPS', 'কুর্তি': 'KRT',
-  'বোরকা': 'BRK', 'হিজাব': 'HJB', 'বেবি ড্রেস': 'BBD',
-  'কিডস আইটেম': 'KID', 'খেলনা': 'TOY', 'ঘড়ি': 'WAT',
-  'স্মার্ট ওয়াচ': 'SWT', 'হেডফোন': 'HDP', 'পাওয়ার ব্যাংক': 'PWB',
-  'কসমেটিক্স': 'CSM', 'স্কিন কেয়ার': 'SKC', 'পারফিউম': 'PRF',
-  'ব্যাগ': 'BAG', 'কাপল আইটেম': 'CPL', 'গিফট আইটেম': 'GFT',
-  'ওয়েস্টার্ন ড্রেস': 'WDR', 'ইন্টেরিয়র': 'INT',
+  'শার্ট': 'SHT', 'Shirt': 'SHT', 
+  'টি-শার্ট': 'TSH', 'T-Shirt': 'TSH', 
+  'পাঞ্জাবি': 'PNJ', 'Panjabi': 'PNJ',
+  'প্যান্ট & ট্রাউজার': 'PNT', 'Pant': 'PNT',
+  'হুডি & জ্যাকেট': 'HDJ', 'Hoodie': 'HDJ',
+  'শাড়ি': 'SAR', 'Sharee': 'SAR',
+  'থ্রি-পিস': 'TPS', '3 Piece': 'TPS',
+  'কুর্তি': 'KRT',
+  'বোরকা': 'BRK', 'Borka': 'BRK', 
+  'হিজাব': 'HJB', 'Hijab': 'HJB', 
+  'বেবি ড্রেস': 'BBD', 'Baby Fashion': 'BBD',
+  'কিডস আইটেম': 'KID', 'Kids Items': 'KID',
+  'খেলনা': 'TOY',
+  'ঘড়ি': 'WAT', 'Watch': 'WAT',
+  'স্মার্ট ওয়াচ': 'SWT', 'Smart Watch': 'SWT',
+  'হেডফোন': 'HDP', 'Headphone': 'HDP',
+  'ইয়ারবাডস (ব্রুটুথ)': 'HDP', 'Airpods': 'HDP',
+  'পাওয়ার ব্যাংক': 'PWB', 'Power Bank': 'PWB',
+  'কসমেটিক্স': 'CSM', 'Cosmetics': 'CSM',
+  'স্কিন কেয়ার': 'SKC', 'Skin Care': 'SKC',
+  'পারফিউম': 'PRF', 'Perfume': 'PRF',
+  'ব্যাগ': 'BAG', 'Bag': 'BAG',
+  'কাপল আইটেম': 'CPL', 'Couple Items': 'CPL',
+  'গিফট আইটেম': 'GFT', 'Gift Items': 'GFT',
+  'ওয়েস্টার্ন ড্রেস': 'WDR', 'Western Dress': 'WDR',
+  'ইন্টেরিয়র': 'INT', 'Interior': 'INT',
 };
 
 export default function AdminProducts() {
@@ -109,6 +175,7 @@ export default function AdminProducts() {
         getDocs(query(collection(db, 'products'), orderBy('name'))),
         getDocs(collection(db, 'categories')),
       ]);
+      
       setProducts(
         productSnap.docs.map((productDoc) => {
           const data = productDoc.data();
@@ -144,12 +211,23 @@ export default function AdminProducts() {
           };
         }),
       );
-      setCategories(
-        categorySnap.docs.map((catDoc) => ({
-          id: catDoc.id,
-          name: typeof catDoc.data().name === 'string' ? catDoc.data().name : 'Unnamed',
-        })),
-      );
+
+      // ক্যাটাগরি লোড এবং সর্ট করা
+      let fetchedCats = categorySnap.docs.map((catDoc) => ({
+        id: catDoc.id,
+        name: typeof catDoc.data().name === 'string' ? catDoc.data().name : 'Unnamed',
+      }));
+
+      fetchedCats.sort((a, b) => {
+        const nameA = getDisplayCategoryName(a.name);
+        const nameB = getDisplayCategoryName(b.name);
+        const indexA = getOrderIndex(nameA);
+        const indexB = getOrderIndex(nameB);
+        if (indexA !== indexB) return indexA - indexB;
+        return nameA.localeCompare(nameB);
+      });
+
+      setCategories(fetchedCats);
     } catch (err) {
       console.error('Failed to load products:', err);
       toast.error('ডেটা লোড করতে সমস্যা হয়েছে।');
@@ -168,6 +246,7 @@ export default function AdminProducts() {
 
   const generateSKU = useCallback(async (categoryName: string): Promise<string> => {
     if (!categoryName) return '';
+    // ইংরেজি বা বাংলা যেকোনো নাম দিলেই কোড খুঁজে নেবে
     const code = CATEGORY_CODES[categoryName] || 'GEN';
     try {
       const q = query(collection(db, 'products'));
@@ -374,7 +453,7 @@ export default function AdminProducts() {
         >
           <option value="">সব ক্যাটাগরি</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.name}>{cat.name}</option>
+            <option key={cat.id} value={cat.name}>{getDisplayCategoryName(cat.name)}</option>
           ))}
         </select>
       </div>
@@ -382,7 +461,6 @@ export default function AdminProducts() {
       {/* ═══ SKELETON LOADING ═══ */}
       {loading ? (
         <div className="space-y-4">
-          {/* Desktop Table Skeleton */}
           <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
             <div className="bg-zeluxe-cream px-4 py-3">
               <div className="h-4 w-1/4 animate-pulse rounded bg-gray-300"></div>
@@ -398,24 +476,6 @@ export default function AdminProducts() {
                 </div>
               ))}
             </div>
-          </div>
-          {/* Mobile Card Skeleton */}
-          <div className="space-y-3 md:hidden">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="rounded-lg border border-zeluxe-lightgray bg-white p-4 animate-pulse">
-                <div className="flex gap-3">
-                  <div className="h-12 w-12 rounded-md bg-gray-200"></div>
-                  <div className="flex-1 space-y-2">
-                    <div className="h-4 w-3/4 rounded bg-gray-200"></div>
-                    <div className="h-3 w-1/2 rounded bg-gray-200"></div>
-                  </div>
-                </div>
-                <div className="mt-4 flex justify-between">
-                  <div className="h-4 w-20 rounded bg-gray-200"></div>
-                  <div className="h-4 w-16 rounded bg-gray-200"></div>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       ) : displayedProducts.length > 0 ? (
@@ -461,7 +521,7 @@ export default function AdminProducts() {
                     </td>
                     <td className="px-4 py-3 font-medium text-zeluxe-black">{product.name}</td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{product.category}</td>
+                    <td className="px-4 py-3 text-xs text-gray-500">{getDisplayCategoryName(product.category)}</td>
                     <td className="px-4 py-3 text-zeluxe-black">{product.stock}</td>
                     <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</td>
                     <td className="px-4 py-3">
@@ -521,7 +581,7 @@ export default function AdminProducts() {
                   </div>
                 </div>
                 <div className="mt-3 flex items-center justify-between text-xs">
-                  <span className="text-gray-500">{product.category} · Stock: {product.stock}</span>
+                  <span className="text-gray-500">{getDisplayCategoryName(product.category)} · Stock: {product.stock}</span>
                   <span className="font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</span>
                 </div>
               </div>
@@ -547,7 +607,7 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* Modal - same as before */}
+      {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6">
@@ -566,7 +626,9 @@ export default function AdminProducts() {
                 <select value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} className={inputClass}>
                   <option value="">ক্যাটাগরি সিলেক্ট করুন</option>
                   {categories.map((cat) => (
-                    <option key={cat.id} value={cat.name}>{cat.name}</option>
+                    <option key={cat.id} value={cat.name}>
+                      {getDisplayCategoryName(cat.name)}
+                    </option>
                   ))}
                 </select>
               </div>
