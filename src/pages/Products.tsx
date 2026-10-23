@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { Copy, Download, Loader2, Package, Search, ChevronDown, Check } from 'lucide-react';
+import { Copy, Download, Loader2, Package, Search, Check } from 'lucide-react';
 import Layout from '../components/Layout';
 import { db } from '../firebase';
-import { downloadSingleImage } from '../lib/imageDownloader'; // ═══ নতুন ফাংশন ইমপোর্ট ═══
+import { downloadSingleImage } from '../lib/imageDownloader';
 import { toast } from 'sonner';
 
 type Product = {
@@ -20,11 +20,18 @@ type Product = {
   stock: number;
 };
 
+type Category = {
+  id: string;
+  name: string;
+  imageUrl?: string;
+};
+
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('সব ক্যাটাগরি');
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
@@ -33,11 +40,12 @@ export default function Products() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadProducts = async () => {
+    const loadData = async () => {
       try {
+        // ১. প্রোডাক্ট লোড
         const productsQuery = query(collection(db, 'products'), where('active', '==', true));
-        const snapshot = await getDocs(productsQuery);
-        const fetchedProducts: Product[] = snapshot.docs.map((productDocument) => {
+        const productSnap = await getDocs(productsQuery);
+        const fetchedProducts: Product[] = productSnap.docs.map((productDocument) => {
           const data = productDocument.data();
           const imgUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
           let urls: string[] = [];
@@ -60,22 +68,29 @@ export default function Products() {
           };
         });
         setProducts(fetchedProducts);
+
+        // ২. ক্যাটাগরি লোড (ছবিসহ)
+        const categorySnap = await getDocs(collection(db, 'categories'));
+        const fetchedCategories: Category[] = categorySnap.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            name: typeof data.name === 'string' ? data.name : '',
+            imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
+          };
+        });
+        setCategories(fetchedCategories);
       } finally {
         setLoading(false);
       }
     };
 
-    void loadProducts();
+    void loadData();
   }, []);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [searchTerm, selectedCategory]);
-
-  const categories = useMemo(() => {
-    const unique = Array.from(new Set(products.map((product) => product.category)));
-    return ['সব ক্যাটাগরি', ...unique];
-  }, [products]);
 
   const filteredProducts = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -105,12 +120,10 @@ export default function Products() {
     }
   };
 
-  // ═══ আপডেটেড ডাউনলোড ফাংশন (শুধু প্রাইমারি ছবি ডাউনলোড হবে) ═══
   const handleDownloadAll = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
     
-    // প্রোডাক্টের প্রথম (প্রাইমারি) ছবিটি নেওয়া হচ্ছে
     const primaryImg = product.imageUrls[0] || product.imageUrl;
     if (!primaryImg) {
       toast.error('কোনো ছবি পাওয়া যায়নি');
@@ -118,7 +131,6 @@ export default function Products() {
     }
 
     setDownloadingId(product.id);
-    // নতুন ফাংশন দিয়ে ছবি ডাউনলোড
     await downloadSingleImage(primaryImg, `${product.sku || 'product'}-1.jpg`);
     setDownloadingId(null);
   };
@@ -135,36 +147,61 @@ export default function Products() {
           </p>
         </div>
 
-        {/* Filters */}
-        <div className="mb-6 space-y-3">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <div className="relative flex-1">
-              <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="প্রোডাক্ট কোড বা নাম দিয়ে খুঁজুন..."
-                className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-12 pr-4 text-sm text-zeluxe-black shadow-sm placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold transition"
-              />
-            </div>
-            <div className="relative sm:w-64">
-              <select
-                value={selectedCategory}
-                onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full appearance-none rounded-2xl border border-gray-200 bg-white px-4 py-3.5 pr-10 text-sm font-medium text-zeluxe-black shadow-sm focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold transition"
+        {/* Search Bar */}
+        <div className="mb-5">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="প্রোডাক্ট কোড বা নাম দিয়ে খুঁজুন..."
+              className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-12 pr-4 text-sm text-zeluxe-black shadow-sm placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold transition"
+            />
+          </div>
+        </div>
+
+        {/* ═══ সুন্দর ক্যাটাগরি স্ক্রলার (গোল ছবি) ═══ */}
+        <div className="mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6">
+          <div className="flex gap-4 overflow-x-auto pb-3 snap-x hide-scrollbar">
+            
+            {/* "সব ক্যাটাগরি" অপশন */}
+            <button
+              onClick={() => setSelectedCategory('সব ক্যাটাগরি')}
+              className="flex flex-col items-center gap-2 min-w-[70px] snap-start group"
+            >
+              <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === 'সব ক্যাটাগরি' ? 'border-zeluxe-gold bg-zeluxe-gold/10 shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
+                <Package size={24} className={selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-gold' : 'text-gray-400'} />
+              </div>
+              <span className={`text-[11px] font-bold text-center ${selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                সব
+              </span>
+            </button>
+
+            {/* ডাটাবেস থেকে আসা ক্যাটাগরি */}
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.name)}
+                className="flex flex-col items-center gap-2 min-w-[70px] snap-start group"
               >
-                {categories.map((category) => (
-                  <option key={category} value={category}>
-                    {category}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                size={16}
-                className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-gray-400"
-              />
-            </div>
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name ? 'border-zeluxe-gold shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
+                  {cat.imageUrl ? (
+                    <img 
+                      src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
+                      alt={cat.name} 
+                      loading="lazy"
+                      className="h-full w-full object-cover" 
+                    />
+                  ) : (
+                    <Package size={24} className="text-gray-400" />
+                  )}
+                </div>
+                <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight ${selectedCategory === cat.name ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                  {cat.name}
+                </span>
+              </button>
+            ))}
           </div>
         </div>
 
