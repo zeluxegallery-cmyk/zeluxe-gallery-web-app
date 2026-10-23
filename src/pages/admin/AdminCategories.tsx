@@ -31,68 +31,14 @@ const emptyForm: CategoryForm = {
   imageUrl: '',
 };
 
-// ═══ ডিফল্ট ক্যাটাগরি ইংরেজিতে আপডেট করা হলো ═══
 const DEFAULT_CATEGORIES = [
-  'Shirt',
-  'T-Shirt',
-  'Panjabi',
-  'Pant & Trouser',
-  'Hoodie & Jacket',
-  'Saree',
-  'Three Piece',
-  'Kurti',
-  'Borka',
-  'Hijab',
-  'Baby Dress',
-  'Kids Items',
-  'Toys',
-  'Watch',
-  'Smart Watch',
-  'Headphone',
-  'Power Bank',
-  'Cosmetics',
-  'Skin Care',
-  'Perfume',
-  'Bag',
-  'Couple Items',
-  'Gift Items',
-  'Western Dress',
-  'Interior',
+  "Men's Fashion", "Women's Fashion", 'Panjabi', 'Three Piece', 'Saree', 'Shirt', 'T-Shirt', 'Pant & Trouser', 'Watch', 'Smart Watch', 'Earbuds', 'Power Bank', 'Dress', 'Borka', 'Hijab', 'Cosmetics', 'Skin Care', 'Perfume', 'Bag', 'Hoodie & Jacket', 'Kids Items', 'Gift Items',
 ];
 
-// ═══ বাংলা থেকে ইংরেজি নামের অভিধান ═══
 const categoryTranslations: Record<string, string> = {
-  'পাওয়ার ব্যাংক': 'Power Bank',
-  'পাঞ্জাবি': 'Panjabi',
-  'হিজাব': 'Hijab',
-  'গিফট আইটেম': 'Gift Items',
-  'কসমেটিক্স': 'Cosmetics',
-  'কাপল আইটেম': 'Couple Items',
-  'ব্যাগ': 'Bag',
-  'বোরকা': 'Borka',
-  'শার্ট': 'Shirt',
-  'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo Set',
-  'কিডস আইটেম': 'Kids Items',
-  'পারফিউম': 'Perfume',
-  'ইয়ারবাডস (ব্রুটুথ)': 'Earbuds',
-  'টি-শার্ট': 'T-Shirt',
-  'থ্রি-পিস': 'Three Piece',
-  'স্কিন কেয়ার': 'Skin Care',
-  'হুডি & জ্যাকেট': 'Hoodie & Jacket',
-  'শাড়ি': 'Saree',
-  'প্যান্ট & ট্রাউজার': 'Pant & Trouser',
-  'স্মার্ট ওয়াচ': 'Smart Watch',
-  'ঘড়ি': 'Watch',
-  'ড্রেস': 'Dress',
-  'খেলনা': 'Toys',
-  'বেবি ড্রেস': 'Baby Dress',
-  'হেডফোন': 'Headphone',
-  'কুর্তি': 'Kurti',
-  'ওয়েস্টার্ন ড্রেস': 'Western Dress',
-  'ইন্টেরিয়র': 'Interior',
+  'পাওয়ার ব্যাংক': 'Power Bank', 'পাঞ্জাবি': 'Panjabi', 'হিজাব': 'Hijab', 'গিফট আইটেম': 'Gift Items', 'কসমেটিক্স': 'Cosmetics', 'কাপল আইটেম': 'Couple Items', 'ব্যাগ': 'Bag', 'বোরকা': 'Borka', 'শার্ট': 'Shirt', 'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo Set', 'কিডস আইটেম': 'Kids Items', 'পারফিউম': 'Perfume', 'ইয়ারবাডস (ব্রুটুথ)': 'Earbuds', 'টি-শার্ট': 'T-Shirt', 'থ্রি-পিস': 'Three Piece', 'স্কিন কেয়ার': 'Skin Care', 'হুডি & জ্যাকেট': 'Hoodie & Jacket', 'শাড়ি': 'Saree', 'প্যান্ট & ট্রাউজার': 'Pant & Trouser', 'স্মার্ট ওয়াচ': 'Smart Watch', 'ঘড়ি': 'Watch', 'ড্রেস': 'Dress', 'খেলনা': 'Toys', 'বেবি ড্রেস': 'Baby Dress', 'হেডফোন': 'Headphone', 'কুর্তি': 'Kurti', 'ওয়েস্টার্ন ড্রেস': 'Western Dress', 'ইন্টেরিয়র': 'Interior',
 };
 
-// ইংরেজি নাম বের করার হেল্পার ফাংশন
 const getDisplayCategoryName = (name: string) => {
   return categoryTranslations[name] || name;
 };
@@ -114,7 +60,6 @@ export default function AdminCategories() {
         getDocs(collection(db, 'products')),
       ]);
 
-      // Auto-seed if categories collection is empty
       if (catSnap.empty) {
         for (const name of DEFAULT_CATEGORIES) {
           await addDoc(collection(db, 'categories'), {
@@ -123,31 +68,37 @@ export default function AdminCategories() {
             createdAt: serverTimestamp(),
           });
         }
-
         const newCatSnap = await getDocs(collection(db, 'categories'));
         const products = productSnap.docs.map((p) => p.data());
-        setCategories(
-          newCatSnap.docs.map((catDoc) => {
+        
+        let newCats = newCatSnap.docs.map((catDoc) => {
             const data = catDoc.data();
             const name = typeof data.name === 'string' ? data.name : 'Unnamed';
             const imageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
             const productCount = products.filter((p) => p.category === name).length;
             return { id: catDoc.id, name, imageUrl, productCount };
-          }),
-        );
+        });
+        
+        // ═══ বর্ণানুক্রমিক (A-Z) ভাবে সাজানো ═══
+        newCats.sort((a, b) => getDisplayCategoryName(a.name).toLowerCase().localeCompare(getDisplayCategoryName(b.name).toLowerCase()));
+        
+        setCategories(newCats);
         return;
       }
 
       const products = productSnap.docs.map((p) => p.data());
-      setCategories(
-        catSnap.docs.map((catDoc) => {
+      let cats = catSnap.docs.map((catDoc) => {
           const data = catDoc.data();
           const name = typeof data.name === 'string' ? data.name : 'Unnamed';
           const imageUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
           const productCount = products.filter((p) => p.category === name).length;
           return { id: catDoc.id, name, imageUrl, productCount };
-        }),
-      );
+      });
+      
+      // ═══ বর্ণানুক্রমিক (A-Z) ভাবে সাজানো ═══
+      cats.sort((a, b) => getDisplayCategoryName(a.name).toLowerCase().localeCompare(getDisplayCategoryName(b.name).toLowerCase()));
+      
+      setCategories(cats);
     } catch (err) {
       console.error('Failed to load categories:', err);
       toast.error('ক্যাটাগরি লোড করতে সমস্যা হয়েছে।');
@@ -167,7 +118,6 @@ export default function AdminCategories() {
   };
 
   const openEdit = (cat: Category) => {
-    // এডিট করার সময় ইনপুটে ইংরেজি নাম দেখাবে
     setForm({ name: getDisplayCategoryName(cat.name), imageUrl: cat.imageUrl });
     setEditingId(cat.id);
     setModalOpen(true);
@@ -270,7 +220,6 @@ export default function AdminCategories() {
                   </span>
                 )}
                 <div>
-                  {/* ═══ এখানে ইংরেজি নামটি দেখাবে ═══ */}
                   <p className="font-bold text-zeluxe-black">{getDisplayCategoryName(cat.name)}</p>
                   <p className="text-xs text-gray-500">{cat.productCount} products</p>
                 </div>
@@ -326,7 +275,6 @@ export default function AdminCategories() {
                 />
               </div>
 
-              {/* ═══ সতর্কবার্তা ═══ */}
               {editingId && (
                 <div className="flex items-start gap-2 rounded-lg bg-yellow-50 p-3 border border-yellow-200">
                   <AlertCircle size={16} className="text-yellow-600 mt-0.5 shrink-0" />
