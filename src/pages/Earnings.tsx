@@ -11,7 +11,6 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 
 type Order = {
@@ -116,7 +115,6 @@ export default function Earnings() {
       }
 
       try {
-        // ═══ প্যারালাল ডাটা ফেচিং (Promise.all) ═══
         const [userSnap, productsSnap, snapshot, withdrawSnap] = await Promise.all([
           getDoc(doc(db, 'users', uid)),
           getDocs(collection(db, 'products')),
@@ -127,7 +125,6 @@ export default function Earnings() {
         const userData = userSnap.exists() ? userSnap.data() : null;
         const referralBonus = typeof userData?.referralBonusEarned === 'number' ? userData.referralBonusEarned : 0;
 
-        // প্রোডাক্ট ম্যাপ তৈরি (শুধুমাত্র পুরনো অর্ডারের প্রফিট ক্যালকুলেশনের জন্য)
         const productMap: Record<string, number> = {};
         productsSnap.docs.forEach((p) => {
           const data = p.data();
@@ -146,7 +143,6 @@ export default function Earnings() {
           const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
           
-          // ═══ স্মার্ট প্রফিট ক্যালকুলেশন ═══
           let actualProfit = 0;
           if (Array.isArray(data.items) && data.items.length > 0) {
             actualProfit = data.items.reduce((sum: number, item: any) => {
@@ -173,7 +169,6 @@ export default function Earnings() {
           };
         });
 
-        // ═══ Calculate stats ═══
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
         const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered');
         const deliveredSales = deliveredOrders.reduce((sum, order) => sum + order.total, 0);
@@ -182,7 +177,6 @@ export default function Earnings() {
           .reduce((sum, order) => sum + order.total, 0);
         const actualProfit = deliveredOrders.reduce((sum, order) => sum + order.actualProfit, 0);
 
-        // ═══ Withdrawals ═══
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
           .filter((d) => d.status === 'approved' || d.status === 'paid')
@@ -229,240 +223,225 @@ export default function Earnings() {
     };
   });
 
-  // ═══ SKELETON LOADING UI ═══
   if (loading) {
     return (
-      <Layout>
-        <div className="mx-auto max-w-2xl">
-          <div className="mb-5">
-            <div className="h-6 w-1/2 animate-pulse rounded bg-gray-300 mb-2"></div>
-            <div className="h-4 w-1/3 animate-pulse rounded bg-gray-200"></div>
-          </div>
-
-          {/* Balance Hero Skeleton */}
-          <div className="mb-5 h-48 w-full animate-pulse rounded-lg bg-gray-300"></div>
-
-          {/* Withdraw Button Skeleton */}
-          <div className="mb-5 h-16 w-full animate-pulse rounded-lg bg-gray-200"></div>
-
-          {/* Summary Cards Skeleton */}
-          <div className="mb-5 grid grid-cols-2 gap-3">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <div key={i} className="h-28 animate-pulse rounded-lg bg-gray-200"></div>
-            ))}
-          </div>
-
-          {/* Recent Transactions Skeleton */}
-          <div className="h-64 w-full animate-pulse rounded-lg bg-gray-200"></div>
+      <div className="mx-auto max-w-2xl">
+        <div className="mb-5">
+          <div className="h-6 w-1/2 animate-pulse rounded bg-gray-300 mb-2"></div>
+          <div className="h-4 w-1/3 animate-pulse rounded bg-gray-200"></div>
         </div>
-      </Layout>
+        <div className="mb-5 h-48 w-full animate-pulse rounded-lg bg-gray-300"></div>
+        <div className="mb-5 h-16 w-full animate-pulse rounded-lg bg-gray-200"></div>
+        <div className="mb-5 grid grid-cols-2 gap-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-28 animate-pulse rounded-lg bg-gray-200"></div>
+          ))}
+        </div>
+        <div className="h-64 w-full animate-pulse rounded-lg bg-gray-200"></div>
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Layout>
-        <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
-        </div>
-      </Layout>
+      <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+        {error}
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-2xl pb-10">
-        {/* ═══ HEADER ═══ */}
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
-            আর্নিংস ও হিসাব
-          </h1>
-          <p className="mt-1 text-xs text-gray-500 md:text-sm">
-            আপনার আয়, লাভ এবং ব্যালেন্সের বিস্তারিত
+    <div className="mx-auto max-w-2xl pb-10">
+      {/* ═══ HEADER ═══ */}
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
+          আর্নিংস ও হিসাব
+        </h1>
+        <p className="mt-1 text-xs text-gray-500 md:text-sm">
+          আপনার আয়, লাভ এবং ব্যালেন্সের বিস্তারিত
+        </p>
+      </div>
+
+      {/* ═══ AVAILABLE BALANCE HERO ═══ */}
+      <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-5 text-white">
+        <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-zeluxe-gold/20 blur-3xl" />
+        <div className="relative">
+          <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
+            <Wallet size={12} />
+            উপলব্ধ ব্যালেন্স (Available Balance)
+          </div>
+          <p className="mt-2 text-4xl font-bold tracking-tight text-zeluxe-gold">
+            Tk {stats.availableBalance.toLocaleString()}
           </p>
-        </div>
 
-        {/* ═══ AVAILABLE BALANCE HERO ═══ */}
-        <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-5 text-white">
-          <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-zeluxe-gold/20 blur-3xl" />
-          <div className="relative">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
-              <Wallet size={12} />
-              উপলব্ধ ব্যালেন্স (Available Balance)
+          {/* Breakdown */}
+          <div className="mt-5 space-y-2.5 border-t border-white/10 pt-4">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 text-gray-300">
+                <TrendingUp size={12} className="text-zeluxe-gold" />
+                অর্ডার প্রফিট
+              </div>
+              <span className="font-bold text-white">
+                Tk {stats.actualProfit.toLocaleString()}
+              </span>
             </div>
-            <p className="mt-2 text-4xl font-bold tracking-tight text-zeluxe-gold">
-              Tk {stats.availableBalance.toLocaleString()}
-            </p>
 
-            {/* Breakdown */}
-            <div className="mt-5 space-y-2.5 border-t border-white/10 pt-4">
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 text-gray-300">
+                <Users size={12} className="text-zeluxe-gold" />
+                রেফারেল বোনাস
+              </div>
+              <span className="font-bold text-green-400">
+                +Tk {stats.referralBonus.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between border-t border-white/10 pt-2.5 text-xs">
+              <span className="text-gray-400">মোট আয়</span>
+              <span className="font-bold text-white">
+                Tk {(stats.actualProfit + stats.referralBonus).toLocaleString()}
+              </span>
+            </div>
+
+            {stats.totalWithdrawn > 0 && (
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-gray-300">
-                  <TrendingUp size={12} className="text-zeluxe-gold" />
-                  অর্ডার প্রফিট
-                </div>
-                <span className="font-bold text-white">
-                  Tk {stats.actualProfit.toLocaleString()}
+                <span className="text-gray-400">আগে তুলেছেন</span>
+                <span className="font-bold text-red-400">
+                  -Tk {stats.totalWithdrawn.toLocaleString()}
                 </span>
               </div>
-
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center gap-1.5 text-gray-300">
-                  <Users size={12} className="text-zeluxe-gold" />
-                  রেফারেল বোনাস
-                </div>
-                <span className="font-bold text-green-400">
-                  +Tk {stats.referralBonus.toLocaleString()}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-white/10 pt-2.5 text-xs">
-                <span className="text-gray-400">মোট আয়</span>
-                <span className="font-bold text-white">
-                  Tk {(stats.actualProfit + stats.referralBonus).toLocaleString()}
-                </span>
-              </div>
-
-              {stats.totalWithdrawn > 0 && (
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-400">আগে তুলেছেন</span>
-                  <span className="font-bold text-red-400">
-                    -Tk {stats.totalWithdrawn.toLocaleString()}
-                  </span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         </div>
+      </div>
 
-        {/* ═══ WITHDRAW BUTTON ═══ */}
-        <Link
-          to="/withdraw"
-          className="mb-5 flex items-center justify-between rounded-lg border border-zeluxe-gold/30 bg-gradient-to-r from-zeluxe-gold/10 to-transparent p-4 transition hover:border-zeluxe-gold"
-        >
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-gold">
-              <Wallet className="text-zeluxe-black" size={18} />
-            </span>
-            <div>
-              <p className="text-sm font-bold text-zeluxe-black">টাকা তুলুন</p>
-              <p className="mt-0.5 text-[11px] text-gray-500">bKash/Nagad-এ টাকা তুলুন</p>
-            </div>
-          </div>
-          <ArrowRight size={18} className="text-zeluxe-gold" />
-        </Link>
-
-        {/* ═══ SUMMARY CARDS ═══ */}
-        <div className="mb-5">
-          <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            সেলস ওভারভিউ
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {summaryCards.map(({ label, value, icon: Icon, iconClass, valueClass }) => (
-              <div key={label} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
-                <Icon className={`h-4 w-4 ${iconClass}`} />
-                <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
-                  {label}
-                </p>
-                <p className={`mt-1 text-lg font-bold ${valueClass}`}>{value}</p>
-              </div>
-            ))}
+      {/* ═══ WITHDRAW BUTTON ═══ */}
+      <Link
+        to="/withdraw"
+        className="mb-5 flex items-center justify-between rounded-lg border border-zeluxe-gold/30 bg-gradient-to-r from-zeluxe-gold/10 to-transparent p-4 transition hover:border-zeluxe-gold"
+      >
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-gold">
+            <Wallet className="text-zeluxe-black" size={18} />
+          </span>
+          <div>
+            <p className="text-sm font-bold text-zeluxe-black">টাকা তুলুন</p>
+            <p className="mt-0.5 text-[11px] text-gray-500">bKash/Nagad-এ টাকা তুলুন</p>
           </div>
         </div>
+        <ArrowRight size={18} className="text-zeluxe-gold" />
+      </Link>
 
-        {/* ═══ HOW WE CALCULATE ═══ */}
-        <div className="mb-5 rounded-lg border border-zeluxe-lightgray bg-white p-5">
-          <h2 className="mb-3 text-sm font-bold text-zeluxe-black">
-            কীভাবে হিসাব করা হয়:
-          </h2>
-          <ul className="space-y-2 text-xs leading-relaxed text-gray-600">
-            <li><strong className="text-zeluxe-black">মোট বিক্রি</strong> — সব অর্ডারের মোট দাম</li>
-            <li><strong className="text-zeluxe-black">ডেলিভারড সেলস</strong> — শুধু ডেলিভার হওয়া অর্ডার</li>
-            <li><strong className="text-zeluxe-black">অপেক্ষমাণ টাকা</strong> — এখনো ডেলিভার হয়নি</li>
-            <li><strong className="text-zeluxe-black">অর্ডার প্রফিট</strong> — (বিক্রয় মূল্য − রিসেলার মূল্য) × পরিমাণ</li>
-            <li><strong className="text-zeluxe-black">রেফারেল বোনাস</strong> — প্রতি সফল রেফারেলে Tk 30</li>
-          </ul>
-        </div>
-
-        {/* ═══ ORDER BREAKDOWN ═══ */}
-        <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
-          <div className="border-b border-zeluxe-lightgray px-4 py-3">
-            <h2 className="text-sm font-bold text-zeluxe-black">অর্ডার ব্রেকডাউন</h2>
-          </div>
-          <table className="w-full text-left text-sm">
-            <thead className="bg-zeluxe-cream">
-              <tr>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">স্ট্যাটাস</th>
-                <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">অর্ডার</th>
-                <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">টাকার পরিমাণ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {breakdown.map(({ status, count, amount, textClass }) => (
-                <tr key={status} className="border-b border-zeluxe-lightgray last:border-0">
-                  <td className="px-4 py-2.5 text-xs capitalize text-zeluxe-black">{getStatusLabel(status)}</td>
-                  <td className="px-4 py-2.5 text-xs text-zeluxe-black">{count}</td>
-                  <td className={`px-4 py-2.5 text-right text-xs font-bold ${textClass}`}>
-                    Tk {amount.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* ═══ RECENT TRANSACTIONS ═══ */}
-        <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
-          <div className="border-b border-zeluxe-lightgray px-4 py-3">
-            <h2 className="text-sm font-bold text-zeluxe-black">সাম্প্রতিক লেনদেন</h2>
-          </div>
-
-          {orders.length === 0 ? (
-            <div className="p-8 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
-                <TrendingUp className="h-6 w-6 text-zeluxe-gold" />
-              </div>
-              <p className="mt-3 text-sm font-bold text-zeluxe-black">এখনো কোনো আর্নিং নেই</p>
-              <p className="mt-1 text-xs text-gray-500">প্রথম অর্ডার দিলেই এখানে দেখতে পাবেন</p>
-              <Link to="/orders/new" className="mt-3 inline-flex items-center gap-1 rounded-md bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800">
-                অর্ডার তৈরি করুন
-                <ArrowRight size={12} />
-              </Link>
-            </div>
-          ) : (
-            orders.slice(0, 10).map((order) => (
-              <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between border-b border-zeluxe-lightgray px-4 py-3 transition last:border-0 hover:bg-zeluxe-cream">
-                <div>
-                  <p className="font-mono text-[11px] font-bold text-zeluxe-black">{order.orderId}</p>
-                  <p className="mt-0.5 text-[10px] text-gray-400">{formatDate(order.createdAt?.seconds)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-bold text-zeluxe-black">Tk {order.total.toLocaleString()}</p>
-                  <span className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold capitalize ${getStatusBadgeClass(order.status)}`}>
-                    {getStatusLabel(order.status)}
-                  </span>
-                </div>
-              </Link>
-            ))
-          )}
-        </div>
-
-        {/* ═══ REFERRAL CARD LINK ═══ */}
-        {stats.referralBonus > 0 && (
-          <Link to="/refer" className="mt-5 flex items-center gap-3 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 transition hover:border-zeluxe-gold">
-            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold">
-              <Gift className="text-zeluxe-black" size={20} />
-            </span>
-            <div className="flex-1">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">রেফারেল আর্নিংস</p>
-              <p className="mt-0.5 text-sm font-bold text-zeluxe-black">
-                আপনার রেফারেল থেকে Tk {stats.referralBonus.toLocaleString()} পেয়েছেন
+      {/* ═══ SUMMARY CARDS ═══ */}
+      <div className="mb-5">
+        <p className="mb-2.5 text-[10px] font-bold uppercase tracking-widest text-gray-500">
+          সেলস ওভারভিউ
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          {summaryCards.map(({ label, value, icon: Icon, iconClass, valueClass }) => (
+            <div key={label} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
+              <Icon className={`h-4 w-4 ${iconClass}`} />
+              <p className="mt-3 text-[10px] font-medium uppercase tracking-wider text-gray-500">
+                {label}
               </p>
+              <p className={`mt-1 text-lg font-bold ${valueClass}`}>{value}</p>
             </div>
-            <ArrowRight size={18} className="shrink-0 text-zeluxe-gold" />
-          </Link>
+          ))}
+        </div>
+      </div>
+
+      {/* ═══ HOW WE CALCULATE ═══ */}
+      <div className="mb-5 rounded-lg border border-zeluxe-lightgray bg-white p-5">
+        <h2 className="mb-3 text-sm font-bold text-zeluxe-black">
+          কীভাবে হিসাব করা হয়:
+        </h2>
+        <ul className="space-y-2 text-xs leading-relaxed text-gray-600">
+          <li><strong className="text-zeluxe-black">মোট বিক্রি</strong> — সব অর্ডারের মোট দাম</li>
+          <li><strong className="text-zeluxe-black">ডেলিভারড সেলস</strong> — শুধু ডেলিভার হওয়া অর্ডার</li>
+          <li><strong className="text-zeluxe-black">অপেক্ষমাণ টাকা</strong> — এখনো ডেলিভার হয়নি</li>
+          <li><strong className="text-zeluxe-black">অর্ডার প্রফিট</strong> — (বিক্রয় মূল্য − রিসেলার মূল্য) × পরিমাণ</li>
+          <li><strong className="text-zeluxe-black">রেফারেল বোনাস</strong> — প্রতি সফল রেফারেলে Tk 30</li>
+        </ul>
+      </div>
+
+      {/* ═══ ORDER BREAKDOWN ═══ */}
+      <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
+        <div className="border-b border-zeluxe-lightgray px-4 py-3">
+          <h2 className="text-sm font-bold text-zeluxe-black">অর্ডার ব্রেকডাউন</h2>
+        </div>
+        <table className="w-full text-left text-sm">
+          <thead className="bg-zeluxe-cream">
+            <tr>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">স্ট্যাটাস</th>
+              <th className="px-4 py-2.5 text-[10px] font-bold uppercase tracking-wider text-gray-500">অর্ডার</th>
+              <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-wider text-gray-500">টাকার পরিমাণ</th>
+            </tr>
+          </thead>
+          <tbody>
+            {breakdown.map(({ status, count, amount, textClass }) => (
+              <tr key={status} className="border-b border-zeluxe-lightgray last:border-0">
+                <td className="px-4 py-2.5 text-xs capitalize text-zeluxe-black">{getStatusLabel(status)}</td>
+                <td className="px-4 py-2.5 text-xs text-zeluxe-black">{count}</td>
+                <td className={`px-4 py-2.5 text-right text-xs font-bold ${textClass}`}>
+                  Tk {amount.toLocaleString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ═══ RECENT TRANSACTIONS ═══ */}
+      <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
+        <div className="border-b border-zeluxe-lightgray px-4 py-3">
+          <h2 className="text-sm font-bold text-zeluxe-black">সাম্প্রতিক লেনদেন</h2>
+        </div>
+
+        {orders.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
+              <TrendingUp className="h-6 w-6 text-zeluxe-gold" />
+            </div>
+            <p className="mt-3 text-sm font-bold text-zeluxe-black">এখনো কোনো আর্নিং নেই</p>
+            <p className="mt-1 text-xs text-gray-500">প্রথম অর্ডার দিলেই এখানে দেখতে পাবেন</p>
+            <Link to="/orders/new" className="mt-3 inline-flex items-center gap-1 rounded-md bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800">
+              অর্ডার তৈরি করুন
+              <ArrowRight size={12} />
+            </Link>
+          </div>
+        ) : (
+          orders.slice(0, 10).map((order) => (
+            <Link key={order.id} to={`/orders/${order.id}`} className="flex items-center justify-between border-b border-zeluxe-lightgray px-4 py-3 transition last:border-0 hover:bg-zeluxe-cream">
+              <div>
+                <p className="font-mono text-[11px] font-bold text-zeluxe-black">{order.orderId}</p>
+                <p className="mt-0.5 text-[10px] text-gray-400">{formatDate(order.createdAt?.seconds)}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-bold text-zeluxe-black">Tk {order.total.toLocaleString()}</p>
+                <span className={`mt-0.5 inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold capitalize ${getStatusBadgeClass(order.status)}`}>
+                  {getStatusLabel(order.status)}
+                </span>
+              </div>
+            </Link>
+          ))
         )}
       </div>
-    </Layout>
+
+      {/* ═══ REFERRAL CARD LINK ═══ */}
+      {stats.referralBonus > 0 && (
+        <Link to="/refer" className="mt-5 flex items-center gap-3 overflow-hidden rounded-lg border border-zeluxe-gold/30 bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 transition hover:border-zeluxe-gold">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold">
+            <Gift className="text-zeluxe-black" size={20} />
+          </span>
+          <div className="flex-1">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">রেফারেল আর্নিংস</p>
+            <p className="mt-0.5 text-sm font-bold text-zeluxe-black">
+              আপনার রেফারেল থেকে Tk {stats.referralBonus.toLocaleString()} পেয়েছেন
+            </p>
+          </div>
+          <ArrowRight size={18} className="shrink-0 text-zeluxe-gold" />
+        </Link>
+      )}
+    </div>
   );
 }
