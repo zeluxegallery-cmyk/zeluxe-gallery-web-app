@@ -24,7 +24,6 @@ import {
   Headphones,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import Layout from '../components/Layout';
 import LogoutModal from '../components/LogoutModal';
 import { auth, db } from '../firebase';
 import { uploadImageToCloudinary } from '../lib/cloudinary';
@@ -180,21 +179,17 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </Layout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+      </div>
     );
   }
 
   if (!userData) {
     return (
-      <Layout>
-        <div className="rounded-xl bg-zeluxe-fieldbg p-12 text-center">
-          <p className="text-gray-600">প্রোফাইল তথ্য পাওয়া যায়নি।</p>
-        </div>
-      </Layout>
+      <div className="rounded-xl bg-zeluxe-fieldbg p-12 text-center">
+        <p className="text-gray-600">প্রোফাইল তথ্য পাওয়া যায়নি।</p>
+      </div>
     );
   }
 
@@ -206,241 +201,240 @@ export default function Profile() {
     userData.bio;
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-2xl">
-        {/* Avatar Section */}
-        <div className="mb-6 text-center">
-          <div className="relative mx-auto inline-block">
-            {userData.avatarUrl ? (
-              <img
-                src={userData.avatarUrl}
-                alt={userData.name}
-                className="h-24 w-24 rounded-full object-cover"
-              />
-            ) : (
-              <div className="flex h-24 w-24 items-center justify-center rounded-full bg-zeluxe-gold text-4xl font-bold text-white">
-                {initial}
-              </div>
-            )}
-            <button
-              onClick={() => avatarInputRef.current?.click()}
-              disabled={uploading}
-              className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-zeluxe-black text-white shadow-lg transition hover:bg-zeluxe-gold disabled:opacity-60"
-            >
-              {uploading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Camera className="h-4 w-4" />
-              )}
-            </button>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void handleAvatarUpload(file);
-                e.target.value = '';
-              }}
+    // ═══ <Layout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
+    <div className="mx-auto max-w-2xl">
+      {/* Avatar Section */}
+      <div className="mb-6 text-center">
+        <div className="relative mx-auto inline-block">
+          {userData.avatarUrl ? (
+            <img
+              src={userData.avatarUrl}
+              alt={userData.name}
+              className="h-24 w-24 rounded-full object-cover"
             />
-          </div>
-
-          <h1 className="mt-4 text-2xl font-bold text-zeluxe-black">
-            {userData.name || 'Reseller'}
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">{userData.email}</p>
+          ) : (
+            <div className="flex h-24 w-24 items-center justify-center rounded-full bg-zeluxe-gold text-4xl font-bold text-white">
+              {initial}
+            </div>
+          )}
+          <button
+            onClick={() => avatarInputRef.current?.click()}
+            disabled={uploading}
+            className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-zeluxe-black text-white shadow-lg transition hover:bg-zeluxe-gold disabled:opacity-60"
+          >
+            {uploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Camera className="h-4 w-4" />
+            )}
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) void handleAvatarUpload(file);
+              e.target.value = '';
+            }}
+          />
         </div>
 
-        {/* Business Info Card */}
-        {hasBusinessInfo ? (
-          <div className="mb-4 overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white p-5">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                {userData.businessLogo ? (
-                  <img
-                    src={userData.businessLogo}
-                    alt="Business Logo"
-                    className="h-12 w-12 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-gold/10">
-                    <Building2 className="text-zeluxe-gold" size={22} />
-                  </div>
+        <h1 className="mt-4 text-2xl font-bold text-zeluxe-black">
+          {userData.name || 'Reseller'}
+        </h1>
+        <p className="mt-1 text-sm text-gray-500">{userData.email}</p>
+      </div>
+
+      {/* Business Info Card */}
+      {hasBusinessInfo ? (
+        <div className="mb-4 overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white p-5">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {userData.businessLogo ? (
+                <img
+                  src={userData.businessLogo}
+                  alt="Business Logo"
+                  className="h-12 w-12 rounded-full object-cover"
+                />
+              ) : (
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-gold/10">
+                  <Building2 className="text-zeluxe-gold" size={22} />
+                </div>
+              )}
+              <div>
+                <p className="text-base font-bold text-zeluxe-black">
+                  {userData.businessName || 'আমার ব্যবসা'}
+                </p>
+                {userData.businessType && (
+                  <p className="text-xs text-gray-500">{userData.businessType}</p>
                 )}
-                <div>
-                  <p className="text-base font-bold text-zeluxe-black">
-                    {userData.businessName || 'আমার ব্যবসা'}
-                  </p>
-                  {userData.businessType && (
-                    <p className="text-xs text-gray-500">{userData.businessType}</p>
-                  )}
-                </div>
               </div>
-              <button
-                onClick={() => setEditOpen(true)}
-                className="rounded-lg border border-zeluxe-lightgray p-2 text-zeluxe-gold transition hover:bg-zeluxe-fieldbg"
-              >
-                <Pencil className="h-4 w-4" />
-              </button>
             </div>
-
-            {userData.bio && (
-              <p className="mb-3 text-sm text-gray-600">{userData.bio}</p>
-            )}
-
-            <div className="space-y-2 text-sm">
-              {userData.businessAddress && (
-                <div className="flex items-center gap-2 text-gray-600">
-                  <MapPin className="h-4 w-4 text-zeluxe-gold" />
-                  <span>{userData.businessAddress}</span>
-                </div>
-              )}
-              {userData.facebookUrl && (
-                <a
-                  href={userData.facebookUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 text-blue-600 hover:underline"
-                >
-                  <Globe className="h-4 w-4" />
-                  <span>Facebook পেজ</span>
-                </a>
-              )}
-              {userData.whatsappNumber && (
-                <a
-                  href={`https://wa.me/88${userData.whatsappNumber}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2 text-green-600 hover:underline"
-                >
-                  <MessageCircle className="h-4 w-4" />
-                  <span>{userData.whatsappNumber}</span>
-                </a>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="mb-4 rounded-xl border border-dashed border-zeluxe-lightgray bg-zeluxe-fieldbg p-5 text-center">
-            <Building2 className="mx-auto text-zeluxe-gold" size={32} />
-            <p className="mt-2 text-sm font-bold text-zeluxe-black">ব্যবসার তথ্য যোগ করুন</p>
-            <p className="mt-1 text-xs text-gray-500">
-              আপনার ব্যবসার নাম, লোগো, Facebook, WhatsApp যোগ করে প্রফেশনাল হয়ে উঠুন
-            </p>
             <button
               onClick={() => setEditOpen(true)}
-              className="mt-3 rounded-xl bg-zeluxe-black px-5 py-2 text-sm font-bold text-white transition hover:bg-[#2a2a2a]"
+              className="rounded-lg border border-zeluxe-lightgray p-2 text-zeluxe-gold transition hover:bg-zeluxe-fieldbg"
             >
-              যোগ করুন
+              <Pencil className="h-4 w-4" />
             </button>
           </div>
-        )}
 
-        {/* Account Info Card */}
-        <div className="mb-4 overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white">
-          <InfoRow icon={Phone} label="মোবাইল নম্বর" value={userData.phone || '—'} />
-          <InfoRow icon={Mail} label="ইমেইল" value={userData.email || '—'} />
-          <InfoRow
-            icon={ShieldCheck}
-            label="মেম্বারশিপ স্ট্যাটাস"
-            value={getStatusBadge(userData.membershipStatus || 'pending')}
-          />
-          <InfoRow
-            icon={UserIcon}
-            label="অ্যাকাউন্ট স্ট্যাটাস"
-            value={getStatusBadge(userData.accountStatus || 'pending_membership')}
-          />
-          <InfoRow
-            icon={Calendar}
-            label="যোগদানের তারিখ"
-            value={formatDate(userData.createdAt)}
-            isLast
-          />
+          {userData.bio && (
+            <p className="mb-3 text-sm text-gray-600">{userData.bio}</p>
+          )}
+
+          <div className="space-y-2 text-sm">
+            {userData.businessAddress && (
+              <div className="flex items-center gap-2 text-gray-600">
+                <MapPin className="h-4 w-4 text-zeluxe-gold" />
+                <span>{userData.businessAddress}</span>
+              </div>
+            )}
+            {userData.facebookUrl && (
+              <a
+                href={userData.facebookUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-blue-600 hover:underline"
+              >
+                <Globe className="h-4 w-4" />
+                <span>Facebook পেজ</span>
+              </a>
+            )}
+            {userData.whatsappNumber && (
+              <a
+                href={`https://wa.me/88${userData.whatsappNumber}`}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center gap-2 text-green-600 hover:underline"
+              >
+                <MessageCircle className="h-4 w-4" />
+                <span>{userData.whatsappNumber}</span>
+              </a>
+            )}
+          </div>
         </div>
-
-        {/* ═══ নতুন সোশ্যাল মিডিয়া লিংক সেকশন ═══ */}
-        <div className="mb-4 space-y-3 rounded-xl border border-zeluxe-lightgray bg-white p-4">
-          <h3 className="text-sm font-bold text-zeluxe-black mb-1">আমাদের সাথে যুক্ত থাকুন</h3>
-          
-          <a
-            href="https://t.me/+NX7sLkCLMPk0YWI1"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#0088cc] hover:bg-blue-50/50"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0088cc]/10">
-              <Send size={18} className="text-[#0088cc]" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-zeluxe-black">Telegram Channel</p>
-              <p className="text-[11px] text-gray-500">নতুন আপডেট ও অফার পেতে জয়েন করুন</p>
-            </div>
-          </a>
-
-          <a
-            href="https://www.facebook.com/share/1BKSZiGu3v/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#1877F2] hover:bg-blue-50/50"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1877F2]/10">
-              <Facebook size={18} className="text-[#1877F2]" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-zeluxe-black">Facebook Page</p>
-              <p className="text-[11px] text-gray-500">আমাদের অফিসিয়াল ফেসবুক পেজ</p>
-            </div>
-          </a>
-
-          <a
-            href="https://t.me/zeluxegalleryreseller"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#229ED9] hover:bg-blue-50/50"
-          >
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#229ED9]/10">
-              <Headphones size={18} className="text-[#229ED9]" />
-            </div>
-            <div>
-              <p className="text-sm font-bold text-zeluxe-black">Telegram Support</p>
-              <p className="text-[11px] text-gray-500">যেকোনো সমস্যায় সরাসরি মেসেজ করুন</p>
-            </div>
-          </a>
-        </div>
-
-        {/* Withdraw Button */}
-        <button
-          onClick={() => navigate('/withdraw')}
-          className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-zeluxe-gold py-3 font-bold text-zeluxe-black transition hover:brightness-110 active:scale-[0.98]"
-        >
-          <Wallet className="h-5 w-5" />
-          টাকা তুলুন
-        </button>
-
-        {/* Actions */}
-        <div className="flex gap-3">
+      ) : (
+        <div className="mb-4 rounded-xl border border-dashed border-zeluxe-lightgray bg-zeluxe-fieldbg p-5 text-center">
+          <Building2 className="mx-auto text-zeluxe-gold" size={32} />
+          <p className="mt-2 text-sm font-bold text-zeluxe-black">ব্যবসার তথ্য যোগ করুন</p>
+          <p className="mt-1 text-xs text-gray-500">
+            আপনার ব্যবসার নাম, লোগো, Facebook, WhatsApp যোগ করে প্রফেশনাল হয়ে উঠুন
+          </p>
           <button
-            onClick={() => navigate('/reseller-dashboard')}
-            className="flex-1 rounded-xl border border-zeluxe-black py-3 font-bold text-zeluxe-black transition hover:bg-zeluxe-fieldbg"
+            onClick={() => setEditOpen(true)}
+            className="mt-3 rounded-xl bg-zeluxe-black px-5 py-2 text-sm font-bold text-white transition hover:bg-[#2a2a2a]"
           >
-            ড্যাশবোর্ড
-          </button>
-          <button
-            onClick={() => setShowLogout(true)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700"
-          >
-            <LogOut className="h-4 w-4" />
-            লগআউট
+            যোগ করুন
           </button>
         </div>
+      )}
 
-        <p className="mt-6 text-center text-xs text-gray-400">
-          সাপোর্ট:{' '}
-          <a href="mailto:zeluxegallery@gmail.com" className="text-zeluxe-gold">
-            zeluxegallery@gmail.com
-          </a>
-        </p>
+      {/* Account Info Card */}
+      <div className="mb-4 overflow-hidden rounded-xl border border-zeluxe-lightgray bg-white">
+        <InfoRow icon={Phone} label="মোবাইল নম্বর" value={userData.phone || '—'} />
+        <InfoRow icon={Mail} label="ইমেইল" value={userData.email || '—'} />
+        <InfoRow
+          icon={ShieldCheck}
+          label="মেম্বারশিপ স্ট্যাটাস"
+          value={getStatusBadge(userData.membershipStatus || 'pending')}
+        />
+        <InfoRow
+          icon={UserIcon}
+          label="অ্যাকাউন্ট স্ট্যাটাস"
+          value={getStatusBadge(userData.accountStatus || 'pending_membership')}
+        />
+        <InfoRow
+          icon={Calendar}
+          label="যোগদানের তারিখ"
+          value={formatDate(userData.createdAt)}
+          isLast
+        />
       </div>
+
+      {/* ═══ নতুন সোশ্যাল মিডিয়া লিংক সেকশন ═══ */}
+      <div className="mb-4 space-y-3 rounded-xl border border-zeluxe-lightgray bg-white p-4">
+        <h3 className="text-sm font-bold text-zeluxe-black mb-1">আমাদের সাথে যুক্ত থাকুন</h3>
+        
+        <a
+          href="https://t.me/+NX7sLkCLMPk0YWI1"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#0088cc] hover:bg-blue-50/50"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#0088cc]/10">
+            <Send size={18} className="text-[#0088cc]" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-zeluxe-black">Telegram Channel</p>
+            <p className="text-[11px] text-gray-500">নতুন আপডেট ও অফার পেতে জয়েন করুন</p>
+          </div>
+        </a>
+
+        <a
+          href="https://www.facebook.com/share/1BKSZiGu3v/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#1877F2] hover:bg-blue-50/50"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1877F2]/10">
+            <Facebook size={18} className="text-[#1877F2]" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-zeluxe-black">Facebook Page</p>
+            <p className="text-[11px] text-gray-500">আমাদের অফিসিয়াল ফেসবুক পেজ</p>
+          </div>
+        </a>
+
+        <a
+          href="https://t.me/zeluxegalleryreseller"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-lg border border-zeluxe-lightgray p-3 transition hover:border-[#229ED9] hover:bg-blue-50/50"
+        >
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#229ED9]/10">
+            <Headphones size={18} className="text-[#229ED9]" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-zeluxe-black">Telegram Support</p>
+            <p className="text-[11px] text-gray-500">যেকোনো সমস্যায় সরাসরি মেসেজ করুন</p>
+          </div>
+        </a>
+      </div>
+
+      {/* Withdraw Button */}
+      <button
+        onClick={() => navigate('/withdraw')}
+        className="mb-3 flex w-full items-center justify-center gap-2 rounded-xl bg-zeluxe-gold py-3 font-bold text-zeluxe-black transition hover:brightness-110 active:scale-[0.98]"
+      >
+        <Wallet className="h-5 w-5" />
+        টাকা তুলুন
+      </button>
+
+      {/* Actions */}
+      <div className="flex gap-3">
+        <button
+          onClick={() => navigate('/reseller-dashboard')}
+          className="flex-1 rounded-xl border border-zeluxe-black py-3 font-bold text-zeluxe-black transition hover:bg-zeluxe-fieldbg"
+        >
+          ড্যাশবোর্ড
+        </button>
+        <button
+          onClick={() => setShowLogout(true)}
+          className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-3 font-bold text-white transition hover:bg-red-700"
+        >
+          <LogOut className="h-4 w-4" />
+          লগআউট
+        </button>
+      </div>
+
+      <p className="mt-6 text-center text-xs text-gray-400">
+        সাপোর্ট:{' '}
+        <a href="mailto:zeluxegallery@gmail.com" className="text-zeluxe-gold">
+          zeluxegallery@gmail.com
+        </a>
+      </p>
 
       {/* Edit Business Modal */}
       {editOpen && (
@@ -621,7 +615,7 @@ export default function Profile() {
         onConfirm={confirmLogout}
         onCancel={() => setShowLogout(false)}
       />
-    </Layout>
+    </div>
   );
 }
 
