@@ -8,7 +8,7 @@ import {
   serverTimestamp,
   updateDoc,
 } from 'firebase/firestore';
-import { FolderTree, Loader2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
+import { AlertCircle, FolderTree, Loader2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
@@ -31,33 +31,71 @@ const emptyForm: CategoryForm = {
   imageUrl: '',
 };
 
+// ═══ ডিফল্ট ক্যাটাগরি ইংরেজিতে আপডেট করা হলো ═══
 const DEFAULT_CATEGORIES = [
-  'শার্ট',
-  'টি-শার্ট',
-  'পাঞ্জাবি',
-  'প্যান্ট & ট্রাউজার',
-  'হুডি & জ্যাকেট',
-  'শাড়ি',
-  'থ্রি-পিস',
-  'কুর্তি',
-  'বোরকা',
-  'হিজাব',
-  'বেবি ড্রেস',
-  'কিডস আইটেম',
-  'খেলনা',
-  'ঘড়ি',
-  'স্মার্ট ওয়াচ',
-  'হেডফোন',
-  'পাওয়ার ব্যাংক',
-  'কসমেটিক্স',
-  'স্কিন কেয়ার',
-  'পারফিউম',
-  'ব্যাগ',
-  'কাপল আইটেম',
-  'গিফট আইটেম',
-  'ওয়েস্টার্ন ড্রেস',
-  'ইন্টেরিয়র',
+  'Shirt',
+  'T-Shirt',
+  'Panjabi',
+  'Pant & Trouser',
+  'Hoodie & Jacket',
+  'Saree',
+  'Three Piece',
+  'Kurti',
+  'Borka',
+  'Hijab',
+  'Baby Dress',
+  'Kids Items',
+  'Toys',
+  'Watch',
+  'Smart Watch',
+  'Headphone',
+  'Power Bank',
+  'Cosmetics',
+  'Skin Care',
+  'Perfume',
+  'Bag',
+  'Couple Items',
+  'Gift Items',
+  'Western Dress',
+  'Interior',
 ];
+
+// ═══ বাংলা থেকে ইংরেজি নামের অভিধান ═══
+const categoryTranslations: Record<string, string> = {
+  'পাওয়ার ব্যাংক': 'Power Bank',
+  'পাঞ্জাবি': 'Panjabi',
+  'হিজাব': 'Hijab',
+  'গিফট আইটেম': 'Gift Items',
+  'কসমেটিক্স': 'Cosmetics',
+  'কাপল আইটেম': 'Couple Items',
+  'ব্যাগ': 'Bag',
+  'বোরকা': 'Borka',
+  'শার্ট': 'Shirt',
+  'পাঞ্জাবি কম্বো সেট': 'Panjabi Combo Set',
+  'কিডস আইটেম': 'Kids Items',
+  'পারফিউম': 'Perfume',
+  'ইয়ারবাডস (ব্রুটুথ)': 'Earbuds',
+  'টি-শার্ট': 'T-Shirt',
+  'থ্রি-পিস': 'Three Piece',
+  'স্কিন কেয়ার': 'Skin Care',
+  'হুডি & জ্যাকেট': 'Hoodie & Jacket',
+  'শাড়ি': 'Saree',
+  'প্যান্ট & ট্রাউজার': 'Pant & Trouser',
+  'স্মার্ট ওয়াচ': 'Smart Watch',
+  'ঘড়ি': 'Watch',
+  'ড্রেস': 'Dress',
+  'খেলনা': 'Toys',
+  'বেবি ড্রেস': 'Baby Dress',
+  'হেডফোন': 'Headphone',
+  'কুর্তি': 'Kurti',
+  'ওয়েস্টার্ন ড্রেস': 'Western Dress',
+  'ইন্টেরিয়র': 'Interior',
+};
+
+// ইংরেজি নাম বের করার হেল্পার ফাংশন
+const getDisplayCategoryName = (name: string) => {
+  return categoryTranslations[name] || name;
+};
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState<Category[]>([]);
@@ -86,7 +124,6 @@ export default function AdminCategories() {
           });
         }
 
-        // Reload after seeding
         const newCatSnap = await getDocs(collection(db, 'categories'));
         const products = productSnap.docs.map((p) => p.data());
         setCategories(
@@ -130,7 +167,8 @@ export default function AdminCategories() {
   };
 
   const openEdit = (cat: Category) => {
-    setForm({ name: cat.name, imageUrl: cat.imageUrl });
+    // এডিট করার সময় ইনপুটে ইংরেজি নাম দেখাবে
+    setForm({ name: getDisplayCategoryName(cat.name), imageUrl: cat.imageUrl });
     setEditingId(cat.id);
     setModalOpen(true);
   };
@@ -216,35 +254,37 @@ export default function AdminCategories() {
           {categories.map((cat) => (
             <div
               key={cat.id}
-              className="flex items-center justify-between rounded-xl border border-zeluxe-lightgray bg-white p-4"
+              className="flex items-center justify-between rounded-xl border border-zeluxe-lightgray bg-white p-4 shadow-sm"
             >
               <div className="flex items-center gap-3">
                 {cat.imageUrl ? (
                   <img
-                    src={cat.imageUrl}
+                    src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_100/') : cat.imageUrl}
                     alt={cat.name}
-                    className="h-10 w-10 rounded-full object-cover"
+                    loading="lazy"
+                    className="h-12 w-12 rounded-full object-cover border border-gray-100"
                   />
                 ) : (
-                  <span className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-gold/10">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-gold/10">
                     <FolderTree className="text-zeluxe-gold" size={20} />
                   </span>
                 )}
                 <div>
-                  <p className="font-bold text-zeluxe-black">{cat.name}</p>
+                  {/* ═══ এখানে ইংরেজি নামটি দেখাবে ═══ */}
+                  <p className="font-bold text-zeluxe-black">{getDisplayCategoryName(cat.name)}</p>
                   <p className="text-xs text-gray-500">{cat.productCount} products</p>
                 </div>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => openEdit(cat)}
-                  className="rounded-lg p-1.5 text-zeluxe-gold transition hover:bg-zeluxe-fieldbg"
+                  className="rounded-lg p-2 text-zeluxe-gold transition hover:bg-zeluxe-fieldbg"
                 >
                   <Pencil className="h-4 w-4" />
                 </button>
                 <button
                   onClick={() => handleDelete(cat)}
-                  className="rounded-lg p-1.5 text-red-600 transition hover:bg-red-50"
+                  className="rounded-lg p-2 text-red-600 transition hover:bg-red-50"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -282,9 +322,19 @@ export default function AdminCategories() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
-                  placeholder="Category name"
+                  placeholder="যেমন: Power Bank"
                 />
               </div>
+
+              {/* ═══ সতর্কবার্তা ═══ */}
+              {editingId && (
+                <div className="flex items-start gap-2 rounded-lg bg-yellow-50 p-3 border border-yellow-200">
+                  <AlertCircle size={16} className="text-yellow-600 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-yellow-800 leading-relaxed">
+                    <strong>সতর্কতা:</strong> ক্যাটাগরির নাম পরিবর্তন করলে, এই ক্যাটাগরির পুরনো প্রোডাক্টগুলো রিসেলার প্যানেলে আর দেখাবে না। তাই নাম পরিবর্তনের পর প্রোডাক্টগুলো আবার নতুন নামে এডিট করে সেভ করতে হবে।
+                  </p>
+                </div>
+              )}
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">ক্যাটাগরির ছবি</label>
@@ -293,7 +343,7 @@ export default function AdminCategories() {
                     <img
                       src={form.imageUrl}
                       alt="Preview"
-                      className="h-32 w-32 rounded-xl object-cover"
+                      className="h-32 w-32 rounded-xl object-cover border border-gray-200"
                     />
                     <button
                       type="button"
@@ -308,7 +358,7 @@ export default function AdminCategories() {
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-zeluxe-lightgray p-4 text-center cursor-pointer transition hover:border-zeluxe-gold disabled:opacity-60"
+                    className="flex w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-zeluxe-lightgray p-4 text-center cursor-pointer transition hover:border-zeluxe-gold disabled:opacity-60 bg-gray-50"
                   >
                     {uploading ? (
                       <>
