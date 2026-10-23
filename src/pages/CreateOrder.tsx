@@ -10,7 +10,6 @@ import {
 } from 'firebase/firestore';
 import { Loader2, Search, Package, X, ChevronDown, Plus, Trash2, Copy, Check, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import Layout from '../components/Layout';
 import { auth, db } from '../firebase';
 import { generateOrderId } from '../lib/orderId';
 
@@ -327,230 +326,227 @@ export default function CreateOrder() {
 
   if (loading) {
     return (
-      <Layout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </Layout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+      </div>
     );
   }
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-2xl pb-24">
-        <h1 className="text-2xl font-bold text-zeluxe-black">নতুন অর্ডার</h1>
-        <p className="mb-6 text-sm text-gray-600">একসাথে একাধিক প্রোডাক্ট যোগ করে অর্ডার করুন</p>
+    // ═══ <Layout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
+    <div className="mx-auto max-w-2xl pb-24">
+      <h1 className="text-2xl font-bold text-zeluxe-black">নতুন অর্ডার</h1>
+      <p className="mb-6 text-sm text-gray-600">একসাথে একাধিক প্রোডাক্ট যোগ করে অর্ডার করুন</p>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          
-          {/* কাস্টমার ইনফরমেশন */}
-          <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5 relative overflow-hidden">
-            {isAutofilled && (
-              <div className="absolute top-0 right-0 rounded-bl-lg bg-green-100 px-3 py-1 text-[10px] font-bold text-green-700 flex items-center gap-1">
-                <UserCheck size={12} /> Autofilled
-              </div>
-            )}
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">কাস্টমারের তথ্য</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">মোবাইল নাম্বার *</label>
-                <input 
-                  type="tel" 
-                  value={customerPhone} 
-                  onChange={handlePhoneChange} 
-                  required 
-                  className={inputClass} 
-                  placeholder="01XXXXXXXXX" 
-                />
-                <p className="mt-1 text-[11px] text-gray-500">পুরনো কাস্টমারের নাম্বার দিলে তথ্য অটো বসে যাবে।</p>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">কাস্টমারের নাম *</label>
-                <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className={inputClass} placeholder="যেমন: রফিকুল ইসলাম" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি ঠিকানা *</label>
-                <textarea value={address} onChange={(e) => setAddress(e.target.value)} required rows={2} className={`${inputClass} resize-none`} placeholder="সম্পূর্ণ ঠিকানা লিখুন" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">এলাকা</label>
-                <select value={district} onChange={(e) => handleDistrictChange(e.target.value)} className={inputClass}>
-                  {DISTRICTS.map((item) => <option key={item} value={item}>{item}</option>)}
-                </select>
-              </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        
+        {/* কাস্টমার ইনফরমেশন */}
+        <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5 relative overflow-hidden">
+          {isAutofilled && (
+            <div className="absolute top-0 right-0 rounded-bl-lg bg-green-100 px-3 py-1 text-[10px] font-bold text-green-700 flex items-center gap-1">
+              <UserCheck size={12} /> Autofilled
             </div>
-          </section>
-
-          {/* প্রোডাক্ট অ্যাড সেকশন */}
-          <section className="rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-5">
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">প্রোডাক্ট যোগ করুন</h2>
-            <div className="space-y-4">
-              
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">প্রোডাক্ট *</label>
-                <button
-                  type="button"
-                  onClick={() => setIsProductModalOpen(true)}
-                  className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm transition ${
-                    selectedProduct ? 'border-zeluxe-gold bg-white text-zeluxe-black font-medium' : 'border-zeluxe-lightgray bg-white text-gray-500'
-                  }`}
-                >
-                  <span className="truncate pr-4">{selectedProduct ? selectedProduct.name : 'প্রোডাক্ট সিলেক্ট করুন...'}</span>
-                  <ChevronDown size={18} className={selectedProduct ? 'text-zeluxe-gold' : 'text-gray-400'} />
-                </button>
-              </div>
-
-              {selectedProduct && selectedProduct.sizes.length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-zeluxe-black mb-1.5">সাইজ</label>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedProduct.sizes.map((s) => (
-                      <button
-                        key={s} type="button" onClick={() => setCurrentSize(s)}
-                        className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${currentSize === s ? 'border-zeluxe-gold bg-zeluxe-gold text-zeluxe-black' : 'border-zeluxe-lightgray bg-white text-zeluxe-black hover:border-zeluxe-gold'}`}
-                      >
-                        {s}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পরিমাণ</label>
-                  <input type="text" inputMode="numeric" value={currentQuantity} onChange={(e) => setCurrentQuantity(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-zeluxe-black mb-1.5">বিক্রয় মূল্য (Tk)</label>
-                  <input type="text" inputMode="numeric" value={currentSellingPrice} onChange={(e) => setCurrentSellingPrice(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
-                  {selectedProduct && (
-                    <p className="mt-1 text-[11px] text-gray-500">
-                      রিসেলার মূল্য (ক্রয়): <span className="font-bold text-zeluxe-black">Tk {selectedProduct.resellerPrice}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <button type="button" onClick={handleAddToCart} className="w-full flex items-center justify-center gap-2 rounded-xl bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800">
-                <Plus size={18} /> অর্ডার লিস্টে যোগ করুন
-              </button>
-            </div>
-          </section>
-
-          {/* কার্ট লিস্ট */}
-          {cart.length > 0 && (
-            <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
-              <h2 className="mb-4 text-lg font-bold text-zeluxe-black">অর্ডার লিস্ট ({cart.length})</h2>
-              <div className="space-y-3">
-                {cart.map((item, index) => (
-                  <div key={index} className="flex items-start gap-3 rounded-lg border border-zeluxe-lightgray p-3 bg-zeluxe-fieldbg">
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-white border border-zeluxe-lightgray">
-                      {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" /> : <Package size={20} className="m-auto mt-3 text-gray-400" />}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-bold text-zeluxe-black line-clamp-1">{item.name}</p>
-                      <p className="text-xs text-gray-500">সাইজ: {item.size} | পরিমাণ: {item.quantity}</p>
-                      <p className="text-xs font-bold text-zeluxe-gold mt-1">Tk {item.sellingPrice} x {item.quantity} = Tk {item.sellingPrice * item.quantity}</p>
-                    </div>
-                    <button type="button" onClick={() => removeFromCart(index)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition">
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </section>
           )}
-
-          {/* পেমেন্ট ও সামারি */}
-          <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
-            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">পেমেন্ট ও সামারি</h2>
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি চার্জ (Tk)</label>
-                <input type="text" inputMode="numeric" value={deliveryCharge} readOnly className={`${inputClass} bg-gray-100 cursor-not-allowed`} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডিসকাউন্ট (Tk)</label>
-                <input type="text" inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} placeholder="0" />
-              </div>
+          <h2 className="mb-4 text-lg font-bold text-zeluxe-black">কাস্টমারের তথ্য</h2>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">মোবাইল নাম্বার *</label>
+              <input 
+                type="tel" 
+                value={customerPhone} 
+                onChange={handlePhoneChange} 
+                required 
+                className={inputClass} 
+                placeholder="01XXXXXXXXX" 
+              />
+              <p className="mt-1 text-[11px] text-gray-500">পুরনো কাস্টমারের নাম্বার দিলে তথ্য অটো বসে যাবে।</p>
             </div>
-            
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পেমেন্ট মেথড</label>
-              <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputClass}>
-                {PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">কাস্টমারের নাম *</label>
+              <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} required className={inputClass} placeholder="যেমন: রফিকুল ইসলাম" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি ঠিকানা *</label>
+              <textarea value={address} onChange={(e) => setAddress(e.target.value)} required rows={2} className={`${inputClass} resize-none`} placeholder="সম্পূর্ণ ঠিকানা লিখুন" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">এলাকা</label>
+              <select value={district} onChange={(e) => handleDistrictChange(e.target.value)} className={inputClass}>
+                {DISTRICTS.map((item) => <option key={item} value={item}>{item}</option>)}
               </select>
             </div>
+          </div>
+        </section>
 
-            {(paymentMethod === 'bKash Advance' || paymentMethod === 'Full Advance') && (
-              <div className="mb-4 rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-4 animate-in fade-in slide-in-from-top-2">
-                <p className="text-sm font-medium text-zeluxe-black mb-2">
-                  অনুগ্রহ করে নিচের নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন:
-                </p>
-                <div className="flex items-center justify-between rounded-lg bg-white border border-zeluxe-gold px-3 py-2 mb-3">
-                  <span className="font-mono text-base font-bold text-zeluxe-black tracking-wider">{PAYMENT_NUMBER}</span>
-                  <button type="button" onClick={handleCopyNumber} className="text-zeluxe-gold hover:text-zeluxe-black transition p-1">
-                    {copied ? <Check size={18} /> : <Copy size={18} />}
-                  </button>
+        {/* প্রোডাক্ট অ্যাড সেকশন */}
+        <section className="rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-5">
+          <h2 className="mb-4 text-lg font-bold text-zeluxe-black">প্রোডাক্ট যোগ করুন</h2>
+          <div className="space-y-4">
+            
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">প্রোডাক্ট *</label>
+              <button
+                type="button"
+                onClick={() => setIsProductModalOpen(true)}
+                className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 text-sm transition ${
+                  selectedProduct ? 'border-zeluxe-gold bg-white text-zeluxe-black font-medium' : 'border-zeluxe-lightgray bg-white text-gray-500'
+                }`}
+              >
+                <span className="truncate pr-4">{selectedProduct ? selectedProduct.name : 'প্রোডাক্ট সিলেক্ট করুন...'}</span>
+                <ChevronDown size={18} className={selectedProduct ? 'text-zeluxe-gold' : 'text-gray-400'} />
+              </button>
+            </div>
+
+            {selectedProduct && selectedProduct.sizes.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">সাইজ</label>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProduct.sizes.map((s) => (
+                    <button
+                      key={s} type="button" onClick={() => setCurrentSize(s)}
+                      className={`rounded-lg border px-4 py-2 text-sm font-medium transition ${currentSize === s ? 'border-zeluxe-gold bg-zeluxe-gold text-zeluxe-black' : 'border-zeluxe-lightgray bg-white text-zeluxe-black hover:border-zeluxe-gold'}`}
+                    >
+                      {s}
+                    </button>
+                  ))}
                 </div>
-                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">Transaction ID *</label>
-                <input 
-                  type="text" 
-                  value={transactionId} 
-                  onChange={(e) => setTransactionId(e.target.value)} 
-                  placeholder="যেমন: 9F7A2B1C4D" 
-                  className={inputClass} 
-                />
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">নোট (ঐচ্ছিক)</label>
-              <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inputClass} resize-none`} placeholder="বিশেষ নির্দেশনা..." />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পরিমাণ</label>
+                <input type="text" inputMode="numeric" value={currentQuantity} onChange={(e) => setCurrentQuantity(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zeluxe-black mb-1.5">বিক্রয় মূল্য (Tk)</label>
+                <input type="text" inputMode="numeric" value={currentSellingPrice} onChange={(e) => setCurrentSellingPrice(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} />
+                {selectedProduct && (
+                  <p className="mt-1 text-[11px] text-gray-500">
+                    রিসেলার মূল্য (ক্রয়): <span className="font-bold text-zeluxe-black">Tk {selectedProduct.resellerPrice}</span>
+                  </p>
+                )}
+              </div>
             </div>
-          </section>
 
-          {/* ফাইনাল সামারি ও সাবমিট */}
-          <section className="rounded-xl bg-zeluxe-black p-6 text-white">
-            <div className="space-y-2 text-sm mb-4">
-              <div className="flex justify-between text-gray-300">
-                <span>সর্বমোট আইটেম</span>
-                <span>{cart.length} টি</span>
-              </div>
-              <div className="flex justify-between text-gray-300">
-                <span>আইটেম মোট দাম</span>
-                <span>Tk {totalItemPrice.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-gray-300">
-                <span>ডেলিভারি চার্জ</span>
-                <span>Tk {numDeliveryCharge.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-gray-300">
-                <span>ডিসকাউন্ট</span>
-                <span>-Tk {numDiscount.toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-green-400 font-bold pt-2 border-t border-white/10">
-                <span>আপনার মোট লাভ:</span>
-                <span>Tk {totalProfit.toLocaleString()}</span>
-              </div>
-            </div>
-            <div className="flex justify-between text-xl font-bold pt-3 border-t border-white/20 mb-6">
-              <span>সর্বমোট বিল</span>
-              <span className="text-zeluxe-gold">Tk {grandTotal.toLocaleString()}</span>
-            </div>
-            
-            <button
-              type="submit"
-              disabled={submitting || cart.length === 0}
-              className="w-full rounded-xl bg-zeluxe-gold py-4 text-sm font-bold text-zeluxe-black transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
-            >
-              {submitting ? 'অর্ডার তৈরি হচ্ছে...' : '✓ অর্ডার কনফার্ম করুন'}
+            <button type="button" onClick={handleAddToCart} className="w-full flex items-center justify-center gap-2 rounded-xl bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800">
+              <Plus size={18} /> অর্ডার লিস্টে যোগ করুন
             </button>
-          </section>
-        </form>
-      </div>
+          </div>
+        </section>
 
+        {/* কার্ট লিস্ট */}
+        {cart.length > 0 && (
+          <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
+            <h2 className="mb-4 text-lg font-bold text-zeluxe-black">অর্ডার লিস্ট ({cart.length})</h2>
+            <div className="space-y-3">
+              {cart.map((item, index) => (
+                <div key={index} className="flex items-start gap-3 rounded-lg border border-zeluxe-lightgray p-3 bg-zeluxe-fieldbg">
+                  <div className="h-12 w-12 shrink-0 overflow-hidden rounded-md bg-white border border-zeluxe-lightgray">
+                    {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" /> : <Package size={20} className="m-auto mt-3 text-gray-400" />}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-bold text-zeluxe-black line-clamp-1">{item.name}</p>
+                    <p className="text-xs text-gray-500">সাইজ: {item.size} | পরিমাণ: {item.quantity}</p>
+                    <p className="text-xs font-bold text-zeluxe-gold mt-1">Tk {item.sellingPrice} x {item.quantity} = Tk {item.sellingPrice * item.quantity}</p>
+                  </div>
+                  <button type="button" onClick={() => removeFromCart(index)} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* পেমেন্ট ও সামারি */}
+        <section className="rounded-xl border border-zeluxe-lightgray bg-white p-5">
+          <h2 className="mb-4 text-lg font-bold text-zeluxe-black">পেমেন্ট ও সামারি</h2>
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডেলিভারি চার্জ (Tk)</label>
+              <input type="text" inputMode="numeric" value={deliveryCharge} readOnly className={`${inputClass} bg-gray-100 cursor-not-allowed`} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">ডিসকাউন্ট (Tk)</label>
+              <input type="text" inputMode="numeric" value={discount} onChange={(e) => setDiscount(e.target.value.replace(/[^0-9]/g, ''))} className={inputClass} placeholder="0" />
+            </div>
+          </div>
+          
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-zeluxe-black mb-1.5">পেমেন্ট মেথড</label>
+            <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className={inputClass}>
+              {PAYMENT_METHODS.map((method) => <option key={method} value={method}>{method}</option>)}
+            </select>
+          </div>
+
+          {(paymentMethod === 'bKash Advance' || paymentMethod === 'Full Advance') && (
+            <div className="mb-4 rounded-xl border border-zeluxe-gold bg-zeluxe-gold/5 p-4 animate-in fade-in slide-in-from-top-2">
+              <p className="text-sm font-medium text-zeluxe-black mb-2">
+                অনুগ্রহ করে নিচের নাম্বারে টাকা পাঠিয়ে ট্রানজেকশন আইডি দিন:
+              </p>
+              <div className="flex items-center justify-between rounded-lg bg-white border border-zeluxe-gold px-3 py-2 mb-3">
+                <span className="font-mono text-base font-bold text-zeluxe-black tracking-wider">{PAYMENT_NUMBER}</span>
+                <button type="button" onClick={handleCopyNumber} className="text-zeluxe-gold hover:text-zeluxe-black transition p-1">
+                  {copied ? <Check size={18} /> : <Copy size={18} />}
+                </button>
+              </div>
+              <label className="block text-sm font-medium text-zeluxe-black mb-1.5">Transaction ID *</label>
+              <input 
+                type="text" 
+                value={transactionId} 
+                onChange={(e) => setTransactionId(e.target.value)} 
+                placeholder="যেমন: 9F7A2B1C4D" 
+                className={inputClass} 
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-zeluxe-black mb-1.5">নোট (ঐচ্ছিক)</label>
+            <textarea value={note} onChange={(e) => setNote(e.target.value)} rows={2} className={`${inputClass} resize-none`} placeholder="বিশেষ নির্দেশনা..." />
+          </div>
+        </section>
+
+        {/* ফাইনাল সামারি ও সাবমিট */}
+        <section className="rounded-xl bg-zeluxe-black p-6 text-white">
+          <div className="space-y-2 text-sm mb-4">
+            <div className="flex justify-between text-gray-300">
+              <span>সর্বমোট আইটেম</span>
+              <span>{cart.length} টি</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>আইটেম মোট দাম</span>
+              <span>Tk {totalItemPrice.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>ডেলিভারি চার্জ</span>
+              <span>Tk {numDeliveryCharge.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-gray-300">
+              <span>ডিসকাউন্ট</span>
+              <span>-Tk {numDiscount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-green-400 font-bold pt-2 border-t border-white/10">
+              <span>আপনার মোট লাভ:</span>
+              <span>Tk {totalProfit.toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="flex justify-between text-xl font-bold pt-3 border-t border-white/20 mb-6">
+            <span>সর্বমোট বিল</span>
+            <span className="text-zeluxe-gold">Tk {grandTotal.toLocaleString()}</span>
+          </div>
+          
+          <button
+            type="submit"
+            disabled={submitting || cart.length === 0}
+            className="w-full rounded-xl bg-zeluxe-gold py-4 text-sm font-bold text-zeluxe-black transition hover:brightness-110 active:scale-[0.98] disabled:opacity-50"
+          >
+            {submitting ? 'অর্ডার তৈরি হচ্ছে...' : '✓ অর্ডার কনফার্ম করুন'}
+          </button>
+        </section>
+      </form>
+    
       {/* প্রোডাক্ট সার্চ মডাল */}
       {isProductModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
@@ -588,6 +584,6 @@ export default function CreateOrder() {
           </div>
         </div>
       )}
-    </Layout>
+    </div>
   );
 }
