@@ -10,7 +10,6 @@ import {
   Phone,
   ExternalLink,
 } from 'lucide-react';
-import Layout from '../components/Layout';
 
 type FAQ = {
   id: string;
@@ -127,203 +126,202 @@ export default function Support() {
   const noResults = hasQuery && searchResults.length === 0;
 
   return (
-    <Layout>
-      <div className="mx-auto max-w-3xl">
-        {/* Header */}
-        <div className="mb-5">
-          <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
-            সাপোর্ট
-          </h1>
-          <p className="mt-1 text-xs text-gray-500 md:text-sm">
-            যেকোনো সমস্যায় সাহায্য নিন — ২৪/৭ আপনার পাশে আছি
+    // ═══ <Layout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
+    <div className="mx-auto max-w-3xl">
+      {/* Header */}
+      <div className="mb-5">
+        <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
+          সাপোর্ট
+        </h1>
+        <p className="mt-1 text-xs text-gray-500 md:text-sm">
+          যেকোনো সমস্যায় সাহায্য নিন — ২৪/৭ আপনার পাশে আছি
+        </p>
+      </div>
+
+      {/* Hero Card */}
+      <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-6 text-white">
+        <div className="relative">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-zeluxe-gold">
+            <HelpCircle size={12} />
+            AI Support Bot
+          </span>
+          <h2 className="mt-3 text-lg font-bold md:text-xl">
+            কেমন সাহায্য লাগবে?
+          </h2>
+          <p className="mt-1 text-xs text-gray-400">
+            নিচে আপনার প্রশ্ন টাইপ করুন — সাথে সাথে উত্তর পাবেন
           </p>
-        </div>
 
-        {/* Hero Card */}
-        <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-6 text-white">
-          <div className="relative">
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[11px] font-bold text-zeluxe-gold">
-              <HelpCircle size={12} />
-              AI Support Bot
-            </span>
-            <h2 className="mt-3 text-lg font-bold md:text-xl">
-              কেমন সাহায্য লাগবে?
-            </h2>
-            <p className="mt-1 text-xs text-gray-400">
-              নিচে আপনার প্রশ্ন টাইপ করুন — সাথে সাথে উত্তর পাবেন
-            </p>
-
-            {/* Search */}
-            <div className="relative mt-4">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
-                size={18}
-              />
-              <input
-                type="text"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="যেমন: টাকা কখন পাব?"
-                className="w-full rounded-md border border-white/20 bg-white/10 py-3 pl-10 pr-10 text-sm text-white placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none"
-              />
-              {query && (
-                <button
-                  onClick={() => setQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-white"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Search Results */}
-        {hasQuery && (
-          <div className="mb-5">
-            {searchResults.length > 0 ? (
-              <>
-                <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">
-                  {searchResults.length}টি উত্তর পাওয়া গেছে
-                </p>
-                <div className="space-y-2">
-                  {searchResults.map((faq) => (
-                    <FaqCard
-                      key={faq.id}
-                      faq={faq}
-                      isOpen={openFaqId === faq.id}
-                      onToggle={() => setOpenFaqId(openFaqId === faq.id ? null : faq.id)}
-                    />
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-5 text-center">
-                <p className="text-sm font-bold text-yellow-900">
-                  "{query}" — এর কোনো উত্তর পাওয়া যায়নি
-                </p>
-                <p className="mt-1 text-xs text-yellow-700">
-                  আমাদের সাপোর্ট টিমের সাথে সরাসরি কথা বলুন
-                </p>
-                <a
-                  href={`https://wa.me/8801603226151?text=${encodeURIComponent(
-                    `আসসালামু আলাইকুম। আমার প্রশ্ন: ${query}`
-                  )}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="mt-4 inline-flex items-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-green-700"
-                >
-                  <MessageCircle size={14} />
-                  WhatsApp-এ জিজ্ঞাসা করুন
-                </a>
-              </div>
+          {/* Search */}
+          <div className="relative mt-4">
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400"
+              size={18}
+            />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="যেমন: টাকা কখন পাব?"
+              className="w-full rounded-md border border-white/20 bg-white/10 py-3 pl-10 pr-10 text-sm text-white placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 transition hover:text-white"
+              >
+                <X size={16} />
+              </button>
             )}
           </div>
-        )}
-
-        {/* Popular Questions */}
-        {!hasQuery && (
-          <div className="mb-5">
-            <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">
-              জনপ্রিয় প্রশ্ন
-            </p>
-            <div className="space-y-2">
-              {popularFaqs.map((faq) => (
-                <FaqCard
-                  key={faq.id}
-                  faq={faq}
-                  isOpen={openFaqId === faq.id}
-                  onToggle={() => setOpenFaqId(openFaqId === faq.id ? null : faq.id)}
-                />
-              ))}
-            </div>
-
-            <Link
-              to="/faq"
-              className="mt-4 flex items-center justify-center gap-1 text-xs font-medium text-zeluxe-gold hover:underline"
-            >
-              সব প্রশ্নোত্তর দেখুন
-              <ChevronRight size={12} />
-            </Link>
-          </div>
-        )}
-
-        {/* Contact Options */}
-        <div className="mt-6">
-          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">
-            সরাসরি যোগাযোগ
-          </p>
-
-          <div className="space-y-2">
-            {/* WhatsApp */}
-            <a
-              href="https://wa.me/8801603226151"
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-green-500"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-green-50">
-                  <MessageCircle className="text-green-600" size={20} />
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-zeluxe-black">WhatsApp</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    01603-226151 · সবচেয়ে দ্রুত
-                  </p>
-                </div>
-              </div>
-              <ExternalLink size={16} className="text-gray-400" />
-            </a>
-
-            {/* Email */}
-            <a
-              href="mailto:zeluxegallery@gmail.com?subject=Support%20Request"
-              className="flex items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-zeluxe-gold"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-zeluxe-cream">
-                  <Mail className="text-zeluxe-gold" size={20} />
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-zeluxe-black">Email</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    zeluxegallery@gmail.com
-                  </p>
-                </div>
-              </div>
-              <ExternalLink size={16} className="text-gray-400" />
-            </a>
-
-            {/* Phone */}
-            <a
-              href="tel:+8801603226151"
-              className="flex items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-zeluxe-gold"
-            >
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 items-center justify-center rounded-full bg-zeluxe-cream">
-                  <Phone className="text-zeluxe-gold" size={20} />
-                </span>
-                <div>
-                  <p className="text-sm font-bold text-zeluxe-black">সরাসরি কল</p>
-                  <p className="mt-0.5 text-xs text-gray-500">
-                    সকাল ৯টা - রাত ৯টা
-                  </p>
-                </div>
-              </div>
-              <ExternalLink size={16} className="text-gray-400" />
-            </a>
-          </div>
-        </div>
-
-        {/* Info note */}
-        <div className="mt-6 rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream p-4">
-          <p className="text-center text-[11px] text-gray-500">
-            সাপোর্ট টিম সাধারণত ২-৪ ঘণ্টার মধ্যে রিপ্লাই দেয়। জরুরি হলে WhatsApp-এ message দিন।
-          </p>
         </div>
       </div>
-    </Layout>
+
+      {/* Search Results */}
+      {hasQuery && (
+        <div className="mb-5">
+          {searchResults.length > 0 ? (
+            <>
+              <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">
+                {searchResults.length}টি উত্তর পাওয়া গেছে
+              </p>
+              <div className="space-y-2">
+                {searchResults.map((faq) => (
+                  <FaqCard
+                    key={faq.id}
+                    faq={faq}
+                    isOpen={openFaqId === faq.id}
+                    onToggle={() => setOpenFaqId(openFaqId === faq.id ? null : faq.id)}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-5 text-center">
+              <p className="text-sm font-bold text-yellow-900">
+                "{query}" — এর কোনো উত্তর পাওয়া যায়নি
+              </p>
+              <p className="mt-1 text-xs text-yellow-700">
+                আমাদের সাপোর্ট টিমের সাথে সরাসরি কথা বলুন
+              </p>
+              <a
+                href={`https://wa.me/8801603226151?text=${encodeURIComponent(
+                  `আসসালামু আলাইকুম। আমার প্রশ্ন: ${query}`
+                )}`}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-4 inline-flex items-center gap-2 rounded-md bg-green-600 px-5 py-2.5 text-xs font-bold text-white transition hover:bg-green-700"
+              >
+                <MessageCircle size={14} />
+                WhatsApp-এ জিজ্ঞাসা করুন
+              </a>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Popular Questions */}
+      {!hasQuery && (
+        <div className="mb-5">
+          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">
+            জনপ্রিয় প্রশ্ন
+          </p>
+          <div className="space-y-2">
+            {popularFaqs.map((faq) => (
+              <FaqCard
+                key={faq.id}
+                faq={faq}
+                isOpen={openFaqId === faq.id}
+                onToggle={() => setOpenFaqId(openFaqId === faq.id ? null : faq.id)}
+              />
+            ))}
+          </div>
+
+          <Link
+            to="/faq"
+            className="mt-4 flex items-center justify-center gap-1 text-xs font-medium text-zeluxe-gold hover:underline"
+          >
+            সব প্রশ্নোত্তর দেখুন
+            <ChevronRight size={12} />
+          </Link>
+        </div>
+      )}
+
+      {/* Contact Options */}
+      <div className="mt-6">
+        <p className="mb-3 text-xs font-bold uppercase tracking-wider text-gray-500">
+          সরাসরি যোগাযোগ
+        </p>
+
+        <div className="space-y-2">
+          {/* WhatsApp */}
+          <a
+            href="https://wa.me/8801603226151"
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-green-500"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-green-50">
+                <MessageCircle className="text-green-600" size={20} />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-zeluxe-black">WhatsApp</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  01603-226151 · সবচেয়ে দ্রুত
+                </p>
+              </div>
+            </div>
+            <ExternalLink size={16} className="text-gray-400" />
+          </a>
+
+          {/* Email */}
+          <a
+            href="mailto:zeluxegallery@gmail.com?subject=Support%20Request"
+            className="flex items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-zeluxe-gold"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-zeluxe-cream">
+                <Mail className="text-zeluxe-gold" size={20} />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-zeluxe-black">Email</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  zeluxegallery@gmail.com
+                </p>
+              </div>
+            </div>
+            <ExternalLink size={16} className="text-gray-400" />
+          </a>
+
+          {/* Phone */}
+          <a
+            href="tel:+8801603226151"
+            className="flex items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-zeluxe-gold"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 items-center justify-center rounded-full bg-zeluxe-cream">
+                <Phone className="text-zeluxe-gold" size={20} />
+              </span>
+              <div>
+                <p className="text-sm font-bold text-zeluxe-black">সরাসরি কল</p>
+                <p className="mt-0.5 text-xs text-gray-500">
+                  সকাল ৯টা - রাত ৯টা
+                </p>
+              </div>
+            </div>
+            <ExternalLink size={16} className="text-gray-400" />
+          </a>
+        </div>
+      </div>
+
+      {/* Info note */}
+      <div className="mt-6 rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream p-4">
+        <p className="text-center text-[11px] text-gray-500">
+          সাপোর্ট টিম সাধারণত ২-৪ ঘণ্টার মধ্যে রিপ্লাই দেয়। জরুরি হলে WhatsApp-এ message দিন।
+        </p>
+      </div>
+    </div>
   );
 }
 
