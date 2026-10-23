@@ -19,7 +19,6 @@ import {
   Gift,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '../components/AdminLayout';
 import { db } from '../firebase';
 import { creditReferrer, REFERRAL_BONUS_AMOUNT } from '../lib/referral';
 
@@ -35,7 +34,6 @@ type MembershipRequest = {
   paymentNumber: string;
   status: string;
   createdAt?: any;
-  // Referral info
   referredBy?: string;
   referredByName?: string;
 };
@@ -54,7 +52,6 @@ export default function AdminMemberships() {
       );
       const snap = await getDocs(q);
 
-      // For each request, also fetch user doc to check referredBy
       const list: MembershipRequest[] = await Promise.all(
         snap.docs.map(async (d) => {
           const data = d.data();
@@ -97,7 +94,6 @@ export default function AdminMemberships() {
         })
       );
 
-      // Sort by createdAt desc
       list.sort((a, b) => {
         const aTime = a.createdAt?.seconds || 0;
         const bTime = b.createdAt?.seconds || 0;
@@ -121,19 +117,16 @@ export default function AdminMemberships() {
     if (!window.confirm(`${req.name} এর membership approve করবেন?`)) return;
     setProcessingId(req.id);
     try {
-      // 1. Activate user
       await updateDoc(doc(db, 'users', req.uid), {
         accountStatus: 'active',
         membershipStatus: 'approved',
       });
 
-      // 2. Update request status
       await updateDoc(doc(db, 'membershipRequests', req.id), {
         status: 'approved',
         approvedAt: serverTimestamp(),
       });
 
-      // 3. Credit referrer if exists
       if (req.referredBy) {
         const credited = await creditReferrer(req.referredBy);
         if (credited) {
@@ -188,18 +181,17 @@ export default function AdminMemberships() {
     }
   };
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </AdminLayout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+      </div>
     );
   }
 
   return (
-    <AdminLayout>
+    <>
       <h1 className="mb-1 text-xl font-bold text-zeluxe-black md:text-2xl">
         Membership Requests
       </h1>
@@ -332,6 +324,6 @@ export default function AdminMemberships() {
           ))}
         </div>
       )}
-    </AdminLayout>
+    </>
   );
 }
