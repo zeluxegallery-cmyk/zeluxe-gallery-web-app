@@ -1,6 +1,6 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { signOut } from 'firebase/auth';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'; // ═══ Outlet ইমপোর্ট করুন ═══
 import {
   LayoutDashboard,
   LogOut,
@@ -22,17 +22,13 @@ import LogoutModal from './LogoutModal';
 const LOGO_URL =
   'https://res.cloudinary.com/q1zrv81l/image/upload/e_make_transparent,h_100,c_fit/v1792003969/file_000000009da4820b95630d85ec992cbb.png';
 
-type LayoutProps = {
-  children: ReactNode;
-  isAdmin?: boolean;
-};
-
 type NavItem = {
   label: string;
   path: string;
   icon: typeof LayoutDashboard;
 };
 
+// ═══ রিসেলারদের মেনু ═══
 const resellerNav: NavItem[] = [
   { label: 'Dashboard', path: '/reseller-dashboard', icon: LayoutDashboard },
   { label: 'Products', path: '/products', icon: Package },
@@ -44,25 +40,23 @@ const resellerNav: NavItem[] = [
   { label: 'Profile', path: '/profile', icon: User },
 ];
 
-const adminNav: NavItem[] = [
-  { label: 'Admin Overview', path: '/admin-dashboard', icon: LayoutDashboard },
-  { label: 'Memberships', path: '/admin/memberships', icon: User },
-];
-
-export default function Layout({ children, isAdmin = false }: LayoutProps) {
+export default function Layout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
-  const navItems = isAdmin ? adminNav : resellerNav;
-
+  
   const confirmLogout = async () => {
     setShowLogout(false);
     await signOut(auth);
     navigate('/login');
   };
 
-  const isActive = (path: string) => location.pathname === path;
+  // ═══ সাব-রাউটে (যেমন /products/123) গেলেও যাতে ন্যাভিগেশন সক্রিয় থাকে ═══
+  const isActive = (path: string) => {
+    if (path === '/reseller-dashboard') return location.pathname === path;
+    return location.pathname.startsWith(path);
+  };
 
   return (
     <div className="min-h-screen bg-zeluxe-cream">
@@ -116,8 +110,8 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3" aria-label="Main navigation">
-          {navItems.map(({ label, path, icon: Icon }) => (
+        <nav className="flex-1 space-y-1 px-3 overflow-y-auto" aria-label="Main navigation">
+          {resellerNav.map(({ label, path, icon: Icon }) => (
             <Link
               key={path}
               to={path}
@@ -150,9 +144,11 @@ export default function Layout({ children, isAdmin = false }: LayoutProps) {
         </div>
       </aside>
 
+      {/* ═══ MAIN CONTENT ═══ */}
       <main className="min-h-screen md:ml-60">
-        <div className="mx-auto max-w-7xl p-5 pb-20 md:p-8 md:pb-8">
-          {children}
+        <div className="mx-auto max-w-7xl p-5 pb-24 md:p-8 md:pb-8">
+          {/* এখানে পেজগুলো লোড হবে */}
+          <Outlet /> 
         </div>
       </main>
 
