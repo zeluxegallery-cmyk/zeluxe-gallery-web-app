@@ -9,7 +9,6 @@ import {
 } from 'firebase/firestore';
 import { CheckCircle, Loader2, XCircle, Clock, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
-import AdminLayout from '../../components/AdminLayout';
 import { db } from '../../firebase';
 
 type Withdrawal = {
@@ -137,18 +136,17 @@ export default function AdminWithdrawals() {
     );
   };
 
+  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
-      <AdminLayout>
-        <div className="flex min-h-40 items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-        </div>
-      </AdminLayout>
+      <div className="flex min-h-40 items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
+      </div>
     );
   }
 
   return (
-    <AdminLayout>
+    <>
       <h1 className="mb-1 text-2xl font-bold text-zeluxe-black">Withdraw Management</h1>
       <p className="mb-6 text-sm text-gray-500">রিসেলারদের টাকা তোলার request ম্যানেজ করুন</p>
 
@@ -169,7 +167,7 @@ export default function AdminWithdrawals() {
       </div>
 
       {/* Filter */}
-      <div className="mb-4 flex gap-2 overflow-x-auto pb-1">
+      <div className="mb-4 flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
         {(['all', 'pending', 'approved', 'paid', 'rejected'] as const).map((f) => (
           <button
             key={f}
@@ -245,6 +243,6 @@ export default function AdminWithdrawals() {
           ))}
         </div>
       )}
-    </AdminLayout>
+    </>
   );
 }
