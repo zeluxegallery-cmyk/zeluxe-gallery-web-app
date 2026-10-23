@@ -5,10 +5,14 @@ import {
   deleteDoc,
   doc,
   getDocs,
+  query,
   serverTimestamp,
   updateDoc,
+  where,
+  writeBatch,
+  getDoc,
 } from 'firebase/firestore';
-import { AlertCircle, FolderTree, Loader2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
+import { FolderTree, Loader2, Pencil, Plus, Trash2, Upload, X } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminLayout from '../../components/AdminLayout';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
@@ -143,7 +147,8 @@ export default function AdminCategories() {
   };
 
   const openEdit = (cat: Category) => {
-    setForm({ name: getDisplayCategoryName(cat.name), imageUrl: cat.imageUrl });
+    // এডিট করার সময় আমরা সরাসরি ডাটাবেসের নামটাই দেখাবো, যাতে কনফিউশন না হয়
+    setForm({ name: cat.name, imageUrl: cat.imageUrl });
     setEditingId(cat.id);
     setModalOpen(true);
   };
@@ -169,17 +174,52 @@ export default function AdminCategories() {
     }
     setSaving(true);
     try {
+      const newName = form.name.trim();
       const payload = {
-        name: form.name.trim(),
+        name: newName,
         imageUrl: form.imageUrl.trim(),
       };
+
       if (editingId) {
-        await updateDoc(doc(db, 'categories', editingId), payload);
-        toast.success('✓ ক্যাটাগরি আপডেট হয়েছে!');
+        // ১. আগের নামটি বের করা
+        const catRef = doc(db, 'categories', editingId);
+        const catSnap = await getDoc(catRef);
+        
+        if (catSnap.exists()) {
+          const oldName = catSnap.data().name;
+
+          // ২. যদি নাম পরিবর্তন করা হয়, তবে প্রোডাক্টগুলোও আপডেট করা
+          if (oldName !== newName) {
+            const productsQuery = query(collection(db, 'products'), where('category', '==', oldName));
+            const productSnap = await getDocs(productsQuery);
+
+            if (!productSnap.empty) {
+              const batch = writeBatch(db);
+              // সব প্রোডাক্টের ক্যাটাগরি নতুন নামে আপডেট হবে
+              productSnap.docs.forEach((pDoc) => {
+                batch.update(doc(db, 'products', pDoc.id), { category: newName });
+              });
+              // ক্যাটাগরি কালেকশনেও নতুন নাম সেভ হবে
+              batch.update(catRef, payload);
+              
+              await batch.commit();
+              toast.success('✓ ক্যাটাগরি এবং এর অধীনে থাকা সব প্রোডাক্টের নাম আপডেট হয়েছে!');
+            } else {
+              // কোনো প্রোডাক্ট না থাকলে শুধু ক্যাটাগরি আপডেট হবে
+              await updateDoc(catRef, payload);
+              toast.success('✓ ক্যাটাগরি আপডেট হয়েছে!');
+            }
+          } else {
+            // নাম পরিবর্তন না হলে শুধু ছবি বা অন্যান্য আপডেট হবে
+            await updateDoc(catRef, payload);
+            toast.success('✓ ক্যাটাগরি আপডেট হয়েছে!');
+          }
+        }
       } else {
         await addDoc(collection(db, 'categories'), { ...payload, createdAt: serverTimestamp() });
         toast.success('✓ নতুন ক্যাটাগরি যোগ হয়েছে!');
       }
+      
       setModalOpen(false);
       await loadData();
     } catch (err) {
@@ -245,6 +285,7 @@ export default function AdminCategories() {
                   </span>
                 )}
                 <div>
+                  {/* এখানে শুধু ইংরেজি নামটি দেখাবে */}
                   <p className="font-bold text-zeluxe-black">{getDisplayCategoryName(cat.name)}</p>
                   <p className="text-xs text-gray-500">{cat.productCount} products</p>
                 </div>
@@ -296,18 +337,12 @@ export default function AdminCategories() {
                   value={form.name}
                   onChange={(e) => setForm({ ...form, name: e.target.value })}
                   className="w-full rounded-xl border border-zeluxe-lightgray bg-zeluxe-fieldbg px-4 py-3 text-sm focus:border-zeluxe-gold focus:outline-none"
-                  placeholder="যেমন: Power Bank"
+                  placeholder="যেমন: Airpods"
                 />
+                <p className="mt-1 text-[11px] text-gray-500">
+                  * নাম পরিবর্তন করলে এই ক্যাটাগরির সব প্রোডাক্টের ক্যাটাগরিও অটোমেটিক্যালি পরিবর্তন হয়ে যাবে।
+                </p>
               </div>
-
-              {editingId && (
-                <div className="flex items-start gap-2 rounded-lg bg-yellow-50 p-3 border border-yellow-200">
-                  <AlertCircle size={16} className="text-yellow-600 mt-0.5 shrink-0" />
-                  <p className="text-[11px] text-yellow-800 leading-relaxed">
-                    <strong>সতর্কতা:</strong> ক্যাটাগরির নাম পরিবর্তন করলে, এই ক্যাটাগরির পুরনো প্রোডাক্টগুলো রিসেলার প্যানেলে আর দেখাবে না। তাই নাম পরিবর্তনের পর প্রোডাক্টগুলো আবার নতুন নামে এডিট করে সেভ করতে হবে।
-                  </p>
-                </div>
-              )}
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-zeluxe-black">ক্যাটাগরির ছবি</label>
