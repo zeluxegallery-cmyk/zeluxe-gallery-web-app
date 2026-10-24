@@ -85,7 +85,7 @@ const getOrderIndex = (name: string) => {
 
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
-const ALL_CATEGORIES = 'সব ক্যাটাগরি';
+const ALL_CATEGORIES = 'All Categories';
 
 type ProductsCache = {
   uid: string;
@@ -259,7 +259,9 @@ export default function Products() {
         product.name.toLowerCase().includes(term) ||
         product.sku.toLowerCase().includes(term);
       const matchesCategory =
-        selectedCategory === 'সব ক্যাটাগরি' || product.category === selectedCategory;
+        selectedCategory === ALL_CATEGORIES || 
+        product.category === selectedCategory || 
+        getDisplayCategoryName(product.category) === selectedCategory;
       return matchesSearch && matchesCategory;
     });
   }, [products, searchTerm, selectedCategory]);
@@ -272,13 +274,13 @@ export default function Products() {
   const handleCopy = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
-    const text = `${product.name}\n${product.sku}\n\n${product.description || ''}\n\nদাম: Tk ${product.suggestedPrice}\n\nZeluxe Gallery`;
+    const text = `${product.name}\n${product.sku}\n\n${product.description || ''}\n\nPrice: Tk ${product.suggestedPrice}\n\nZeluxe Gallery`;
     try {
       await navigator.clipboard.writeText(text);
       setCopiedId(product.id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      toast.error('কপি করা যায়নি');
+      toast.error('Failed to copy');
     }
   };
 
@@ -288,7 +290,7 @@ export default function Products() {
     
     const primaryImg = product.imageUrls[0] || product.imageUrl;
     if (!primaryImg) {
-      toast.error('কোনো ছবি পাওয়া যায়নি');
+      toast.error('No images found');
       return;
     }
 
@@ -301,12 +303,13 @@ export default function Products() {
 
   return (
     <div className="mx-auto max-w-6xl pb-20">
+      {/* HEADER SECTION (English & Professional) */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-zeluxe-black md:text-3xl tracking-tight">
-          প্রোডাক্ট ক্যাটালগ
+          Product <span className="text-zeluxe-gold">Catalog</span>
         </h1>
         <p className="mt-1 text-sm text-gray-500">
-          সব প্রোডাক্ট দেখুন এবং কাস্টমারের জন্য অর্ডার তৈরি করুন
+          Explore all products and create orders for your customers seamlessly.
         </p>
       </div>
 
@@ -318,13 +321,13 @@ export default function Products() {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="প্রোডাক্ট কোড বা নাম দিয়ে খুঁজুন..."
+            placeholder="Search by product code or name..."
             className="w-full rounded-2xl border border-gray-200 bg-white py-3.5 pl-12 pr-4 text-sm text-zeluxe-black shadow-sm placeholder:text-gray-400 focus:border-zeluxe-gold focus:outline-none focus:ring-1 focus:ring-zeluxe-gold transition"
           />
         </div>
       </div>
 
-      {/* ক্যাটাগরি স্ক্রলার */}
+      {/* Categories Scroller */}
       <div className="mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-bold text-zeluxe-black pl-1">Categories</h2>
@@ -338,46 +341,49 @@ export default function Products() {
         
         <div className="flex gap-4 overflow-x-auto pb-3 snap-x hide-scrollbar">
           <button
-            onClick={() => setSelectedCategory('সব ক্যাটাগরি')}
+            onClick={() => setSelectedCategory(ALL_CATEGORIES)}
             className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
           >
-            <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === 'সব ক্যাটাগরি' ? 'border-zeluxe-gold bg-zeluxe-gold/10 shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
-              <Package size={24} className={selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-gold' : 'text-gray-400'} />
+            <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === ALL_CATEGORIES ? 'border-zeluxe-gold bg-zeluxe-gold/10 shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
+              <Package size={24} className={selectedCategory === ALL_CATEGORIES ? 'text-zeluxe-gold' : 'text-gray-400'} />
             </div>
-            <span className={`text-[11px] font-bold text-center leading-tight ${selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+            <span className={`text-[11px] font-bold text-center leading-tight ${selectedCategory === ALL_CATEGORIES ? 'text-zeluxe-black' : 'text-gray-500'}`}>
               All
             </span>
           </button>
 
-          {displayedCategories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.name)}
-              className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
-            >
-              <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name ? 'border-zeluxe-gold shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
-                {cat.imageUrl ? (
-                  <img 
-                    src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
-                    alt={cat.name} 
-                    loading="lazy"
-                    className="h-full w-full object-cover" 
-                  />
-                ) : (
-                  <Package size={24} className="text-gray-400" />
-                )}
-              </div>
-              <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[72px] ${selectedCategory === cat.name ? 'text-zeluxe-black' : 'text-gray-500'}`}>
-                {getDisplayCategoryName(cat.name)}
-              </span>
-            </button>
-          ))}
+          {displayedCategories.map((cat) => {
+            const displayName = getDisplayCategoryName(cat.name);
+            return (
+              <button
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.name)}
+                className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
+              >
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name || selectedCategory === displayName ? 'border-zeluxe-gold shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
+                  {cat.imageUrl ? (
+                    <img 
+                      src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
+                      alt={displayName} 
+                      loading="lazy"
+                      className="h-full w-full object-cover" 
+                    />
+                  ) : (
+                    <Package size={24} className="text-gray-400" />
+                  )}
+                </div>
+                <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[72px] ${selectedCategory === cat.name || selectedCategory === displayName ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                  {displayName}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 
       {loadError && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-700">প্রোডাক্ট লোড করা যায়নি। ইন্টারনেট চেক করে আবার চেষ্টা করুন।</p>
+          <p className="text-sm font-medium text-red-700">Failed to load products. Please check your internet connection.</p>
           <button
             onClick={() => {
               setAllLoaded(false);
@@ -385,7 +391,7 @@ export default function Products() {
             }}
             className="shrink-0 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white transition active:scale-95"
           >
-            আবার চেষ্টা করুন
+            Retry
           </button>
         </div>
       )}
@@ -440,14 +446,14 @@ export default function Products() {
 
                   {product.imageUrls.length > 1 && (
                     <span className="absolute right-2 top-2 rounded-full bg-black/60 px-2.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-sm">
-                      {product.imageUrls.length} ছবি
+                      {product.imageUrls.length} Pics
                     </span>
                   )}
 
                   {product.stock === 0 && (
                     <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-sm">
                       <span className="rounded-lg bg-red-600 px-3 py-1 text-xs font-bold text-white shadow-sm">
-                        স্টক নেই
+                        Out of Stock
                       </span>
                     </div>
                   )}
@@ -477,6 +483,7 @@ export default function Products() {
                       </div>
                     </div>
 
+                    {/* Action Buttons (English Labels) */}
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         onClick={(e) => handleDownloadAll(e, product)}
@@ -488,7 +495,7 @@ export default function Products() {
                         ) : (
                           <Download size={13} />
                         )}
-                        ছবি
+                        Download
                       </button>
                       <button
                         onClick={(e) => handleCopy(e, product)}
@@ -497,12 +504,12 @@ export default function Products() {
                         {copiedId === product.id ? (
                           <>
                             <Check size={13} />
-                            কপি
+                            Copied
                           </>
                         ) : (
                           <>
                             <Copy size={13} />
-                            কপি
+                            Copy
                           </>
                         )}
                       </button>
@@ -519,7 +526,7 @@ export default function Products() {
                 onClick={() => setVisibleCount((prev) => prev + LOAD_MORE_COUNT)}
                 className="rounded-xl border border-gray-200 bg-white px-8 py-3 text-sm font-bold text-zeluxe-black shadow-sm transition hover:bg-gray-50 active:scale-95"
               >
-                আরো দেখুন (Load More)
+                Load More
               </button>
             </div>
           )}
@@ -528,32 +535,32 @@ export default function Products() {
             <div className="mt-8 flex justify-center">
               <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-8 py-3 text-sm font-bold text-gray-400">
                 <Loader2 size={16} className="animate-spin" />
-                আরও প্রোডাক্ট লোড হচ্ছে...
+                Loading more products...
               </div>
             </div>
           )}
 
           <p className="mt-6 text-center text-xs font-medium text-gray-400">
             {allLoaded
-              ? `${displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে (মোট ${filteredProducts.length}টি)`
-              : `${displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে`}
+              ? `Showing ${displayedProducts.length} of ${filteredProducts.length} products`
+              : `Showing ${displayedProducts.length} products`}
           </p>
         </>
       ) : (
         <div className="rounded-2xl border border-dashed border-gray-300 bg-white p-12 text-center shadow-sm">
           <Package className="mx-auto h-12 w-12 text-gray-300" />
           <p className="mt-4 text-sm font-bold text-gray-600">
-            কোনো প্রোডাক্ট পাওয়া যায়নি
+            No products found
           </p>
-          {searchTerm || selectedCategory !== 'সব ক্যাটাগরি' ? (
+          {searchTerm || selectedCategory !== ALL_CATEGORIES ? (
             <button
               onClick={() => {
                 setSearchTerm('');
-                setSelectedCategory('সব ক্যাটাগরি');
+                setSelectedCategory(ALL_CATEGORIES);
               }}
               className="mt-3 text-sm font-bold text-zeluxe-gold hover:underline"
             >
-              ফিল্টার রিসেট করুন
+              Reset Filters
             </button>
           ) : null}
         </div>
@@ -576,40 +583,43 @@ export default function Products() {
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid grid-cols-3 gap-y-6 gap-x-2">
                 <button
-                  onClick={() => { setSelectedCategory('সব ক্যাটাগরি'); setIsCategoryModalOpen(false); }}
+                  onClick={() => { setSelectedCategory(ALL_CATEGORIES); setIsCategoryModalOpen(false); }}
                   className="flex flex-col items-center gap-2 group"
                 >
-                  <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === 'সব ক্যাটাগরি' ? 'border-zeluxe-gold bg-zeluxe-gold/10' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
-                    <Package size={24} className={selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-gold' : 'text-gray-400'} />
+                  <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === ALL_CATEGORIES ? 'border-zeluxe-gold bg-zeluxe-gold/10' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
+                    <Package size={24} className={selectedCategory === ALL_CATEGORIES ? 'text-zeluxe-gold' : 'text-gray-400'} />
                   </div>
-                  <span className={`text-[11px] font-bold text-center leading-tight ${selectedCategory === 'সব ক্যাটাগরি' ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                  <span className={`text-[11px] font-bold text-center leading-tight ${selectedCategory === ALL_CATEGORIES ? 'text-zeluxe-black' : 'text-gray-500'}`}>
                     All
                   </span>
                 </button>
 
-                {categories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => { setSelectedCategory(cat.name); setIsCategoryModalOpen(false); }}
-                    className="flex flex-col items-center gap-2 group"
-                  >
-                    <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name ? 'border-zeluxe-gold' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
-                      {cat.imageUrl ? (
-                        <img 
-                          src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
-                          alt={cat.name} 
-                          loading="lazy"
-                          className="h-full w-full object-cover" 
-                        />
-                      ) : (
-                        <Package size={24} className="text-gray-400" />
-                      )}
-                    </div>
-                    <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[76px] ${selectedCategory === cat.name ? 'text-zeluxe-black' : 'text-gray-500'}`}>
-                      {getDisplayCategoryName(cat.name)}
-                    </span>
-                  </button>
-                ))}
+                {categories.map((cat) => {
+                  const displayName = getDisplayCategoryName(cat.name);
+                  return (
+                    <button
+                      key={cat.id}
+                      onClick={() => { setSelectedCategory(cat.name); setIsCategoryModalOpen(false); }}
+                      className="flex flex-col items-center gap-2 group"
+                    >
+                      <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name || selectedCategory === displayName ? 'border-zeluxe-gold' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
+                        {cat.imageUrl ? (
+                          <img 
+                            src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
+                            alt={displayName} 
+                            loading="lazy"
+                            className="h-full w-full object-cover" 
+                          />
+                        ) : (
+                          <Package size={24} className="text-gray-400" />
+                        )}
+                      </div>
+                      <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[76px] ${selectedCategory === cat.name || selectedCategory === displayName ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                        {displayName}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
