@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, where, doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc, updateDoc, writeBatch, setDoc } from 'firebase/firestore';
+import { getToken } from 'firebase/messaging';
 import {
   Package,
   Plus,
@@ -19,8 +20,7 @@ import {
   X,
   BellOff,
 } from 'lucide-react';
-// ═══ Layout ইমপোর্ট মুছে ফেলা হয়েছে ═══
-import { auth, db } from '../firebase';
+import { auth, db, messaging } from '../firebase';
 import {
   REFERRAL_BONUS_AMOUNT,
   generateUniqueReferralCode,
@@ -133,8 +133,6 @@ type DashboardCache = {
   bonusStartDate: number;
 };
 
-// Lives in memory while the app is open: the next visit shows the last data at once,
-// then refreshes quietly in the background.
 let dashboardCache: DashboardCache | null = null;
 
 function updateDashboardCache(uid: string, patch: Partial<DashboardCache>) {
@@ -176,21 +174,49 @@ export default function ResellerDashboard() {
   const [bonusDaysLeft, setBonusDaysLeft] = useState(cached?.bonusDaysLeft ?? 0);
   const [bonusStartDate, setBonusStartDate] = useState<number>(cached?.bonusStartDate ?? 0);
 
-  // Each part of the page has its own loading flag, so the page appears piece by piece.
   const [statsLoading, setStatsLoading] = useState(!cached);
   const [productsLoading, setProductsLoading] = useState(!cached);
   const [refLoading, setRefLoading] = useState(!cached);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
-  // নোটিফিকেশন মডাল স্টেট
   const [isNotifOpen, setIsNotifOpen] = useState(false);
+
+  // ═══ ফায়ারবেস পুশ নোটিফিকেশন পারমিশন ও টোকেন রিকোয়েস্ট ═══
+  useEffect(() => {
+    const requestNotificationPermission = async () => {
+      try {
+        if (!messaging) return;
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+          const uid = auth.currentUser?.uid;
+          if (!uid) return;
+          
+          const currentToken = await getToken(messaging, {
+            vapidKey: 'BC... (আপনার ফায়ারবেস ওয়েব পুশ সার্টিফিকেট কি থাকলে দিতে পারেন, অথবা খালি রাখা যায়)'
+          }).catch(() => null);
+
+          if (currentToken) {
+            // ইউজারের ডিভাইসের FCM টোকেন ফায়ারস্টোরে সেভ করে রাখা
+            await setDoc(doc(db, 'fcmTokens', `${uid}_${currentToken.slice(-10)}`), {
+              uid,
+              token: currentToken,
+              updatedAt: new Date().toISOString()
+            }, { merge: true });
+          }
+        }
+      } catch (err) {
+        console.error('Notification permission error:', err);
+      }
+    };
+
+    void requestNotificationPermission();
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
-      // Wait until Firebase has restored the login session (fixes blank page on refresh).
       await auth.authStateReady();
       const uid = auth.currentUser?.uid;
       if (!uid || cancelled) {
@@ -202,14 +228,12 @@ export default function ResellerDashboard() {
 
       setLoadError(false);
 
-      // Start every read at once; each part of the page shows as soon as its data arrives.
       const userP = getDoc(doc(db, 'users', uid));
       const productsP = getDocs(collection(db, 'products'));
       const ordersP = getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid)));
       const withdrawP = getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid)));
       const notifP = getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)));
 
-      // ─── নোটিফিকেশন ───
       void notifP
         .then((notifSnap) => {
           const fetchedNotifs: Notification[] = notifSnap.docs.map((d) => {
@@ -229,7 +253,6 @@ export default function ResellerDashboard() {
         })
         .catch((err) => console.error('Notifications load error:', err));
 
-      // ─── প্রোডাক্ট (Featured + দামের তালিকা) ───
       const productMapP: Promise<Record<string, number>> = productsP
         .then((productsSnap) => {
           const productMap: Record<string, number> = {};
@@ -268,7 +291,6 @@ export default function ResellerDashboard() {
           if (!cancelled) setProductsLoading(false);
         });
 
-      // ─── রেফারেল তথ্য ───
       void (async () => {
         try {
           const userDoc = await userP;
@@ -309,12 +331,10 @@ export default function ResellerDashboard() {
         }
       })();
 
-      // ─── অর্ডার, উইথড্র ও ব্যালেন্স হিসাব (হিসাবের নিয়ম আগের মতোই) ───
       try {
         const [userDoc, ordersSnapshot, withdrawSnap] = await Promise.all([userP, ordersP, withdrawP]);
         const userInfo = userDoc.exists() ? userDoc.data() : null;
 
-        // পুরনো অর্ডারে items না থাকলে প্রোডাক্টের দাম লাগে; নইলে প্রোডাক্টের জন্য অপেক্ষা করব না
         const needsProductPrices = ordersSnapshot.docs.some((d) => {
           const items = d.data().items;
           return !(Array.isArray(items) && items.length > 0);
@@ -423,7 +443,6 @@ export default function ResellerDashboard() {
     };
   }, [reloadKey]);
 
-  // নোটিফিকেশন রিড হিসেবে মার্ক করা
   const handleOpenNotifications = async () => {
     setIsNotifOpen(true);
     const unreadNotifs = notifications.filter(n => !n.read);
@@ -454,10 +473,7 @@ export default function ResellerDashboard() {
   const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
-    // ═══ মেইন রিটার্ন থেকেও Layout ট্যাগ বাদ দেওয়া হয়েছে ═══
     <div className="mx-auto max-w-2xl pb-10">
-      
-      {/* ═══ PREMIUM HEADER WITH NOTIFICATIONS ═══ */}
       <div className="mb-5 flex items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-zeluxe-black capitalize leading-snug break-words">
@@ -468,7 +484,6 @@ export default function ResellerDashboard() {
           </p>
         </div>
         
-        {/* বেল আইকন বাটন */}
         <button 
           onClick={handleOpenNotifications}
           className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-card border border-gray-50 text-zeluxe-black transition hover:-translate-y-0.5 hover:text-zeluxe-gold"
@@ -498,7 +513,6 @@ export default function ResellerDashboard() {
         </div>
       )}
 
-      {/* ═══ TODAY'S SNAPSHOT ═══ */}
       {(stats.todayOrders > 0 || stats.todaySales > 0) && (
         <div className="mb-4 rounded-xl bg-white p-3 shadow-card border border-gray-50 flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -514,7 +528,6 @@ export default function ResellerDashboard() {
         </div>
       )}
 
-      {/* ═══ WELCOME BONUS ═══ */}
       {statsLoading ? (
         <SkeletonBlock className="mb-5 h-36" />
       ) : bonusAchieved ? (
@@ -587,50 +600,46 @@ export default function ResellerDashboard() {
         </div>
       ) : null}
 
-      {/* ═══ BALANCE ═══ */}
       {statsLoading ? (
         <SkeletonBlock className="mb-5 h-32" />
       ) : (
-        <>
-      <div className="mb-5 rounded-2xl bg-white p-5 shadow-card border border-gray-50">
-        <div className="flex items-start justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zeluxe-gold/10">
-                <Wallet size={14} className="text-zeluxe-gold" />
-              </span>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-                Available Balance
-              </p>
-            </div>
-            <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black font-number">
-              Tk {stats.availableBalance.toLocaleString()}
-            </p>
-            
-            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
-                Profit: <strong className="text-zeluxe-black font-number">Tk {stats.actualProfit.toLocaleString()}</strong>
-              </span>
-              {stats.referralBonus > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
-                  Referral: <strong className="text-green-800 font-number">+Tk {stats.referralBonus.toLocaleString()}</strong>
+        <div className="mb-5 rounded-2xl bg-white p-5 shadow-card border border-gray-50">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-zeluxe-gold/10">
+                  <Wallet size={14} className="text-zeluxe-gold" />
                 </span>
-              )}
+                <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                  Available Balance
+                </p>
+              </div>
+              <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black font-number">
+                Tk {stats.availableBalance.toLocaleString()}
+              </p>
+              
+              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
+                  Profit: <strong className="text-zeluxe-black font-number">Tk {stats.actualProfit.toLocaleString()}</strong>
+                </span>
+                {stats.referralBonus > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
+                    Referral: <strong className="text-green-800 font-number">+Tk {stats.referralBonus.toLocaleString()}</strong>
+                  </span>
+                )}
+              </div>
             </div>
+            <Link
+              to="/withdraw"
+              className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
+            >
+              Withdraw
+              <ArrowRight size={12} />
+            </Link>
           </div>
-          <Link
-            to="/withdraw"
-            className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
-          >
-            Withdraw
-            <ArrowRight size={12} />
-          </Link>
         </div>
-      </div>
-        </>
       )}
 
-      {/* ═══ QUICK ACTIONS ═══ */}
       <div className="mb-6">
         <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
           Quick Actions
@@ -658,57 +667,53 @@ export default function ResellerDashboard() {
         </div>
       </div>
 
-      {/* ═══ MY PROGRESS ═══ */}
       {statsLoading ? (
         <SkeletonBlock className="mb-6 h-36" />
       ) : (
-        <>
-      <div className="mb-6">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-            My Progress
-          </p>
-          <Link to="/earnings" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
-            বিস্তারিত <ChevronRight size={12} />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2.5">
-          <Link to="/orders" className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:shadow-md flex flex-col items-center justify-center text-center">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-2">
-              <ShoppingBag size={16} />
-            </div>
-            <p className="text-lg font-bold tracking-tight text-zeluxe-black font-number">
-              {stats.totalOrders}
+        <div className="mb-6">
+          <div className="mb-2 flex items-center justify-between">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+              My Progress
             </p>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Orders</p>
-          </Link>
-
-          <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 mb-2">
-              <TrendingUp size={16} />
-            </div>
-            <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
-              Tk {stats.totalSales > 9999 ? (stats.totalSales / 1000).toFixed(1) + 'k' : stats.totalSales.toLocaleString()}
-            </p>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Sales</p>
+            <Link to="/earnings" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+              বিস্তারিত <ChevronRight size={12} />
+            </Link>
           </div>
 
-          <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10 text-zeluxe-gold mb-2">
-              <Wallet size={16} />
+          <div className="grid grid-cols-3 gap-2.5">
+            <Link to="/orders" className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:shadow-md flex flex-col items-center justify-center text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-2">
+                <ShoppingBag size={16} />
+              </div>
+              <p className="text-lg font-bold tracking-tight text-zeluxe-black font-number">
+                {stats.totalOrders}
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Orders</p>
+            </Link>
+
+            <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 mb-2">
+                <TrendingUp size={16} />
+              </div>
+              <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
+                Tk {stats.totalSales > 9999 ? (stats.totalSales / 1000).toFixed(1) + 'k' : stats.totalSales.toLocaleString()}
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Sales</p>
             </div>
-            <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
-              Tk {stats.actualProfit > 9999 ? (stats.actualProfit / 1000).toFixed(1) + 'k' : stats.actualProfit.toLocaleString()}
-            </p>
-            <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Profit</p>
+
+            <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10 text-zeluxe-gold mb-2">
+                <Wallet size={16} />
+              </div>
+              <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
+                Tk {stats.actualProfit > 9999 ? (stats.actualProfit / 1000).toFixed(1) + 'k' : stats.actualProfit.toLocaleString()}
+              </p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Profit</p>
+            </div>
           </div>
         </div>
-      </div>
-        </>
       )}
 
-      {/* ═══ FEATURED PRODUCTS ═══ */}
       {productsLoading ? (
         <SkeletonBlock className="mb-6 h-44" />
       ) : featuredProducts.length > 0 && (
@@ -751,7 +756,6 @@ export default function ResellerDashboard() {
         </div>
       )}
 
-      {/* ═══ REFER & EARN ═══ */}
       {refLoading ? (
         <SkeletonBlock className="mb-6 h-24" />
       ) : referralInfo && referralInfo.referralCode && (
@@ -782,7 +786,6 @@ export default function ResellerDashboard() {
         </Link>
       )}
 
-      {/* ═══ RECENT ORDERS ═══ */}
       <section>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
@@ -853,12 +856,10 @@ export default function ResellerDashboard() {
         )}
       </section>
 
-      {/* ═══ NOTIFICATION MODAL (Bottom Sheet Style) ═══ */}
       {isNotifOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm">
           <div className="w-full max-w-md max-h-[85vh] rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300">
             
-            {/* Header */}
             <div className="flex items-center justify-between border-b border-gray-100 p-4 sm:p-5">
               <div className="flex items-center gap-2">
                 <Bell className="text-zeluxe-gold" size={20} />
@@ -872,7 +873,6 @@ export default function ResellerDashboard() {
               </button>
             </div>
 
-            {/* List */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 text-center">
