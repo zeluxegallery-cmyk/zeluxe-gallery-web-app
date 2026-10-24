@@ -40,14 +40,20 @@ type LeaderboardEntry = {
   referralBonusEarned: number;
 };
 
+// ইনস্ট্যান্ট পেজ ওপেনিংয়ের জন্য মেমোরি ক্যাশ
+let referralCache: { referralInfo: ReferralInfo | null; leaderboard: LeaderboardEntry[]; uid: string } | null = null;
+
 export default function Refer() {
   const navigate = useNavigate();
-  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const currentUid = auth.currentUser?.uid || '';
+  
+  const hasCache = referralCache && referralCache.uid === currentUid;
+
+  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(hasCache ? referralCache!.referralInfo : null);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>(hasCache ? referralCache!.leaderboard : []);
+  const [loading, setLoading] = useState(!hasCache);
   const [codeCopied, setCodeCopied] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [currentUid, setCurrentUid] = useState<string>('');
 
   useEffect(() => {
     const loadData = async () => {
@@ -56,7 +62,6 @@ export default function Refer() {
         navigate('/login');
         return;
       }
-      setCurrentUid(uid);
 
       try {
         const userDoc = await getDoc(doc(db, 'users', uid));
@@ -64,7 +69,6 @@ export default function Refer() {
 
         let refStats = await getReferralStats(uid);
 
-        // Auto-generate if old user
         if (refStats && !refStats.referralCode) {
           try {
             const newCode = await generateUniqueReferralCode();
@@ -90,21 +94,29 @@ export default function Refer() {
           }
         }
 
-        setReferralInfo(refStats);
-
-        // Load leaderboard
         const top = await getTopReferrers(10);
+
+        setReferralInfo(refStats);
         setLeaderboard(top);
+
+        // ক্যাশ আপডেট করে রাখা
+        referralCache = {
+          referralInfo: refStats,
+          leaderboard: top,
+          uid,
+        };
       } catch (err) {
         console.error('Failed to load referral data:', err);
-        toast.error('রেফারেল ডেটা লোড করতে সমস্যা হয়েছে।');
+        if (!hasCache) {
+          toast.error('রেফারেল ডেটা লোড করতে সমস্যা হয়েছে।');
+        }
       } finally {
         setLoading(false);
       }
     };
 
     void loadData();
-  }, [navigate]);
+  }, [navigate, hasCache]);
 
   const handleCopyCode = async () => {
     if (!referralInfo?.referralCode) return;
@@ -167,18 +179,17 @@ export default function Refer() {
     }
   };
 
-  if (loading) {
+  if (loading && !referralInfo) {
     return (
-      <div className="flex min-h-40 items-center justify-center">
+      <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
       </div>
     );
   }
 
   return (
-    // ═══ <Layout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
-    <div className="mx-auto max-w-2xl">
-      {/* ═══ HEADER ═══ */}
+    <div className="mx-auto max-w-2xl pb-10 transform-gpu">
+      {/* HEADER */}
       <div className="mb-5">
         <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
           Refer & Earn
@@ -189,20 +200,20 @@ export default function Refer() {
         </p>
       </div>
 
-      {/* ═══ HERO CARD ═══ */}
-      <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-5 text-white">
+      {/* HERO CARD */}
+      <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-5 text-white shadow-xl">
         <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-zeluxe-gold/20 blur-3xl" />
 
         <div className="relative">
           <div className="flex items-start gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
               <Gift className="text-zeluxe-black" size={24} />
             </span>
             <div className="flex-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
                 Referral Bonus
               </p>
-              <p className="mt-1 text-2xl font-bold text-white">
+              <p className="mt-1 text-2xl font-bold text-white font-number">
                 Tk {REFERRAL_BONUS_AMOUNT}
               </p>
               <p className="mt-0.5 text-[11px] text-gray-400">
@@ -224,13 +235,9 @@ export default function Refer() {
               </div>
               <button
                 onClick={handleCopyCode}
-                className="flex h-[52px] w-[52px] items-center justify-center rounded-md bg-zeluxe-gold text-zeluxe-black transition hover:brightness-110"
+                className="flex h-[52px] w-[52px] items-center justify-center rounded-md bg-zeluxe-gold text-zeluxe-black transition hover:brightness-110 active:scale-95"
               >
-                {codeCopied ? (
-                  <Check size={20} />
-                ) : (
-                  <Copy size={20} />
-                )}
+                {codeCopied ? <Check size={20} /> : <Copy size={20} />}
               </button>
             </div>
           </div>
@@ -244,7 +251,7 @@ export default function Refer() {
                   Referrals
                 </p>
               </div>
-              <p className="mt-1.5 text-2xl font-bold text-white">
+              <p className="mt-1.5 text-2xl font-bold text-white font-number">
                 {referralInfo?.referralCount || 0}
               </p>
             </div>
@@ -255,7 +262,7 @@ export default function Refer() {
                   Earned
                 </p>
               </div>
-              <p className="mt-1.5 text-2xl font-bold text-zeluxe-gold">
+              <p className="mt-1.5 text-2xl font-bold text-zeluxe-gold font-number">
                 Tk {referralInfo?.referralBonusEarned.toLocaleString() || 0}
               </p>
             </div>
@@ -265,21 +272,21 @@ export default function Refer() {
           <div className="mt-5 grid grid-cols-3 gap-2">
             <button
               onClick={handleWhatsAppShare}
-              className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 py-3 text-xs font-bold text-white transition hover:bg-green-700"
+              className="flex items-center justify-center gap-1.5 rounded-md bg-green-600 py-3 text-xs font-bold text-white transition hover:bg-green-700 active:scale-95"
             >
               <MessageCircle size={14} />
               WhatsApp
             </button>
             <button
               onClick={handleFacebookShare}
-              className="flex items-center justify-center gap-1.5 rounded-md bg-blue-600 py-3 text-xs font-bold text-white transition hover:bg-blue-700"
+              className="flex items-center justify-center gap-1.5 rounded-md bg-blue-600 py-3 text-xs font-bold text-white transition hover:bg-blue-700 active:scale-95"
             >
               <Facebook size={14} />
               Facebook
             </button>
             <button
               onClick={handleNativeShare}
-              className="flex items-center justify-center gap-1.5 rounded-md bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:bg-gray-100"
+              className="flex items-center justify-center gap-1.5 rounded-md bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:bg-gray-100 active:scale-95"
             >
               <Share2 size={14} />
               Share
@@ -289,7 +296,7 @@ export default function Refer() {
           {/* Copy Link Button */}
           <button
             onClick={handleCopyLink}
-            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-white/20 py-2.5 text-xs font-medium text-gray-300 transition hover:bg-white/5"
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-md border border-white/20 py-2.5 text-xs font-medium text-gray-300 transition hover:bg-white/5 active:scale-95"
           >
             {linkCopied ? (
               <>
@@ -306,8 +313,8 @@ export default function Refer() {
         </div>
       </div>
 
-      {/* ═══ HOW IT WORKS ═══ */}
-      <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
+      {/* HOW IT WORKS */}
+      <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white shadow-sm">
         <div className="border-b border-zeluxe-lightgray px-4 py-3">
           <div className="flex items-center gap-2">
             <Sparkles size={14} className="text-zeluxe-gold" />
@@ -319,22 +326,10 @@ export default function Refer() {
 
         <div className="space-y-3 p-4">
           {[
-            {
-              num: '১',
-              text: 'আপনার Referral link বন্ধুদের সাথে শেয়ার করুন',
-            },
-            {
-              num: '২',
-              text: 'বন্ধু আপনার লিংক দিয়ে রেজিস্ট্রেশন করবে',
-            },
-            {
-              num: '৩',
-              text: 'বন্ধু Tk 99 payment submit করবে',
-            },
-            {
-              num: '৪',
-              text: 'অ্যাডমিন approve করলে আপনি Tk 30 বোনাস পাবেন',
-            },
+            { num: '১', text: 'আপনার Referral link বন্ধুদের সাথে শেয়ার করুন' },
+            { num: '২', text: 'বন্ধু আপনার লিংক দিয়ে রেজিস্ট্রেশন করবে' },
+            { num: '৩', text: 'বন্ধু Tk 99 payment submit করবে' },
+            { num: '৪', text: 'অ্যাডমিন approve করলে আপনি Tk 30 বোনাস পাবেন' },
           ].map(({ num, text }) => (
             <div key={num} className="flex items-start gap-3">
               <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-zeluxe-cream text-[11px] font-bold text-zeluxe-gold">
@@ -348,8 +343,8 @@ export default function Refer() {
         </div>
       </div>
 
-      {/* ═══ LEADERBOARD ═══ */}
-      <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
+      {/* LEADERBOARD */}
+      <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white shadow-sm">
         <div className="border-b border-zeluxe-lightgray bg-gradient-to-r from-zeluxe-gold/10 to-transparent px-4 py-3">
           <div className="flex items-center gap-2">
             <Trophy size={14} className="text-zeluxe-gold" />
@@ -410,12 +405,12 @@ export default function Refer() {
                           </span>
                         )}
                       </p>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-[10px] text-gray-500 font-number">
                         {entry.referralCount}টি referral
                       </p>
                     </div>
                   </div>
-                  <p className="text-xs font-bold text-zeluxe-gold">
+                  <p className="text-xs font-bold text-zeluxe-gold font-number">
                     Tk {entry.referralBonusEarned.toLocaleString()}
                   </p>
                 </div>
@@ -425,10 +420,10 @@ export default function Refer() {
         )}
       </div>
 
-      {/* ═══ CTA — Browse Products ═══ */}
+      {/* CTA — Browse Products */}
       <button
         onClick={() => navigate('/products')}
-        className="flex w-full items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-zeluxe-gold"
+        className="flex w-full items-center justify-between rounded-lg border border-zeluxe-lightgray bg-white p-4 transition hover:border-zeluxe-gold shadow-sm"
       >
         <div className="text-left">
           <p className="text-sm font-bold text-zeluxe-black">
