@@ -1,8 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  limit,
+  query,
+  where,
+  type DocumentData,
+  type QueryDocumentSnapshot,
+} from 'firebase/firestore';
 import { Copy, Download, Loader2, Package, Search, Check, X } from 'lucide-react';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import { downloadSingleImage } from '../lib/imageDownloader';
 import { toast } from 'sonner';
 
@@ -75,79 +83,161 @@ const getOrderIndex = (name: string) => {
 
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
+const ALL_CATEGORIES = 'সব ক্যাটাগরি';
+
+type ProductsCache = {
+  uid: string;
+  products: Product[];
+  categories: Category[];
+};
+
+// Kept in memory only while the app is open (never saved on the phone's disk),
+// so wholesale prices do not stay behind on a shared phone. Keyed by user id.
+let productsCache: ProductsCache | null = null;
+
+function mapProduct(productDocument: QueryDocumentSnapshot<DocumentData>): Product {
+  const data = productDocument.data();
+  const imgUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
+  let urls: string[] = [];
+  if (Array.isArray(data.imageUrls)) {
+    urls = data.imageUrls.filter((u: unknown): u is string => typeof u === 'string');
+  }
+  if (urls.length === 0 && imgUrl) urls = [imgUrl];
+
+  return {
+    id: productDocument.id,
+    name: typeof data.name === 'string' ? data.name : 'Unnamed Product',
+    sku: typeof data.sku === 'string' ? data.sku : '',
+    category: typeof data.category === 'string' ? data.category : 'Uncategorized',
+    description: typeof data.description === 'string' ? data.description : '',
+    imageUrl: imgUrl,
+    imageUrls: urls,
+    resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+    suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
+    stock: typeof data.stock === 'number' ? data.stock : 0,
+  };
+}
+
+function buildCategories(docs: QueryDocumentSnapshot<DocumentData>[]): Category[] {
+  const fetchedCategories: Category[] = docs.map((categoryDocument) => {
+    const data = categoryDocument.data();
+    return {
+      id: categoryDocument.id,
+      name: typeof data.name === 'string' ? data.name : '',
+      imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
+    };
+  });
+
+  // ═══ কাস্টম অর্ডার অনুযায়ী সাজানো ═══
+  fetchedCategories.sort((a, b) => {
+    const nameA = getDisplayCategoryName(a.name);
+    const nameB = getDisplayCategoryName(b.name);
+    const indexA = getOrderIndex(nameA);
+    const indexB = getOrderIndex(nameB);
+
+    if (indexA !== indexB) {
+      return indexA - indexB;
+    }
+    return nameA.localeCompare(nameB);
+  });
+
+  return fetchedCategories;
+}
 
 export default function Products() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
+  const cached = productsCache && productsCache.uid === auth.currentUser?.uid ? productsCache : null;
+
+  const [products, setProducts] = useState<Product[]>(cached?.products ?? []);
+  const [categories, setCategories] = useState<Category[]>(cached?.categories ?? []);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('সব ক্যাটাগরি');
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
-  const [loading, setLoading] = useState(true);
+  // loading = nothing to show yet. allLoaded = the full list is here (needed for search and categories).
+  const [loading, setLoading] = useState(!cached);
+  const [allLoaded, setAllLoaded] = useState(!!cached);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  
+
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const productsQuery = query(collection(db, 'products'), where('active', '==', true));
-        const productSnap = await getDocs(productsQuery);
-        const fetchedProducts: Product[] = productSnap.docs.map((productDocument) => {
-          const data = productDocument.data();
-          const imgUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
-          let urls: string[] = [];
-          if (Array.isArray(data.imageUrls)) {
-            urls = data.imageUrls.filter((u: any) => typeof u === 'string');
-          }
-          if (urls.length === 0 && imgUrl) urls = [imgUrl];
+    let cancelled = false;
 
-          return {
-            id: productDocument.id,
-            name: typeof data.name === 'string' ? data.name : 'Unnamed Product',
-            sku: typeof data.sku === 'string' ? data.sku : '',
-            category: typeof data.category === 'string' ? data.category : 'Uncategorized',
-            description: typeof data.description === 'string' ? data.description : '',
-            imageUrl: imgUrl,
-            imageUrls: urls,
-            resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
-            suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
-            stock: typeof data.stock === 'number' ? data.stock : 0,
-          };
-        });
-        setProducts(fetchedProducts);
-
-        const categorySnap = await getDocs(collection(db, 'categories'));
-        let fetchedCategories: Category[] = categorySnap.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            name: typeof data.name === 'string' ? data.name : '',
-            imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
-          };
-        });
-
-        // ═══ কাস্টম অর্ডার অনুযায়ী সাজানো ═══
-        fetchedCategories.sort((a, b) => {
-          const nameA = getDisplayCategoryName(a.name);
-          const nameB = getDisplayCategoryName(b.name);
-          const indexA = getOrderIndex(nameA);
-          const indexB = getOrderIndex(nameB);
-
-          if (indexA !== indexB) {
-            return indexA - indexB;
-          }
-          return nameA.localeCompare(nameB);
-        });
-
-        setCategories(fetchedCategories);
-      } finally {
+    const run = async () => {
+      // Wait until Firebase has restored the login session.
+      await auth.authStateReady();
+      const uid = auth.currentUser?.uid;
+      if (!uid || cancelled) {
         setLoading(false);
+        setAllLoaded(true);
+        return;
+      }
+
+      setLoadError(false);
+      const hasCache = productsCache !== null && productsCache.uid === uid;
+
+      // Start the full list and the categories at the same time (they used to load one after the other).
+      const fullP = getDocs(query(collection(db, 'products'), where('active', '==', true)));
+      const categoriesP = getDocs(collection(db, 'categories'))
+        .then((snap) => buildCategories(snap.docs))
+        .catch((err) => {
+          console.error('Categories load error:', err);
+          return null;
+        });
+
+      void categoriesP.then((cats) => {
+        if (cats && !cancelled) setCategories(cats);
+      });
+
+      let fullDone = false;
+
+      // Nothing cached yet: show the first page as soon as it arrives.
+      // Both queries use the same default order, so these are the same 20 products the full list starts with.
+      if (!hasCache) {
+        void getDocs(
+          query(collection(db, 'products'), where('active', '==', true), limit(INITIAL_VISIBLE_COUNT)),
+        )
+          .then((firstSnap) => {
+            if (cancelled || fullDone) return;
+            setProducts(firstSnap.docs.map(mapProduct));
+            setLoading(false);
+          })
+          .catch((err) => console.error('First page load error:', err));
+      }
+
+      try {
+        const fullSnap = await fullP;
+        fullDone = true;
+        const all = fullSnap.docs.map(mapProduct);
+        if (!cancelled) {
+          setProducts(all);
+          setAllLoaded(true);
+        }
+        const cats = await categoriesP;
+        productsCache = {
+          uid,
+          products: all,
+          categories: cats ?? (productsCache && productsCache.uid === uid ? productsCache.categories : []),
+        };
+        if (!cancelled && cats) setCategories(cats);
+      } catch (err) {
+        console.error('Products load error:', err);
+        if (!cancelled) setLoadError(true);
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setAllLoaded(true);
+        }
       }
     };
 
-    void loadData();
-  }, []);
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   useEffect(() => {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
@@ -168,6 +258,10 @@ export default function Products() {
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
 
+  // While only the first page is here, search/category results would be incomplete: show the skeleton instead.
+  const isFiltering = searchTerm.trim() !== '' || selectedCategory !== ALL_CATEGORIES;
+  const showSkeleton = loading || (!allLoaded && isFiltering);
+
   const handleCopy = async (e: React.MouseEvent, product: Product) => {
     e.preventDefault();
     e.stopPropagation();
@@ -177,7 +271,7 @@ export default function Products() {
       setCopiedId(product.id);
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      alert('কপি করা যায়নি');
+      toast.error('কপি করা যায়নি');
     }
   };
 
@@ -279,8 +373,23 @@ export default function Products() {
         </div>
       </div>
 
+      {loadError && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-700">প্রোডাক্ট লোড করা যায়নি। ইন্টারনেট চেক করে আবার চেষ্টা করুন।</p>
+          <button
+            onClick={() => {
+              setAllLoaded(false);
+              setReloadKey((k) => k + 1);
+            }}
+            className="shrink-0 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white transition active:scale-95"
+          >
+            আবার চেষ্টা করুন
+          </button>
+        </div>
+      )}
+
       {/* ═══ SKELETON LOADING GRID ═══ */}
-      {loading ? (
+      {showSkeleton ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
             <div key={index} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-card">
@@ -303,7 +412,7 @@ export default function Products() {
       ) : displayedProducts.length > 0 ? (
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
-            {displayedProducts.map((product) => (
+            {displayedProducts.map((product, index) => (
               <Link
                 key={product.id}
                 to={`/products/${product.id}`}
@@ -315,7 +424,8 @@ export default function Products() {
                       src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_400/') : product.imageUrl}
                       alt={product.name}
                       crossOrigin="anonymous"
-                      loading="lazy"
+                      loading={index < 4 ? 'eager' : 'lazy'}
+                      decoding="async"
                       className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
                     />
                   ) : (
@@ -410,8 +520,19 @@ export default function Products() {
             </div>
           )}
 
+          {!allLoaded && !isFiltering && displayedProducts.length >= INITIAL_VISIBLE_COUNT && (
+            <div className="mt-8 flex justify-center">
+              <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-8 py-3 text-sm font-bold text-gray-400">
+                <Loader2 size={16} className="animate-spin" />
+                আরও প্রোডাক্ট লোড হচ্ছে...
+              </div>
+            </div>
+          )}
+
           <p className="mt-6 text-center text-xs font-medium text-gray-400">
-            {displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে (মোট {filteredProducts.length}টি)
+            {allLoaded
+              ? `${displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে (মোট ${filteredProducts.length}টি)`
+              : `${displayedProducts.length}টি প্রোডাক্ট দেখানো হচ্ছে`}
           </p>
         </>
       ) : (
