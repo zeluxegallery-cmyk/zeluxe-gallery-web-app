@@ -35,14 +35,12 @@ type Category = {
   imageUrl?: string;
 };
 
-// ═══ আপনার দেওয়া নির্দিষ্ট সিরিয়াল (Custom Order) ═══
 const customOrder = [
   'T-Shirt', '3 Piece', 'Panjabi', 'Polo Shirt', 'Gadget', 'Watch',
   'Airpods', 'Hoodie', 'Sharee', '2 Piece', 'Baby Fashion', 'Borka',
   'Hijab', 'Smart Watch', 'Neckband', 'Microphone', 'Pant', 'Shirt'
 ];
 
-// ═══ বাংলা থেকে ইংরেজি নামের অভিধান ═══
 const categoryTranslations: Record<string, string> = {
   'পাওয়ার ব্যাংক': 'Power Bank',
   'পাঞ্জাবি': 'Panjabi',
@@ -94,8 +92,6 @@ type ProductsCache = {
 };
 
 let productsCache: ProductsCache | null = null;
-
-// ইনস্ট্যান্ট পেজ লোডিংয়ের জন্য প্রোডাক্ট ডিটেইলস ক্যাশ মেমোরি
 const productDetailCache = new Map<string, any>();
 
 function mapProduct(productDocument: QueryDocumentSnapshot<DocumentData>): Product {
@@ -163,7 +159,6 @@ export default function Products() {
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
-  // ═══ ইনস্ট্যান্ট প্রি-ফেচিং (মাউস হোভার বা টাচ করার সাথে সাথে ডেটা লোড করে রাখা) ═══
   const prefetchProduct = (productId: string) => {
     if (productDetailCache.has(productId)) return;
     const docRef = doc(db, 'products', productId);
@@ -302,8 +297,7 @@ export default function Products() {
   const displayedCategories = categories.slice(0, 8);
 
   return (
-    <div className="mx-auto max-w-6xl pb-32">
-      {/* HEADER SECTION (English & Professional) */}
+    <div className="mx-auto max-w-6xl pb-28">
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-zeluxe-black md:text-3xl tracking-tight">
           Product <span className="text-zeluxe-gold">Catalog</span>
@@ -483,7 +477,6 @@ export default function Products() {
                       </div>
                     </div>
 
-                    {/* Action Buttons (English Labels) */}
                     <div className="mt-4 grid grid-cols-2 gap-2">
                       <button
                         onClick={(e) => handleDownloadAll(e, product)}
