@@ -17,12 +17,12 @@ const items: NavEntry[] = [
 ];
 
 export default function BottomNav() {
-  const location = useLocation();
+  const location =useLocation();
 
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[9999] grid h-16 grid-cols-5 border-t border-zeluxe-lightgray bg-white shadow-2xl md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-[99999] grid h-16 grid-cols-5 border-t border-zeluxe-lightgray bg-white/95 backdrop-blur-md shadow-[0_-4px_25px_rgba(0,0,0,0.1)] md:hidden pb-[env(safe-area-inset-bottom)]">
       {items.map(({ label, path, icon: Icon, elevated }) => {
         const active = isActive(path);
 
