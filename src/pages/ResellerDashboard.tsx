@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, where, doc, getDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import {
-  Loader2,
   Package,
   Plus,
   ShoppingBag,
@@ -23,7 +22,6 @@ import {
 // ═══ Layout ইমপোর্ট মুছে ফেলা হয়েছে ═══
 import { auth, db } from '../firebase';
 import {
-  getReferralStats,
   REFERRAL_BONUS_AMOUNT,
   generateUniqueReferralCode,
   publishReferralCode,
@@ -122,118 +120,224 @@ function formatDate(seconds?: number) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
+type DashboardCache = {
+  uid: string;
+  stats: Stats;
+  orders: Order[];
+  featuredProducts: Product[];
+  referralInfo: ReferralInfo | null;
+  notifications: Notification[];
+  bonusProgress: number;
+  bonusAchieved: boolean;
+  bonusDaysLeft: number;
+  bonusStartDate: number;
+};
+
+// Lives in memory while the app is open: the next visit shows the last data at once,
+// then refreshes quietly in the background.
+let dashboardCache: DashboardCache | null = null;
+
+function updateDashboardCache(uid: string, patch: Partial<DashboardCache>) {
+  const base: DashboardCache =
+    dashboardCache && dashboardCache.uid === uid
+      ? dashboardCache
+      : {
+          uid,
+          stats: initialStats,
+          orders: [],
+          featuredProducts: [],
+          referralInfo: null,
+          notifications: [],
+          bonusProgress: 0,
+          bonusAchieved: false,
+          bonusDaysLeft: 0,
+          bonusStartDate: 0,
+        };
+  dashboardCache = { ...base, ...patch };
+}
+
+function SkeletonBlock({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-2xl bg-gray-200/70 ${className}`} />;
+}
+
+type OrderItemLike = { resellerPrice?: number; sellingPrice?: number; quantity?: number };
+
 export default function ResellerDashboard() {
-  const [stats, setStats] = useState<Stats>(initialStats);
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
-  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [bonusProgress, setBonusProgress] = useState(0);
-  const [bonusAchieved, setBonusAchieved] = useState(false);
-  const [bonusDaysLeft, setBonusDaysLeft] = useState(0);
-  const [bonusStartDate, setBonusStartDate] = useState<number>(0);
-  
+  const currentUid = auth.currentUser?.uid;
+  const cached = dashboardCache && dashboardCache.uid === currentUid ? dashboardCache : null;
+
+  const [stats, setStats] = useState<Stats>(cached?.stats ?? initialStats);
+  const [orders, setOrders] = useState<Order[]>(cached?.orders ?? []);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(cached?.featuredProducts ?? []);
+  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(cached?.referralInfo ?? null);
+  const [notifications, setNotifications] = useState<Notification[]>(cached?.notifications ?? []);
+  const [bonusProgress, setBonusProgress] = useState(cached?.bonusProgress ?? 0);
+  const [bonusAchieved, setBonusAchieved] = useState(cached?.bonusAchieved ?? false);
+  const [bonusDaysLeft, setBonusDaysLeft] = useState(cached?.bonusDaysLeft ?? 0);
+  const [bonusStartDate, setBonusStartDate] = useState<number>(cached?.bonusStartDate ?? 0);
+
+  // Each part of the page has its own loading flag, so the page appears piece by piece.
+  const [statsLoading, setStatsLoading] = useState(!cached);
+  const [productsLoading, setProductsLoading] = useState(!cached);
+  const [refLoading, setRefLoading] = useState(!cached);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
   // নোটিফিকেশন মডাল স্টেট
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
   useEffect(() => {
-    const loadData = async () => {
+    let cancelled = false;
+
+    const run = async () => {
+      // Wait until Firebase has restored the login session (fixes blank page on refresh).
+      await auth.authStateReady();
       const uid = auth.currentUser?.uid;
-      if (!uid) {
-        setLoading(false);
+      if (!uid || cancelled) {
+        setStatsLoading(false);
+        setProductsLoading(false);
+        setRefLoading(false);
         return;
       }
 
-      try {
-        const [userDoc, refStatsResult, productsSnap, ordersSnapshot, withdrawSnap, notifSnap] = await Promise.all([
-          getDoc(doc(db, 'users', uid)),
-          getReferralStats(uid),
-          getDocs(collection(db, 'products')),
-          getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid))),
-          getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid))),
-          getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)))
-        ]);
+      setLoadError(false);
 
-        const userInfo = userDoc.exists() ? userDoc.data() : null;
-        let refStats = refStatsResult;
+      // Start every read at once; each part of the page shows as soon as its data arrives.
+      const userP = getDoc(doc(db, 'users', uid));
+      const productsP = getDocs(collection(db, 'products'));
+      const ordersP = getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid)));
+      const withdrawP = getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid)));
+      const notifP = getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)));
 
-        if (refStats && !refStats.referralCode) {
-          try {
-            const newCode = await generateUniqueReferralCode();
-            await updateDoc(doc(db, 'users', uid), {
-              referralCode: newCode,
-              referralCount: 0,
-              referralBonusEarned: 0,
-            });
-
-            const userName = (userInfo?.name as string) || auth.currentUser?.email?.split('@')[0] || 'Reseller';
-            await publishReferralCode(uid, userName, newCode);
-
-            refStats = { referralCode: newCode, referralCount: 0, referralBonusEarned: 0 };
-          } catch (err) {
-            console.error('Failed to generate referral code:', err);
-          }
-        }
-
-        if (refStats) setReferralInfo(refStats);
-
-        // ─── নোটিফিকেশন লোড ও সর্ট ───
-        const fetchedNotifs: Notification[] = notifSnap.docs.map((d) => {
-          const data = d.data();
-          return {
-            id: d.id,
-            title: typeof data.title === 'string' ? data.title : 'নোটিফিকেশন',
-            message: typeof data.message === 'string' ? data.message : '',
-            read: typeof data.read === 'boolean' ? data.read : false,
-            createdAt: data.createdAt,
-          };
-        });
-        fetchedNotifs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-        setNotifications(fetchedNotifs);
-
-        // প্রোডাক্ট ও অন্যান্য ডাটা
-        const productMap: Record<string, number> = {};
-        productsSnap.docs.forEach((p) => {
-          const data = p.data();
-          productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
-        });
-
-        const activeProducts: Product[] = productsSnap.docs
-          .filter((d) => {
-            const data = d.data();
-            return data.active === true && typeof data.imageUrl === 'string' && data.imageUrl.length > 0;
-          })
-          .slice(0, 6)
-          .map((d) => {
+      // ─── নোটিফিকেশন ───
+      void notifP
+        .then((notifSnap) => {
+          const fetchedNotifs: Notification[] = notifSnap.docs.map((d) => {
             const data = d.data();
             return {
               id: d.id,
-              name: typeof data.name === 'string' ? data.name : 'Product',
-              imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
-              resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+              title: typeof data.title === 'string' ? data.title : 'নোটিফিকেশন',
+              message: typeof data.message === 'string' ? data.message : '',
+              read: typeof data.read === 'boolean' ? data.read : false,
+              createdAt: data.createdAt,
             };
           });
-        setFeaturedProducts(activeProducts);
+          fetchedNotifs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          if (cancelled) return;
+          setNotifications(fetchedNotifs);
+          updateDashboardCache(uid, { notifications: fetchedNotifs });
+        })
+        .catch((err) => console.error('Notifications load error:', err));
 
-        // অর্ডার প্রসেসিং
+      // ─── প্রোডাক্ট (Featured + দামের তালিকা) ───
+      const productMapP: Promise<Record<string, number>> = productsP
+        .then((productsSnap) => {
+          const productMap: Record<string, number> = {};
+          productsSnap.docs.forEach((p) => {
+            const data = p.data();
+            productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
+          });
+
+          const activeProducts: Product[] = productsSnap.docs
+            .filter((d) => {
+              const data = d.data();
+              return data.active === true && typeof data.imageUrl === 'string' && data.imageUrl.length > 0;
+            })
+            .slice(0, 6)
+            .map((d) => {
+              const data = d.data();
+              return {
+                id: d.id,
+                name: typeof data.name === 'string' ? data.name : 'Product',
+                imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
+                resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+              };
+            });
+
+          if (!cancelled) {
+            setFeaturedProducts(activeProducts);
+            updateDashboardCache(uid, { featuredProducts: activeProducts });
+          }
+          return productMap;
+        })
+        .catch((err) => {
+          console.error('Products load error:', err);
+          return {} as Record<string, number>;
+        })
+        .finally(() => {
+          if (!cancelled) setProductsLoading(false);
+        });
+
+      // ─── রেফারেল তথ্য ───
+      void (async () => {
+        try {
+          const userDoc = await userP;
+          if (!userDoc.exists()) return;
+          const userInfo = userDoc.data();
+
+          let refStats: ReferralInfo = {
+            referralCode: typeof userInfo.referralCode === 'string' ? userInfo.referralCode : '',
+            referralCount: typeof userInfo.referralCount === 'number' ? userInfo.referralCount : 0,
+            referralBonusEarned: typeof userInfo.referralBonusEarned === 'number' ? userInfo.referralBonusEarned : 0,
+          };
+
+          if (!refStats.referralCode) {
+            try {
+              const newCode = await generateUniqueReferralCode();
+              await updateDoc(doc(db, 'users', uid), {
+                referralCode: newCode,
+                referralCount: 0,
+                referralBonusEarned: 0,
+              });
+
+              const userName = (userInfo.name as string) || auth.currentUser?.email?.split('@')[0] || 'Reseller';
+              await publishReferralCode(uid, userName, newCode);
+
+              refStats = { referralCode: newCode, referralCount: 0, referralBonusEarned: 0 };
+            } catch (err) {
+              console.error('Failed to generate referral code:', err);
+            }
+          }
+
+          if (cancelled) return;
+          setReferralInfo(refStats);
+          updateDashboardCache(uid, { referralInfo: refStats });
+        } catch (err) {
+          console.error('Referral load error:', err);
+        } finally {
+          if (!cancelled) setRefLoading(false);
+        }
+      })();
+
+      // ─── অর্ডার, উইথড্র ও ব্যালেন্স হিসাব (হিসাবের নিয়ম আগের মতোই) ───
+      try {
+        const [userDoc, ordersSnapshot, withdrawSnap] = await Promise.all([userP, ordersP, withdrawP]);
+        const userInfo = userDoc.exists() ? userDoc.data() : null;
+
+        // পুরনো অর্ডারে items না থাকলে প্রোডাক্টের দাম লাগে; নইলে প্রোডাক্টের জন্য অপেক্ষা করব না
+        const needsProductPrices = ordersSnapshot.docs.some((d) => {
+          const items = d.data().items;
+          return !(Array.isArray(items) && items.length > 0);
+        });
+        const productMap: Record<string, number> = needsProductPrices ? await productMapP : {};
+
         const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
           const data = orderDocument.data();
           const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
           const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
-          
+
           let actualProfit = 0;
           if (Array.isArray(data.items) && data.items.length > 0) {
-             actualProfit = data.items.reduce((sum: number, item: any) => {
-                const resP = item.resellerPrice || 0;
-                const sellP = item.sellingPrice || 0;
-                const qty = item.quantity || 0;
-                return sum + ((sellP - resP) * qty);
-             }, 0);
+            actualProfit = (data.items as OrderItemLike[]).reduce((sum, item) => {
+              const resP = item.resellerPrice || 0;
+              const sellP = item.sellingPrice || 0;
+              const qty = item.quantity || 0;
+              return sum + (sellP - resP) * qty;
+            }, 0);
           } else {
-             const resellerPrice = productMap[productId] || 0;
-             actualProfit = (sellingPrice - resellerPrice) * quantity;
+            const resellerPrice = productMap[productId] || 0;
+            actualProfit = (sellingPrice - resellerPrice) * quantity;
           }
 
           return {
@@ -258,7 +362,7 @@ export default function ResellerDashboard() {
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
         const pendingOrders = fetchedOrders.filter((order) => PENDING_STATUSES.includes(order.status)).length;
         const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered').length;
-        
+
         const actualProfit = fetchedOrders
           .filter((order) => order.status === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
@@ -271,8 +375,7 @@ export default function ResellerDashboard() {
         const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
         const todaySales = todayOrders.reduce((sum, o) => sum + o.total, 0);
 
-        setOrders(fetchedOrders);
-        setStats({
+        const newStats: Stats = {
           totalOrders: fetchedOrders.length,
           pendingOrders,
           deliveredOrders,
@@ -282,26 +385,43 @@ export default function ResellerDashboard() {
           todayOrders: todayOrders.length,
           todaySales,
           referralBonus,
-        });
+        };
 
         const userCreatedAt = userInfo?.createdAt?.seconds || 0;
-        setBonusStartDate(userCreatedAt);
         const nowSec = Math.floor(Date.now() / 1000);
         const bonusDeadline = userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
         const daysLeft = Math.max(0, Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)));
-        
+        const progress = Math.min(deliveredOrders, WELCOME_BONUS_TARGET);
+        const achieved = deliveredOrders >= WELCOME_BONUS_TARGET;
+
+        if (cancelled) return;
+        setOrders(fetchedOrders);
+        setStats(newStats);
+        setBonusStartDate(userCreatedAt);
         setBonusDaysLeft(daysLeft);
-        setBonusProgress(Math.min(deliveredOrders, WELCOME_BONUS_TARGET));
-        setBonusAchieved(deliveredOrders >= WELCOME_BONUS_TARGET);
+        setBonusProgress(progress);
+        setBonusAchieved(achieved);
+        updateDashboardCache(uid, {
+          orders: fetchedOrders,
+          stats: newStats,
+          bonusStartDate: userCreatedAt,
+          bonusDaysLeft: daysLeft,
+          bonusProgress: progress,
+          bonusAchieved: achieved,
+        });
       } catch (error) {
-        console.error("Dashboard load error:", error);
+        console.error('Dashboard load error:', error);
+        if (!cancelled) setLoadError(true);
       } finally {
-        setLoading(false);
+        if (!cancelled) setStatsLoading(false);
       }
     };
 
-    void loadData();
-  }, []);
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [reloadKey]);
 
   // নোটিফিকেশন রিড হিসেবে মার্ক করা
   const handleOpenNotifications = async () => {
@@ -333,15 +453,6 @@ export default function ResellerDashboard() {
   const bonusPercent = Math.round((bonusProgress / WELCOME_BONUS_TARGET) * 100);
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  // ═══ লোডিং অবস্থায় Layout ট্যাগ বাদ দেওয়া হয়েছে ═══
-  if (loading) {
-    return (
-      <div className="flex min-h-40 items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
-      </div>
-    );
-  }
-
   return (
     // ═══ মেইন রিটার্ন থেকেও Layout ট্যাগ বাদ দেওয়া হয়েছে ═══
     <div className="mx-auto max-w-2xl pb-10">
@@ -372,6 +483,21 @@ export default function ResellerDashboard() {
         </button>
       </div>
 
+      {loadError && (
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 p-4">
+          <p className="text-sm font-medium text-red-700">ডাটা লোড করা যায়নি। ইন্টারনেট চেক করে আবার চেষ্টা করুন।</p>
+          <button
+            onClick={() => {
+              setStatsLoading(true);
+              setReloadKey((k) => k + 1);
+            }}
+            className="shrink-0 rounded-xl bg-red-600 px-4 py-2 text-xs font-bold text-white transition active:scale-95"
+          >
+            আবার চেষ্টা করুন
+          </button>
+        </div>
+      )}
+
       {/* ═══ TODAY'S SNAPSHOT ═══ */}
       {(stats.todayOrders > 0 || stats.todaySales > 0) && (
         <div className="mb-4 rounded-xl bg-white p-3 shadow-card border border-gray-50 flex items-center justify-between">
@@ -389,7 +515,9 @@ export default function ResellerDashboard() {
       )}
 
       {/* ═══ WELCOME BONUS ═══ */}
-      {bonusAchieved ? (
+      {statsLoading ? (
+        <SkeletonBlock className="mb-5 h-36" />
+      ) : bonusAchieved ? (
         <div className="mb-5 rounded-2xl bg-gradient-to-br from-green-50 to-emerald-50 p-5 shadow-card border border-green-100">
           <div className="flex items-start gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-green-500 shadow-sm">
@@ -460,6 +588,10 @@ export default function ResellerDashboard() {
       ) : null}
 
       {/* ═══ BALANCE ═══ */}
+      {statsLoading ? (
+        <SkeletonBlock className="mb-5 h-32" />
+      ) : (
+        <>
       <div className="mb-5 rounded-2xl bg-white p-5 shadow-card border border-gray-50">
         <div className="flex items-start justify-between">
           <div>
@@ -495,6 +627,8 @@ export default function ResellerDashboard() {
           </Link>
         </div>
       </div>
+        </>
+      )}
 
       {/* ═══ QUICK ACTIONS ═══ */}
       <div className="mb-6">
@@ -525,6 +659,10 @@ export default function ResellerDashboard() {
       </div>
 
       {/* ═══ MY PROGRESS ═══ */}
+      {statsLoading ? (
+        <SkeletonBlock className="mb-6 h-36" />
+      ) : (
+        <>
       <div className="mb-6">
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
@@ -567,9 +705,13 @@ export default function ResellerDashboard() {
           </div>
         </div>
       </div>
+        </>
+      )}
 
       {/* ═══ FEATURED PRODUCTS ═══ */}
-      {featuredProducts.length > 0 && (
+      {productsLoading ? (
+        <SkeletonBlock className="mb-6 h-44" />
+      ) : featuredProducts.length > 0 && (
         <div className="mb-6">
           <div className="mb-2 flex items-center justify-between">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
@@ -610,7 +752,9 @@ export default function ResellerDashboard() {
       )}
 
       {/* ═══ REFER & EARN ═══ */}
-      {referralInfo && referralInfo.referralCode && (
+      {refLoading ? (
+        <SkeletonBlock className="mb-6 h-24" />
+      ) : referralInfo && referralInfo.referralCode && (
         <Link
           to="/refer"
           className="mb-6 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 shadow-card border border-zeluxe-gold/20 transition hover:border-zeluxe-gold"
@@ -649,7 +793,13 @@ export default function ResellerDashboard() {
           </Link>
         </div>
 
-        {recentOrders.length > 0 ? (
+        {statsLoading ? (
+          <div className="space-y-2">
+            {[0, 1, 2].map((i) => (
+              <SkeletonBlock key={i} className="h-[76px]" />
+            ))}
+          </div>
+        ) : recentOrders.length > 0 ? (
           <div className="space-y-2">
             {recentOrders.map((order) => (
               <Link
