@@ -302,7 +302,7 @@ export default function Products() {
   const displayedCategories = categories.slice(0, 8);
 
   return (
-    <div className="mx-auto max-w-6xl pb-20">
+    <div className="mx-auto max-w-6xl pb-32">
       {/* HEADER SECTION (English & Professional) */}
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-zeluxe-black md:text-3xl tracking-tight">
