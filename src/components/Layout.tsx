@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom'; // ═══ ১. এটি ইমপোর্ট করুন ═══
 import { signOut } from 'firebase/auth';
-import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom'; // ═══ Outlet ইমপোর্ট করুন ═══
+import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
   LogOut,
@@ -18,7 +19,6 @@ import { auth } from '../firebase';
 import BottomNav from './BottomNav';
 import LogoutModal from './LogoutModal';
 
-// ═══ Horizontal Logo (Cloudinary) ═══
 const LOGO_URL =
   'https://res.cloudinary.com/q1zrv81l/image/upload/e_make_transparent,h_100,c_fit/v1792003969/file_000000009da4820b95630d85ec992cbb.png';
 
@@ -28,7 +28,6 @@ type NavItem = {
   icon: typeof LayoutDashboard;
 };
 
-// ═══ রিসেলারদের মেনু ═══
 const resellerNav: NavItem[] = [
   { label: 'Dashboard', path: '/reseller-dashboard', icon: LayoutDashboard },
   { label: 'Products', path: '/products', icon: Package },
@@ -52,7 +51,6 @@ export default function Layout() {
     navigate('/login');
   };
 
-  // ═══ সাব-রাউটে (যেমন /products/123) গেলেও যাতে ন্যাভিগেশন সক্রিয় থাকে ═══
   const isActive = (path: string) => {
     if (path === '/reseller-dashboard') return location.pathname === path;
     return location.pathname.startsWith(path);
@@ -146,13 +144,13 @@ export default function Layout() {
 
       {/* ═══ MAIN CONTENT ═══ */}
       <main className="min-h-screen md:ml-60">
-        <div className="mx-auto max-w-7xl p-5 pb-24 md:p-8 md:pb-8">
-          {/* এখানে পেজগুলো লোড হবে */}
+        <div className="mx-auto max-w-7xl p-5 pb-28 md:p-8 md:pb-8">
           <Outlet /> 
         </div>
       </main>
 
-      <BottomNav />
+      {/* ═══ ২. Portal ব্যবহার করে সরাসরি body-তে রেন্ডার করা হলো যাতে transform বা CSS এর ঝামেলা না হয় ═══ */}
+      {createPortal(<BottomNav />, document.body)}
 
       {/* Custom Logout Modal */}
       <LogoutModal
