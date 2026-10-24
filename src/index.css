@@ -8,12 +8,19 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
+    /* ═══ স্মুথ স্ক্রোলিং যোগ করা হয়েছে ═══ */
+    scroll-behavior: smooth;
+    -webkit-overflow-scrolling: touch;
   }
 
   body {
     @apply bg-zeluxe-cream text-zeluxe-black antialiased;
     font-family: 'Noto Sans Bengali', 'Inter', system-ui, sans-serif;
     font-feature-settings: 'liga' 1, 'kern' 1;
+    /* ═══ মোবাইল স্ক্রোল ল্যাগ দূর করার জন্য ═══ */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    transform: translateZ(0);
   }
 
   /* Bengali text always uses Noto Sans Bengali */
