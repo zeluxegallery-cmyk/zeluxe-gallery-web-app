@@ -6,6 +6,8 @@ import {
   limit,
   query,
   where,
+  doc,
+  getDoc,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
@@ -91,9 +93,10 @@ type ProductsCache = {
   categories: Category[];
 };
 
-// Kept in memory only while the app is open (never saved on the phone's disk),
-// so wholesale prices do not stay behind on a shared phone. Keyed by user id.
 let productsCache: ProductsCache | null = null;
+
+// ইনস্ট্যান্ট পেজ লোডিংয়ের জন্য প্রোডাক্ট ডিটেইলস ক্যাশ মেমোরি
+const productDetailCache = new Map<string, any>();
 
 function mapProduct(productDocument: QueryDocumentSnapshot<DocumentData>): Product {
   const data = productDocument.data();
@@ -128,7 +131,6 @@ function buildCategories(docs: QueryDocumentSnapshot<DocumentData>[]): Category[
     };
   });
 
-  // ═══ কাস্টম অর্ডার অনুযায়ী সাজানো ═══
   fetchedCategories.sort((a, b) => {
     const nameA = getDisplayCategoryName(a.name);
     const nameB = getDisplayCategoryName(b.name);
@@ -152,7 +154,6 @@ export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
-  // loading = nothing to show yet. allLoaded = the full list is here (needed for search and categories).
   const [loading, setLoading] = useState(!cached);
   const [allLoaded, setAllLoaded] = useState(!!cached);
   const [loadError, setLoadError] = useState(false);
@@ -162,11 +163,21 @@ export default function Products() {
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
 
+  // ═══ ইনস্ট্যান্ট প্রি-ফেচিং (মাউস হোভার বা টাচ করার সাথে সাথে ডেটা লোড করে রাখা) ═══
+  const prefetchProduct = (productId: string) => {
+    if (productDetailCache.has(productId)) return;
+    const docRef = doc(db, 'products', productId);
+    getDoc(docRef).then((docSnap) => {
+      if (docSnap.exists()) {
+        productDetailCache.set(productId, docSnap.data());
+      }
+    }).catch(() => {});
+  };
+
   useEffect(() => {
     let cancelled = false;
 
     const run = async () => {
-      // Wait until Firebase has restored the login session.
       await auth.authStateReady();
       const uid = auth.currentUser?.uid;
       if (!uid || cancelled) {
@@ -178,7 +189,6 @@ export default function Products() {
       setLoadError(false);
       const hasCache = productsCache !== null && productsCache.uid === uid;
 
-      // Start the full list and the categories at the same time (they used to load one after the other).
       const fullP = getDocs(query(collection(db, 'products'), where('active', '==', true)));
       const categoriesP = getDocs(collection(db, 'categories'))
         .then((snap) => buildCategories(snap.docs))
@@ -193,8 +203,6 @@ export default function Products() {
 
       let fullDone = false;
 
-      // Nothing cached yet: show the first page as soon as it arrives.
-      // Both queries use the same default order, so these are the same 20 products the full list starts with.
       if (!hasCache) {
         void getDocs(
           query(collection(db, 'products'), where('active', '==', true), limit(INITIAL_VISIBLE_COUNT)),
@@ -258,7 +266,6 @@ export default function Products() {
 
   const displayedProducts = filteredProducts.slice(0, visibleCount);
 
-  // While only the first page is here, search/category results would be incomplete: show the skeleton instead.
   const isFiltering = searchTerm.trim() !== '' || selectedCategory !== ALL_CATEGORIES;
   const showSkeleton = loading || (!allLoaded && isFiltering);
 
@@ -293,7 +300,6 @@ export default function Products() {
   const displayedCategories = categories.slice(0, 8);
 
   return (
-    // ═══ <Layout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
     <div className="mx-auto max-w-6xl pb-20">
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-zeluxe-black md:text-3xl tracking-tight">
@@ -318,7 +324,7 @@ export default function Products() {
         </div>
       </div>
 
-      {/* ═══ ক্যাটাগরি স্ক্রলার (See All সহ) ═══ */}
+      {/* ক্যাটাগরি স্ক্রলার */}
       <div className="mb-6 -mx-4 px-4 sm:-mx-6 sm:px-6">
         <div className="flex items-center justify-between mb-2">
           <h2 className="text-sm font-bold text-zeluxe-black pl-1">Categories</h2>
@@ -331,8 +337,6 @@ export default function Products() {
         </div>
         
         <div className="flex gap-4 overflow-x-auto pb-3 snap-x hide-scrollbar">
-          
-          {/* "সব" অপশন */}
           <button
             onClick={() => setSelectedCategory('সব ক্যাটাগরি')}
             className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
@@ -345,7 +349,6 @@ export default function Products() {
             </span>
           </button>
 
-          {/* প্রথম ৮টি ক্যাটাগরি */}
           {displayedCategories.map((cat) => (
             <button
               key={cat.id}
@@ -369,7 +372,6 @@ export default function Products() {
               </span>
             </button>
           ))}
-
         </div>
       </div>
 
@@ -388,7 +390,7 @@ export default function Products() {
         </div>
       )}
 
-      {/* ═══ SKELETON LOADING GRID ═══ */}
+      {/* SKELETON LOADING GRID */}
       {showSkeleton ? (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
           {Array.from({ length: 8 }).map((_, index) => (
@@ -416,6 +418,8 @@ export default function Products() {
               <Link
                 key={product.id}
                 to={`/products/${product.id}`}
+                onMouseEnter={() => prefetchProduct(product.id)}
+                onTouchStart={() => prefetchProduct(product.id)}
                 className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="relative aspect-square overflow-hidden bg-zeluxe-cream">
@@ -555,11 +559,10 @@ export default function Products() {
         </div>
       )}
 
-      {/* ═══ ALL CATEGORIES MODAL (See All Popup) ═══ */}
+      {/* ALL CATEGORIES MODAL */}
       {isCategoryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm">
           <div className="w-full max-w-lg max-h-[85vh] rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300">
-            
             <div className="flex items-center justify-between border-b border-gray-100 p-4 sm:p-5">
               <h2 className="text-lg font-bold text-zeluxe-black">All Categories</h2>
               <button 
@@ -609,11 +612,9 @@ export default function Products() {
                 ))}
               </div>
             </div>
-
           </div>
         </div>
       )}
-
     </div>
   );
 }
