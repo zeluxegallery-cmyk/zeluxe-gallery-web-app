@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import {
@@ -28,10 +28,15 @@ import LogoutModal from '../components/LogoutModal';
 import { auth, db } from '../firebase';
 import { uploadImageToCloudinary } from '../lib/cloudinary';
 
+// মেমোরি ক্যাশ ফর ইনস্ট্যান্ট পেজ ওপেনিং
+let profileCache: any = null;
+
 export default function Profile() {
   const navigate = useNavigate();
-  const [userData, setUserData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  
+  // ক্যাশ থাকলে ইনস্ট্যান্ট লোড হবে, কোনো স্পিনার দেখাবে না
+  const [userData, setUserData] = useState<any>(profileCache);
+  const [loading, setLoading] = useState(!profileCache);
   const [uploading, setUploading] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -41,13 +46,13 @@ export default function Profile() {
   const logoInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
-    businessName: '',
-    businessType: '',
-    businessAddress: '',
-    facebookUrl: '',
-    whatsappNumber: '',
-    bio: '',
-    businessLogo: '',
+    businessName: profileCache?.businessName || '',
+    businessType: profileCache?.businessType || '',
+    businessAddress: profileCache?.businessAddress || '',
+    facebookUrl: profileCache?.facebookUrl || '',
+    whatsappNumber: profileCache?.whatsappNumber || '',
+    bio: profileCache?.bio || '',
+    businessLogo: profileCache?.businessLogo || '',
   });
 
   const loadProfile = async () => {
@@ -60,6 +65,7 @@ export default function Profile() {
       const userDoc = await getDoc(doc(db, 'users', user.uid));
       if (userDoc.exists()) {
         const data = { uid: user.uid, email: user.email, ...userDoc.data() };
+        profileCache = data; // ক্যাশ আপডেট
         setUserData(data);
         setForm({
           businessName: (data as any).businessName || '',
@@ -79,8 +85,7 @@ export default function Profile() {
   };
 
   useEffect(() => {
-    loadProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    void loadProfile();
   }, []);
 
   const handleAvatarUpload = async (file: File) => {
@@ -89,7 +94,11 @@ export default function Profile() {
     try {
       const url = await uploadImageToCloudinary(file);
       await updateDoc(doc(db, 'users', auth.currentUser.uid), { avatarUrl: url });
-      setUserData((prev: any) => ({ ...prev, avatarUrl: url }));
+      setUserData((prev: any) => {
+        const updated = { ...prev, avatarUrl: url };
+        profileCache = updated;
+        return updated;
+      });
       toast.success('✓ প্রোফাইল ছবি আপডেট হয়েছে!');
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'ছবি আপলোড ব্যর্থ');
@@ -114,7 +123,7 @@ export default function Profile() {
     if (!auth.currentUser) return;
     setSaving(true);
     try {
-      await updateDoc(doc(db, 'users', auth.currentUser.uid), {
+      const updatePayload = {
         businessName: form.businessName.trim(),
         businessType: form.businessType.trim(),
         businessAddress: form.businessAddress.trim(),
@@ -122,8 +131,15 @@ export default function Profile() {
         whatsappNumber: form.whatsappNumber.trim(),
         bio: form.bio.trim(),
         businessLogo: form.businessLogo.trim(),
+      };
+      await updateDoc(doc(db, 'users', auth.currentUser.uid), updatePayload);
+      
+      setUserData((prev: any) => {
+        const updated = { ...prev, ...updatePayload };
+        profileCache = updated;
+        return updated;
       });
-      setUserData((prev: any) => ({ ...prev, ...form }));
+      
       setEditOpen(false);
       toast.success('✓ ব্যবসার তথ্য আপডেট হয়েছে!');
     } catch (err) {
@@ -135,6 +151,7 @@ export default function Profile() {
 
   const confirmLogout = async () => {
     setShowLogout(false);
+    profileCache = null; // লগআউট করলে ক্যাশ ক্লিয়ার
     await signOut(auth);
     navigate('/login');
   };
@@ -177,9 +194,9 @@ export default function Profile() {
     );
   };
 
-  if (loading) {
+  if (loading && !userData) {
     return (
-      <div className="flex min-h-40 items-center justify-center">
+      <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
       </div>
     );
@@ -201,8 +218,7 @@ export default function Profile() {
     userData.bio;
 
   return (
-    // ═══ <Layout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-2xl pb-10 transform-gpu">
       {/* Avatar Section */}
       <div className="mb-6 text-center">
         <div className="relative mx-auto inline-block">
@@ -353,7 +369,7 @@ export default function Profile() {
         />
       </div>
 
-      {/* ═══ নতুন সোশ্যাল মিডিয়া লিংক সেকশন ═══ */}
+      {/* সোশ্যাল মিডিয়া লিংক সেকশন */}
       <div className="mb-4 space-y-3 rounded-xl border border-zeluxe-lightgray bg-white p-4">
         <h3 className="text-sm font-bold text-zeluxe-black mb-1">আমাদের সাথে যুক্ত থাকুন</h3>
         
@@ -438,10 +454,10 @@ export default function Profile() {
 
       {/* Edit Business Modal */}
       {editOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-zeluxe-black">ব্যবসার তথ্য</h2>
+              <h2 className="text-lg font-bold text-zeluxe-black">ব্যব사의 তথ্য</h2>
               <button
                 onClick={() => setEditOpen(false)}
                 className="rounded-lg p-1.5 text-zeluxe-gray hover:bg-zeluxe-fieldbg"
@@ -609,7 +625,6 @@ export default function Profile() {
         </div>
       )}
 
-      {/* Custom Logout Modal */}
       <LogoutModal
         isOpen={showLogout}
         onConfirm={confirmLogout}
