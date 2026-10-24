@@ -26,13 +26,19 @@ import { auth, db } from '../firebase';
 
 const MIN_WITHDRAW = 500;
 
+// ইনস্ট্যান্ট পেজ ওপেনিংয়ের জন্য মেমোরি ক্যাশ
+let withdrawCache: { userData: any; orders: any[]; products: any[]; withdrawals: any[]; uid: string } | null = null;
+
 export default function Withdraw() {
   const navigate = useNavigate();
-  const [userData, setUserData] = useState<any>(null);
-  const [orders, setOrders] = useState<any[]>([]);
-  const [products, setProducts] = useState<any[]>([]);
-  const [withdrawals, setWithdrawals] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const currentUid = auth.currentUser?.uid || '';
+  const hasCache = withdrawCache && withdrawCache.uid === currentUid;
+
+  const [userData, setUserData] = useState<any>(hasCache ? withdrawCache!.userData : null);
+  const [orders, setOrders] = useState<any[]>(hasCache ? withdrawCache!.orders : []);
+  const [products, setProducts] = useState<any[]>(hasCache ? withdrawCache!.products : []);
+  const [withdrawals, setWithdrawals] = useState<any[]>(hasCache ? withdrawCache!.withdrawals : []);
+  const [loading, setLoading] = useState(!hasCache);
 
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<'bKash' | 'Nagad'>('bKash');
@@ -55,14 +61,29 @@ export default function Withdraw() {
           query(collection(db, 'withdrawRequests'), where('resellerId', '==', user.uid))
         ),
       ]);
-      setUserData(userDoc.exists() ? { uid: user.uid, ...userDoc.data() } : null);
-      setOrders(ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      setProducts(productsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
+
+      const uData = userDoc.exists() ? { uid: user.uid, ...userDoc.data() } : null;
+      const oList = ordersSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const pList = productsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const wList = withdrawSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      
       wList.sort(
         (a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
       );
+
+      setUserData(uData);
+      setOrders(oList);
+      setProducts(pList);
       setWithdrawals(wList);
+
+      // ক্যাশ আপডেট করে রাখা
+      withdrawCache = {
+        userData: uData,
+        orders: oList,
+        products: pList,
+        withdrawals: wList,
+        uid: user.uid,
+      };
     } catch (err) {
       console.error('Load failed:', err);
     } finally {
@@ -74,7 +95,7 @@ export default function Withdraw() {
     void loadData();
   }, []);
 
-  // ═══ Order Profit (only delivered) ═══
+  // Order Profit (only delivered)
   const orderProfit = orders.reduce((sum, order) => {
     if (order.status !== 'delivered') return sum;
     const product = products.find((p) => p.id === order.productId);
@@ -85,18 +106,18 @@ export default function Withdraw() {
     return sum + (sellingPrice - resellerPrice) * qty;
   }, 0);
 
-  // ═══ Referral Bonus ═══
+  // Referral Bonus
   const referralBonus = Number(userData?.referralBonusEarned) || 0;
 
-  // ═══ Total Earned ═══
+  // Total Earned
   const totalEarned = orderProfit + referralBonus;
 
-  // ═══ Already Requested/Withdrawn ═══
+  // Already Requested/Withdrawn
   const alreadyRequested = withdrawals
     .filter((w) => ['pending', 'approved', 'paid'].includes(w.status))
     .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
 
-  // ═══ Available Balance ═══
+  // Available Balance
   const availableBalance = Math.max(0, totalEarned - alreadyRequested);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -202,18 +223,17 @@ export default function Withdraw() {
     }
   };
 
-  if (loading) {
+  if (loading && !userData) {
     return (
-      <div className="flex min-h-40 items-center justify-center">
+      <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
       </div>
     );
   }
 
   return (
-    // ═══ <Layout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
-    <div className="mx-auto max-w-2xl">
-      {/* ═══ HEADER ═══ */}
+    <div className="mx-auto max-w-2xl pb-10 transform-gpu">
+      {/* HEADER */}
       <div className="mb-5">
         <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
           টাকা তুলুন
@@ -223,15 +243,15 @@ export default function Withdraw() {
         </p>
       </div>
 
-      {/* ═══ BALANCE HERO ═══ */}
-      <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-5 text-white">
+      {/* BALANCE HERO */}
+      <div className="relative mb-5 overflow-hidden rounded-lg bg-zeluxe-black p-5 text-white shadow-xl">
         <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full bg-zeluxe-gold/20 blur-3xl" />
         <div className="relative">
           <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest text-gray-400">
             <Wallet size={12} />
             Available Balance
           </div>
-          <p className="mt-2 text-4xl font-bold tracking-tight text-zeluxe-gold">
+          <p className="mt-2 text-4xl font-bold tracking-tight text-zeluxe-gold font-number">
             Tk {availableBalance.toFixed(0)}
           </p>
 
@@ -242,7 +262,7 @@ export default function Withdraw() {
                 <TrendingUp size={12} className="text-zeluxe-gold" />
                 Order Profit
               </div>
-              <span className="font-bold text-white">
+              <span className="font-bold text-white font-number">
                 Tk {orderProfit.toLocaleString()}
               </span>
             </div>
@@ -252,14 +272,14 @@ export default function Withdraw() {
                 <Users size={12} className="text-zeluxe-gold" />
                 Referral Bonus
               </div>
-              <span className="font-bold text-green-400">
+              <span className="font-bold text-green-400 font-number">
                 +Tk {referralBonus.toLocaleString()}
               </span>
             </div>
 
             <div className="flex items-center justify-between border-t border-white/10 pt-2.5 text-xs">
               <span className="text-gray-400">মোট আয়</span>
-              <span className="font-bold text-white">
+              <span className="font-bold text-white font-number">
                 Tk {totalEarned.toLocaleString()}
               </span>
             </div>
@@ -267,7 +287,7 @@ export default function Withdraw() {
             {alreadyRequested > 0 && (
               <div className="flex items-center justify-between text-xs">
                 <span className="text-gray-400">আগে তুলেছেন</span>
-                <span className="font-bold text-red-400">
+                <span className="font-bold text-red-400 font-number">
                   -Tk {alreadyRequested.toLocaleString()}
                 </span>
               </div>
@@ -276,9 +296,9 @@ export default function Withdraw() {
         </div>
       </div>
 
-      {/* ═══ MIN WITHDRAW INFO ═══ */}
+      {/* MIN WITHDRAW INFO */}
       {availableBalance < MIN_WITHDRAW && (
-        <div className="mb-5 rounded-md border border-yellow-200 bg-yellow-50 p-4">
+        <div className="mb-5 rounded-md border border-yellow-200 bg-yellow-50 p-4 shadow-sm">
           <div className="flex items-start gap-3">
             <Gift className="mt-0.5 shrink-0 text-yellow-700" size={16} />
             <div className="flex-1">
@@ -294,8 +314,8 @@ export default function Withdraw() {
         </div>
       )}
 
-      {/* ═══ WITHDRAW FORM ═══ */}
-      <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
+      {/* WITHDRAW FORM */}
+      <div className="mb-5 overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white shadow-sm">
         <div className="border-b border-zeluxe-lightgray px-5 py-3.5">
           <h2 className="text-sm font-bold text-zeluxe-black">
             Withdraw Request
@@ -382,7 +402,7 @@ export default function Withdraw() {
             <button
               type="submit"
               disabled={submitting || availableBalance < MIN_WITHDRAW}
-              className="flex w-full items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3.5 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3.5 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50 active:scale-95"
             >
               {submitting ? (
                 <>
@@ -402,8 +422,8 @@ export default function Withdraw() {
         </div>
       </div>
 
-      {/* ═══ WITHDRAW HISTORY ═══ */}
-      <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white">
+      {/* WITHDRAW HISTORY */}
+      <div className="overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white shadow-sm">
         <div className="border-b border-zeluxe-lightgray px-5 py-3.5">
           <h2 className="text-sm font-bold text-zeluxe-black">
             আগের Withdraw
@@ -417,7 +437,7 @@ export default function Withdraw() {
                 className="flex items-center justify-between border-b border-zeluxe-lightgray px-5 py-3.5 last:border-0"
               >
                 <div>
-                  <p className="text-sm font-bold text-zeluxe-black">
+                  <p className="text-sm font-bold text-zeluxe-black font-number">
                     Tk {w.amount}
                   </p>
                   <p className="mt-0.5 text-[11px] text-gray-500">
