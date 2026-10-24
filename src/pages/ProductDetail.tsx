@@ -54,18 +54,48 @@ export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
-  const [product, setProduct] = useState<Product | null>(null);
+  // ক্যাশ থেকে ইনিশিয়াল ডাটা তোলার ব্যবস্থা (যদি থাকে তবে জিরো লোডিং টাইম)
+  const [product, setProduct] = useState<Product | null>(() => {
+    // @ts-ignore
+    const cachedMap = window.__productDetailCache;
+    if (id && cachedMap && cachedMap.has(id)) {
+      const data = cachedMap.get(id);
+      const imgUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
+      let urls: string[] = Array.isArray(data.imageUrls) ? data.imageUrls.filter((u: any) => typeof u === 'string') : [];
+      if (urls.length === 0 && imgUrl) urls = [imgUrl];
+      let colors: string[] = Array.isArray(data.colors) ? data.colors.filter((c: any) => typeof c === 'string') : [];
+      let sizes: string[] = Array.isArray(data.sizes) ? data.sizes.filter((s: any) => typeof s === 'string') : [];
+
+      return {
+        id,
+        name: typeof data.name === 'string' ? data.name : 'Product',
+        sku: typeof data.sku === 'string' ? data.sku : '',
+        category: typeof data.category === 'string' ? data.category : '',
+        description: typeof data.description === 'string' ? data.description : '',
+        imageUrl: imgUrl,
+        imageUrls: urls,
+        colors,
+        sizes,
+        stock: typeof data.stock === 'number' ? data.stock : 0,
+        resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+        suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
+        active: true,
+      };
+    }
+    return null;
+  });
+
   const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!product);
   const [activeImage, setActiveImage] = useState(0);
-  const [selectedColor, setSelectedColor] = useState('');
-  const [selectedSize, setSelectedSize] = useState('');
+  const [selectedColor, setSelectedColor] = useState(product?.colors?.[0] || '');
+  const [selectedSize, setSelectedSize] = useState(product?.sizes?.[0] || '');
 
   const [quantity, setQuantity] = useState(1);
   const [copied, setCopied] = useState(false);
   const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
 
-  // ═══ কার্ট স্টেট ═══
+  // কার্ট স্টেট
   const [cartCount, setCartCount] = useState(0);
   const [cartTotal, setCartTotal] = useState(0);
 
@@ -75,7 +105,7 @@ export default function ProductDetail() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [address, setAddress] = useState('');
   const [district, setDistrict] = useState('ঢাকার ভিতরে');
-  const [sellingPrice, setSellingPrice] = useState('');
+  const [sellingPrice, setSellingPrice] = useState(product ? String(product.suggestedPrice) : '');
   const [deliveryCharge, setDeliveryCharge] = useState('70');
   const [discount, setDiscount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
@@ -135,9 +165,9 @@ export default function ProductDetail() {
           };
 
           setProduct(loadedProduct);
-          setSellingPrice(String(loadedProduct.suggestedPrice));
-          if (colors.length > 0) setSelectedColor(colors[0]);
-          if (sizes.length > 0) setSelectedSize(sizes[0]);
+          if (!sellingPrice) setSellingPrice(String(loadedProduct.suggestedPrice));
+          if (colors.length > 0 && !selectedColor) setSelectedColor(colors[0]);
+          if (sizes.length > 0 && !selectedSize) setSelectedSize(sizes[0]);
 
           if (loadedProduct.category) {
             try {
@@ -261,7 +291,6 @@ export default function ProductDetail() {
     }
   };
 
-  // ═══ একক ছবি ডাউনলোড ফাংশন ═══
   const handleDownloadSingle = async (url: string, idx: number) => {
     if (!product) return;
     setDownloadingIdx(idx);
@@ -346,9 +375,9 @@ export default function ProductDetail() {
     }
   };
 
-  if (loading) {
+  if (loading && !product) {
     return (
-      <div className="flex min-h-40 items-center justify-center">
+      <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
       </div>
     );
@@ -367,7 +396,8 @@ export default function ProductDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl pb-24">
+    // হার্ডওয়্যার অ্যাকসেলেরেশন এবং স্মুথ স্ক্রলিং সহ মূল কন্টেইনার
+    <div className="mx-auto max-w-5xl pb-24 transform-gpu transition-all">
       <Link
         to="/products"
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-zeluxe-gold"
@@ -376,7 +406,7 @@ export default function ProductDetail() {
         সব প্রোডাক্ট
       </Link>
 
-      <div className="rounded-lg border border-zeluxe-lightgray bg-white p-5 md:p-6">
+      <div className="rounded-lg border border-zeluxe-lightgray bg-white p-5 md:p-6 shadow-sm">
         <div className="grid gap-6 md:grid-cols-2 md:gap-8">
           {/* LEFT — Images */}
           <div>
@@ -387,9 +417,8 @@ export default function ProductDetail() {
                     <img
                       src={product.imageUrls[activeImage]}
                       alt={product.name}
-                      className="h-full w-full object-cover"
+                      className="h-full w-full object-cover transition-transform duration-300 transform-gpu"
                     />
-                    {/* মেইন ছবির ডাউনলোড বাটন */}
                     <button
                       onClick={() => handleDownloadSingle(product.imageUrls[activeImage], activeImage)}
                       disabled={downloadingIdx === activeImage}
@@ -407,7 +436,6 @@ export default function ProductDetail() {
               </div>
             </div>
 
-            {/* ═══ থাম্বনেইল লিস্ট এবং ডাউনলোড আইকন ═══ */}
             {product.imageUrls.length > 1 && (
               <div className="mt-4 grid grid-cols-4 gap-2">
                 {product.imageUrls.map((url, idx) => (
@@ -425,7 +453,6 @@ export default function ProductDetail() {
                       />
                     </button>
                     
-                    {/* ছোট ডাউনলোড আইকন */}
                     <button
                       onClick={(e) => {
                         e.preventDefault();
@@ -589,7 +616,6 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* ═══ ফ্লোটিং কার্ট বাটন ═══ */}
       {cartCount > 0 && (
         <div className="fixed bottom-20 left-4 right-4 z-40 mx-auto max-w-md animate-in slide-in-from-bottom-5 fade-in duration-300">
           <button
@@ -616,10 +642,9 @@ export default function ProductDetail() {
         </div>
       )}
 
-      {/* ═══ ORDER MODAL ═══ */}
       {orderModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6">
+          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-zeluxe-black">অর্ডার করুন</h2>
               <button onClick={() => setOrderModalOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream"><X size={18} /></button>
