@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { createPortal } from 'react-dom'; // ═══ ১. এটি ইমপোর্ট করুন ═══
+import { createPortal } from 'react-dom';
 import { signOut } from 'firebase/auth';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import {
@@ -72,10 +72,19 @@ export default function Layout() {
           alt="Zeluxe Gallery"
           className="h-8 w-auto object-contain"
         />
-        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-zeluxe-black text-sm font-bold text-zeluxe-gold">
-          {auth.currentUser?.displayName?.charAt(0).toUpperCase() ||
+        {/* ═══ User Profile Picture / Initial Avatar ═══ */}
+        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-zeluxe-black text-sm font-bold text-zeluxe-gold border border-zeluxe-gold/30">
+          {auth.currentUser?.photoURL ? (
+            <img 
+              src={auth.currentUser.photoURL} 
+              alt="Profile" 
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            auth.currentUser?.displayName?.charAt(0).toUpperCase() ||
             auth.currentUser?.email?.charAt(0).toUpperCase() ||
-            'U'}
+            'U'
+          )}
         </div>
       </header>
 
@@ -149,7 +158,7 @@ export default function Layout() {
         </div>
       </main>
 
-      {/* ═══ ২. Portal ব্যবহার করে সরাসরি body-তে রেন্ডার করা হলো যাতে transform বা CSS এর ঝামেলা না হয় ═══ */}
+      {/* ═══ Portal ব্যবহার করে সরাসরি body-তে রেন্ডার করা হলো ═══ */}
       {createPortal(<BottomNav />, document.body)}
 
       {/* Custom Logout Modal */}
