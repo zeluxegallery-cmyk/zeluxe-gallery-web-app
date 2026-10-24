@@ -22,7 +22,7 @@ export default function BottomNav() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 grid h-16 grid-cols-5 border-t border-zeluxe-lightgray bg-white/95 backdrop-blur-md shadow-lg md:hidden">
+    <nav className="fixed bottom-0 left-0 right-0 z-[9999] grid h-16 grid-cols-5 border-t border-zeluxe-lightgray bg-white shadow-2xl md:hidden">
       {items.map(({ label, path, icon: Icon, elevated }) => {
         const active = isActive(path);
 
