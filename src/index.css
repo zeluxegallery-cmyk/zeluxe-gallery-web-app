@@ -20,7 +20,6 @@
     /* ═══ মোবাইল স্ক্রোল ল্যাগ দূর করার জন্য ═══ */
     overflow-y: auto;
     -webkit-overflow-scrolling: touch;
-    transform: translateZ(0);
   }
 
   /* Bengali text always uses Noto Sans Bengali */
