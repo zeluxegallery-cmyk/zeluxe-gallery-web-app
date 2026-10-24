@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase';
+import AnimatedTutorial from '../components/AnimatedTutorial'; // ═══ অ্যানিমেটেড টিউটোরিয়াল কম্পোনেন্ট ইমপোর্ট ═══
 
 // ═══ Horizontal Logo (Cloudinary) ═══
 const LOGO_URL =
@@ -57,7 +58,7 @@ const testimonials = [
   },
   {
     name: 'মাহমুদুল ইসলাম', location: 'সিলেট', role: '৪ মাসের রিসেলার', rating: 5,
-    text: 'আগে অন্য প্লাটফর্মে কাজ করেছি, কিন্তু Zeluxe-এর সাপোর্ট এবং কমিশন সিস্টেম সবচেয়ে ভালো। প্রতি সপ্তাহে টাকা তুলতে পারি।',
+    text: 'আগে অন্য প্লাটফর্মে কাজ করেছি, কিন্তু Zeluxe-এর সাপোর্ট এবং কমিশন সিস্টেম সবচেয়ে ভালো। সপ্তাহে ২ বার টাকা তুলতে পারি।',
   },
 ];
 
@@ -238,7 +239,7 @@ export default function Landing() {
               <div className="mt-5 space-y-4">
                 <div>
                   <p className="text-[10px] uppercase tracking-widest text-gray-400">মেম্বারশিপ ফি</p>
-                  <p className="mt-0.5 text-2xl font-bold text-zeluxe-gold">Tk 99</p>
+                  <p className="mt-0.5 text-2xl font-bold text-zeluxe-gold font-number">Tk 99</p>
                   <p className="text-[11px] text-gray-500">এককালীন · ফেরতযোগ্য নয়</p>
                 </div>
                 <div className="border-t border-white/10 pt-4">
@@ -256,6 +257,9 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* ═══════ ANIMATED TUTORIAL / VIDEO GUIDE SECTION ═══════ */}
+      <AnimatedTutorial />
 
       {/* ═══════ SERVICES GRID ═══════ */}
       <section id="services" className="px-5 py-14 md:py-20">
@@ -355,7 +359,7 @@ export default function Landing() {
               <div key={num} className="relative">
                 <div className="rounded-lg border border-zeluxe-lightgray bg-white p-6 text-left transition hover:border-zeluxe-gold">
                   <div className="flex items-center justify-between">
-                    <span className="text-3xl font-bold text-zeluxe-gold/30">{num}</span>
+                    <span className="text-3xl font-bold text-zeluxe-gold/30 font-number">{num}</span>
                     <span className="rounded-full border border-zeluxe-lightgray bg-zeluxe-cream px-2 py-0.5 text-[10px] font-bold text-gray-600">
                       {time}
                     </span>
@@ -521,7 +525,7 @@ export default function Landing() {
               </a>
             </div>
 
-            {/* ═══ নতুন সোশ্যাল মিডিয়া সেকশন ═══ */}
+            {/* সোশ্যাল মিডিয়া সেকশন */}
             <div className="text-center md:text-left md:w-1/4">
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">সোশ্যাল মিডিয়া</p>
               <div className="mt-2 flex flex-col gap-2 text-xs">
