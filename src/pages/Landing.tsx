@@ -258,6 +258,39 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* ═══════ PROMOTIONAL YOUTUBE VIDEO SECTION ═══════ */}
+      <section className="py-14 px-4 sm:px-6 lg:px-8 bg-white border-y border-zeluxe-lightgray">
+        <div className="mx-auto max-w-4xl text-center">
+          <h2 className="text-2xl sm:text-3xl font-bold text-zeluxe-black tracking-tight mb-3">
+            মাত্র ৯৯ টাকায় <span className="text-zeluxe-gold">অনলাইন ব্যবসা</span> শুরু করুন!
+          </h2>
+          <p className="text-sm sm:text-base text-gray-600 mb-8 max-w-2xl mx-auto">
+            স্টক ছাড়াই কিভাবে জিরো ইনভেস্টমেন্টে রিসেলার হিসেবে নিজের ব্যবসা শুরু করবেন, তা দেখে নিন আমাদের এই ভিডিওটিতে।
+          </p>
+
+          {/* Responsive YouTube Video Embed */}
+          <div className="relative overflow-hidden rounded-2xl shadow-xl aspect-video bg-black">
+            <iframe
+              className="absolute top-0 left-0 h-full w-full border-0"
+              src="https://www.youtube.com/embed/LUCVBXUzEdo"
+              title="Zeluxe Gallery Reseller Promotional Video"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+            ></iframe>
+          </div>
+
+          {/* Call to Action Button */}
+          <div className="mt-8">
+            <Link 
+              to="/register" 
+              className="inline-flex items-center justify-center rounded-xl bg-zeluxe-gold px-8 py-4 text-base font-bold text-zeluxe-black shadow-lg transition hover:brightness-110 active:scale-95"
+            >
+              আজই রিসেলার হিসেবে যুক্ত হোন (মাত্র ৯৯ টাকা)
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ═══════ ANIMATED TUTORIAL / VIDEO GUIDE SECTION ═══════ */}
       <AnimatedTutorial />
 
