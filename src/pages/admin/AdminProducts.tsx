@@ -70,7 +70,7 @@ const emptyForm: ProductForm = {
   active: true,
 };
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 10; // একসঙ্গে একাধিক ছবি আপলোড করার সুবিধা বাড়াতে লিমিট বাড়ানো হলো
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
 
@@ -122,7 +122,7 @@ const getOrderIndex = (name: string) => {
   return index === -1 ? 9999 : index;
 };
 
-// ═══ SKU জেনারেট করার কোড (ইংরেজি ও বাংলা দুই ভাবেই কাজ করবে) ═══
+// ═══ SKU জেনারেট করার কোড ═══
 const CATEGORY_CODES: Record<string, string> = {
   'শার্ট': 'SHT', 'Shirt': 'SHT', 
   'টি-শার্ট': 'TSH', 'T-Shirt': 'TSH', 
@@ -211,7 +211,6 @@ export default function AdminProducts() {
         }),
       );
 
-      // ক্যাটাগরি লোড এবং সর্ট করা
       let fetchedCats = categorySnap.docs.map((catDoc) => ({
         id: catDoc.id,
         name: typeof catDoc.data().name === 'string' ? catDoc.data().name : 'Unnamed',
@@ -245,7 +244,6 @@ export default function AdminProducts() {
 
   const generateSKU = useCallback(async (categoryName: string): Promise<string> => {
     if (!categoryName) return '';
-    // ইংরেজি বা বাংলা যেকোনো নাম দিলেই কোড খুঁজে নেবে
     const code = CATEGORY_CODES[categoryName] || 'GEN';
     try {
       const q = query(collection(db, 'products'));
@@ -318,39 +316,73 @@ export default function AdminProducts() {
     setModalOpen(true);
   };
 
+  // ═══ মাল্টিপল ছবি আপলোড করলে প্রতিটি ছবির জন্য আলাদা প্রোডাক্ট হিসেবে সেভ করার লজিক ═══
   const handleSave = async () => {
-    if (!form.name.trim() || !form.sku.trim()) {
-      toast.error('নাম এবং SKU অবশ্যই দিতে হবে');
+    if (!form.name.trim()) {
+      toast.error('প্রোডাক্টের নাম অবশ্যই দিতে হবে');
       return;
     }
+    if (form.imageUrls.length === 0) {
+      toast.error('কমপক্ষে একটি ছবি আপলোড করতে হবে');
+      return;
+    }
+
     setSaving(true);
     try {
       const colors = form.colorsInput.split(',').map((c) => c.trim()).filter((c) => c.length > 0);
       const sizes = form.sizesInput.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 
-      const payload = {
-        name: form.name.trim(),
-        sku: form.sku.trim(),
-        category: form.category,
-        description: form.description.trim(),
-        imageUrl: form.imageUrls[0] || '',
-        imageUrls: form.imageUrls,
-        colors,
-        sizes,
-        sourceUrl: form.sourceUrl.trim(),
-        stock: Number(form.stock) || 0,
-        purchaseCost: Number(form.purchaseCost) || 0,
-        resellerPrice: Number(form.resellerPrice) || 0,
-        suggestedPrice: Number(form.suggestedPrice) || 0,
-        active: form.active,
-      };
+      // যদি এডিট মোডে থাকেন, তবে একটিই আপডেট হবে
       if (editingId) {
+        const payload = {
+          name: form.name.trim(),
+          sku: form.sku.trim(),
+          category: form.category,
+          description: form.description.trim(),
+          imageUrl: form.imageUrls[0] || '',
+          imageUrls: form.imageUrls,
+          colors,
+          sizes,
+          sourceUrl: form.sourceUrl.trim(),
+          stock: Number(form.stock) || 0,
+          purchaseCost: Number(form.purchaseCost) || 0,
+          resellerPrice: Number(form.resellerPrice) || 0,
+          suggestedPrice: Number(form.suggestedPrice) || 0,
+          active: form.active,
+        };
         await updateDoc(doc(db, 'products', editingId), payload);
         toast.success('✓ প্রোডাক্ট আপডেট হয়েছে!');
       } else {
-        await addDoc(collection(db, 'products'), { ...payload, createdAt: serverTimestamp() });
-        toast.success('✓ নতুন প্রোডাক্ট যোগ হয়েছে!');
+        // নতুন প্রোডাক্ট যোগ করার সময় একাধিক ছবি থাকলে প্রতিটি ছবির জন্য লুপ চালিয়ে আলাদা আলাদা প্রোডাক্ট তৈরি করা হবে
+        for (let i = 0; i < form.imageUrls.length; i++) {
+          const imgUrl = form.imageUrls[i];
+          
+          // প্রতিটি আলাদা প্রোডাক্টের জন্য নতুন SKU জেনারেট করা
+          const uniqueSku = await generateSKU(form.category);
+
+          const payload = {
+            name: form.imageUrls.length > 1 ? `${form.name.trim()} (${i + 1})` : form.name.trim(),
+            sku: uniqueSku,
+            category: form.category,
+            description: form.description.trim(),
+            imageUrl: imgUrl,
+            imageUrls: [imgUrl],
+            colors,
+            sizes,
+            sourceUrl: form.sourceUrl.trim(),
+            stock: Number(form.stock) || 0,
+            purchaseCost: Number(form.purchaseCost) || 0,
+            resellerPrice: Number(form.resellerPrice) || 0,
+            suggestedPrice: Number(form.suggestedPrice) || 0,
+            active: form.active,
+            createdAt: serverTimestamp(),
+          };
+
+          await addDoc(collection(db, 'products'), payload);
+        }
+        toast.success(`✓ সফলভাবে ${form.imageUrls.length}টি আলাদা প্রোডাক্ট যোগ হয়েছে!`);
       }
+
       setModalOpen(false);
       await loadData();
     } catch (err) {
@@ -404,15 +436,6 @@ export default function AdminProducts() {
     setForm((prev) => ({ ...prev, imageUrls: prev.imageUrls.filter((_, i) => i !== index) }));
   };
 
-  const setPrimaryImage = (index: number) => {
-    setForm((prev) => {
-      const newUrls = [...prev.imageUrls];
-      const [selected] = newUrls.splice(index, 1);
-      newUrls.unshift(selected);
-      return { ...prev, imageUrls: newUrls };
-    });
-  };
-
   const filtered = products.filter((product) => {
     const matchesSearch =
       product.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -426,7 +449,6 @@ export default function AdminProducts() {
   const inputClass =
     'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none';
 
-  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
       <div className="space-y-4">
@@ -483,7 +505,6 @@ export default function AdminProducts() {
 
       {displayedProducts.length > 0 ? (
         <>
-          {/* Desktop table */}
           <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-zeluxe-cream">
@@ -510,11 +531,6 @@ export default function AdminProducts() {
                             loading="lazy"
                             className="h-10 w-10 rounded-md object-cover" 
                           />
-                          {product.imageUrls.length > 1 && (
-                            <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
-                              {product.imageUrls.length}
-                            </span>
-                          )}
                         </div>
                       ) : (
                         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zeluxe-cream">
@@ -551,7 +567,6 @@ export default function AdminProducts() {
             </table>
           </div>
 
-          {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
             {displayedProducts.map((product) => (
               <div key={product.id} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
@@ -591,7 +606,6 @@ export default function AdminProducts() {
             ))}
           </div>
 
-          {/* Load More Button */}
           {visibleCount < filtered.length && (
             <div className="mt-8 flex justify-center">
               <button
@@ -610,13 +624,12 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-zeluxe-black">
-                {editingId ? 'প্রোডাক্ট এডিট' : 'নতুন প্রোডাক্ট'}
+                {editingId ? 'প্রোডাক্ট এডিট' : 'নতুন প্রোডাক্ট (একাধিক ছবি দিলে আলাদা প্রোডাক্ট তৈরি হবে)'}
               </h2>
               <button onClick={() => setModalOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream">
                 <X className="h-5 w-5" />
@@ -712,7 +725,7 @@ export default function AdminProducts() {
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <Palette size={14} className="text-zeluxe-gold" />
-                  <span>উপলব্ধ কালার</span>
+                  <span>উপলব্ধ কালার (ঐচ্ছিক)</span>
                 </label>
                 <input
                   value={form.colorsInput}
@@ -724,25 +737,15 @@ export default function AdminProducts() {
 
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
-                  <span>প্রোডাক্টের ছবি</span>
+                  <span>প্রোডাক্টের ছবিগুলো (একাধিক আপলোড করতে পারবেন)</span>
                   <span className="text-[11px] font-normal text-gray-500">{form.imageUrls.length}/{MAX_IMAGES}</span>
                 </label>
 
                 {form.imageUrls.length > 0 && (
-                  <div className="mb-3 grid grid-cols-3 gap-2">
+                  <div className="mb-3 grid grid-cols-4 gap-2">
                     {form.imageUrls.map((url, idx) => (
-                      <div
-                        key={idx}
-                        className={`group relative aspect-square overflow-hidden rounded-md border-2 ${
-                          idx === 0 ? 'border-zeluxe-gold' : 'border-zeluxe-lightgray'
-                        }`}
-                      >
+                      <div key={idx} className="group relative aspect-square overflow-hidden rounded-md border-2 border-zeluxe-gold">
                         <img src={url} alt={`Product ${idx + 1}`} className="h-full w-full object-cover" />
-                        {idx === 0 && (
-                          <span className="absolute left-1 top-1 rounded bg-zeluxe-gold px-1.5 py-0.5 text-[9px] font-bold text-zeluxe-black">
-                            Primary
-                          </span>
-                        )}
                         <button
                           type="button"
                           onClick={() => removeImage(idx)}
@@ -750,15 +753,6 @@ export default function AdminProducts() {
                         >
                           <X size={11} />
                         </button>
-                        {idx > 0 && (
-                          <button
-                            type="button"
-                            onClick={() => setPrimaryImage(idx)}
-                            className="absolute bottom-1 left-1 right-1 rounded bg-black/70 px-2 py-1 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100"
-                          >
-                            Primary করুন
-                          </button>
-                        )}
                       </div>
                     ))}
                   </div>
@@ -774,13 +768,13 @@ export default function AdminProducts() {
                     {uploading ? (
                       <>
                         <Loader2 className="mx-auto h-6 w-6 animate-spin text-zeluxe-gold" />
-                        <p className="mt-2 text-xs text-gray-500">আপলোড হচ্ছে...</p>
+                        <p className="mt-2 text-xs text-gray-500">ছবি আপলোড হচ্ছে...</p>
                       </>
                     ) : (
                       <>
                         <Upload className="mx-auto h-6 w-6 text-zeluxe-gold" />
                         <p className="mt-2 text-sm font-medium text-zeluxe-black">
-                          {form.imageUrls.length === 0 ? 'ছবি আপলোড করুন' : 'আরো ছবি যোগ করুন'}
+                          একাধিক ছবি সিলেক্ট করুন (প্রতিটি ছবি আলাদা প্রোডাক্ট হবে)
                         </p>
                       </>
                     )}
