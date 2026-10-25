@@ -1,6 +1,6 @@
-Import { useCallback, useEffect, useRef, useState } from 'react';
+
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  addDoc,
   collection,
   deleteDoc,
   doc,
@@ -9,8 +9,21 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
-import { Loader2, Package, Pencil, Plus, Search, Trash2, Upload, X, Wand2, Palette, Ruler, Link as LinkIcon } from 'lucide-react';
+import {
+  Loader2,
+  Package,
+  Pencil,
+  Search,
+  Trash2,
+  Upload,
+  X,
+  Wand2,
+  Palette,
+  Ruler,
+  Link as LinkIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { uploadImageToCloudinary } from '../../lib/cloudinary';
 import { db } from '../../firebase';
@@ -24,6 +37,7 @@ type Product = {
   imageUrl: string;
   imageUrls: string[];
   colors: string[];
+  color?: string;
   sizes: string[];
   sourceUrl: string;
   stock: number;
@@ -31,6 +45,7 @@ type Product = {
   resellerPrice: number;
   suggestedPrice: number;
   active: boolean;
+  groupId?: string;
 };
 
 type Category = {
@@ -70,18 +85,16 @@ const emptyForm: ProductForm = {
   active: true,
 };
 
-const MAX_IMAGES = 5;
+const MAX_IMAGES = 20;
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
 
-// ═══ আপনার দেওয়া নির্দিষ্ট সিরিয়াল (Custom Order) ═══
 const customOrder = [
   'T-Shirt', '3 Piece', 'Panjabi', 'Polo Shirt', 'Gadget', 'Watch',
   'Airpods', 'Hoodie', 'Sharee', '2 Piece', 'Baby Fashion', 'Borka',
-  'Hijab', 'Smart Watch', 'Neckband', 'Microphone', 'Pant', 'Shirt'
+  'Hijab', 'Smart Watch', 'Neckband', 'Microphone', 'Pant', 'Shirt',
 ];
 
-// ═══ বাংলা থেকে ইংরেজি নামের অভিধান ═══
 const categoryTranslations: Record<string, string> = {
   'পাওয়ার ব্যাংক': 'Power Bank',
   'পাঞ্জাবি': 'Panjabi',
@@ -113,43 +126,41 @@ const categoryTranslations: Record<string, string> = {
   'ইন্টেরিয়র': 'Interior',
 };
 
-const getDisplayCategoryName = (name: string) => {
-  return categoryTranslations[name] || name;
-};
+const getDisplayCategoryName = (name: string) =>
+  categoryTranslations[name] || name;
 
 const getOrderIndex = (name: string) => {
   const index = customOrder.indexOf(name);
   return index === -1 ? 9999 : index;
 };
 
-// ═══ SKU জেনারেট করার কোড (ইংরেজি ও বাংলা দুই ভাবেই কাজ করবে) ═══
 const CATEGORY_CODES: Record<string, string> = {
-  'শার্ট': 'SHT', 'Shirt': 'SHT', 
-  'টি-শার্ট': 'TSH', 'T-Shirt': 'TSH', 
-  'পাঞ্জাবি': 'PNJ', 'Panjabi': 'PNJ',
-  'প্যান্ট & ট্রাউজার': 'PNT', 'Pant': 'PNT',
-  'হুডি & জ্যাকেট': 'HDJ', 'Hoodie': 'HDJ',
-  'শাড়ি': 'SAR', 'Sharee': 'SAR',
+  'শার্ট': 'SHT', Shirt: 'SHT',
+  'টি-শার্ট': 'TSH', 'T-Shirt': 'TSH',
+  'পাঞ্জাবি': 'PNJ', Panjabi: 'PNJ',
+  'প্যান্ট & ট্রাউজার': 'PNT', Pant: 'PNT',
+  'হুডি & জ্যাকেট': 'HDJ', Hoodie: 'HDJ',
+  'শাড়ি': 'SAR', Sharee: 'SAR',
   'থ্রি-পিস': 'TPS', '3 Piece': 'TPS',
-  'কুর্তি': 'KRT',
-  'বোরকা': 'BRK', 'Borka': 'BRK', 
-  'হিজাব': 'HJB', 'Hijab': 'HJB', 
+  'কুর্তি': 'KRT', Kurti: 'KRT',
+  'বোরকা': 'BRK', Borka: 'BRK',
+  'হিজাব': 'HJB', Hijab: 'HJB',
   'বেবি ড্রেস': 'BBD', 'Baby Fashion': 'BBD',
   'কিডস আইটেম': 'KID', 'Kids Items': 'KID',
-  'খেলনা': 'TOY',
-  'ঘড়ি': 'WAT', 'Watch': 'WAT',
+  'খেলনা': 'TOY', Toys: 'TOY',
+  'ঘড়ি': 'WAT', Watch: 'WAT',
   'স্মার্ট ওয়াচ': 'SWT', 'Smart Watch': 'SWT',
-  'হেডফোন': 'HDP', 'Headphone': 'HDP',
-  'ইয়ারবাডস (ব্রুটুথ)': 'HDP', 'Airpods': 'HDP',
+  'হেডফোন': 'HDP', Headphone: 'HDP',
+  'ইয়ারবাডস (ব্রুটুথ)': 'HDP', Airpods: 'HDP',
   'পাওয়ার ব্যাংক': 'PWB', 'Power Bank': 'PWB',
-  'কসমেটিক্স': 'CSM', 'Cosmetics': 'CSM',
+  'কসমেটিক্স': 'CSM', Cosmetics: 'CSM',
   'স্কিন কেয়ার': 'SKC', 'Skin Care': 'SKC',
-  'পারফিউম': 'PRF', 'Perfume': 'PRF',
-  'ব্যাগ': 'BAG', 'Bag': 'BAG',
+  'পারফিউম': 'PRF', Perfume: 'PRF',
+  'ব্যাগ': 'BAG', Bag: 'BAG',
   'কাপল আইটেম': 'CPL', 'Couple Items': 'CPL',
   'গিফট আইটেম': 'GFT', 'Gift Items': 'GFT',
   'ওয়েস্টার্ন ড্রেস': 'WDR', 'Western Dress': 'WDR',
-  'ইন্টেরিয়র': 'INT', 'Interior': 'INT',
+  'ইন্টেরিয়র': 'INT', Interior: 'INT',
 };
 
 export default function AdminProducts() {
@@ -159,14 +170,18 @@ export default function AdminProducts() {
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
-  
+
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [skuLoading, setSkuLoading] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const inputClass =
+    'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none';
 
   const loadData = useCallback(async () => {
     try {
@@ -174,47 +189,70 @@ export default function AdminProducts() {
         getDocs(query(collection(db, 'products'), orderBy('name'))),
         getDocs(collection(db, 'categories')),
       ]);
-      
+
       setProducts(
         productSnap.docs.map((productDoc) => {
           const data = productDoc.data();
-          const imgUrl = typeof data.imageUrl === 'string' ? data.imageUrl : '';
+          const imgUrl =
+            typeof data.imageUrl === 'string' ? data.imageUrl : '';
+
           let urls: string[] = [];
           if (Array.isArray(data.imageUrls)) {
-            urls = data.imageUrls.filter((u: any) => typeof u === 'string');
+            urls = data.imageUrls.filter(
+              (u: unknown): u is string => typeof u === 'string',
+            );
           }
           if (urls.length === 0 && imgUrl) urls = [imgUrl];
 
-          let colors: string[] = [];
-          if (Array.isArray(data.colors)) colors = data.colors.filter((c: any) => typeof c === 'string');
-          
-          let sizes: string[] = [];
-          if (Array.isArray(data.sizes)) sizes = data.sizes.filter((s: any) => typeof s === 'string');
+          const colors: string[] = Array.isArray(data.colors)
+            ? data.colors.filter(
+                (c: unknown): c is string => typeof c === 'string',
+              )
+            : [];
+
+          const sizes: string[] = Array.isArray(data.sizes)
+            ? data.sizes.filter(
+                (s: unknown): s is string => typeof s === 'string',
+              )
+            : [];
 
           return {
             id: productDoc.id,
             name: typeof data.name === 'string' ? data.name : '—',
             sku: typeof data.sku === 'string' ? data.sku : '—',
-            category: typeof data.category === 'string' ? data.category : '—',
-            description: typeof data.description === 'string' ? data.description : '',
+            category:
+              typeof data.category === 'string' ? data.category : '—',
+            description:
+              typeof data.description === 'string' ? data.description : '',
             imageUrl: imgUrl,
             imageUrls: urls,
             colors,
+            color: typeof data.color === 'string' ? data.color : '',
             sizes,
-            sourceUrl: typeof data.sourceUrl === 'string' ? data.sourceUrl : '',
+            sourceUrl:
+              typeof data.sourceUrl === 'string' ? data.sourceUrl : '',
             stock: typeof data.stock === 'number' ? data.stock : 0,
-            purchaseCost: typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
-            resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
-            suggestedPrice: typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
+            purchaseCost:
+              typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
+            resellerPrice:
+              typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+            suggestedPrice:
+              typeof data.suggestedPrice === 'number'
+                ? data.suggestedPrice
+                : 0,
             active: typeof data.active === 'boolean' ? data.active : true,
+            groupId:
+              typeof data.groupId === 'string' ? data.groupId : undefined,
           };
         }),
       );
 
-      // ক্যাটাগরি লোড এবং সর্ট করা
-      let fetchedCats = categorySnap.docs.map((catDoc) => ({
+      const fetchedCats = categorySnap.docs.map((catDoc) => ({
         id: catDoc.id,
-        name: typeof catDoc.data().name === 'string' ? catDoc.data().name : 'Unnamed',
+        name:
+          typeof catDoc.data().name === 'string'
+            ? catDoc.data().name
+            : 'Unnamed',
       }));
 
       fetchedCats.sort((a, b) => {
@@ -222,6 +260,7 @@ export default function AdminProducts() {
         const nameB = getDisplayCategoryName(b.name);
         const indexA = getOrderIndex(nameA);
         const indexB = getOrderIndex(nameB);
+
         if (indexA !== indexB) return indexA - indexB;
         return nameA.localeCompare(nameB);
       });
@@ -243,25 +282,27 @@ export default function AdminProducts() {
     setVisibleCount(INITIAL_VISIBLE_COUNT);
   }, [search, categoryFilter]);
 
-  const generateSKU = useCallback(async (categoryName: string): Promise<string> => {
+  const generateSKU = useCallback(async (categoryName: string) => {
     if (!categoryName) return '';
-    // ইংরেজি বা বাংলা যেকোনো নাম দিলেই কোড খুঁজে নেবে
+
     const code = CATEGORY_CODES[categoryName] || 'GEN';
+
     try {
-      const q = query(collection(db, 'products'));
-      const snap = await getDocs(q);
+      const snap = await getDocs(query(collection(db, 'products')));
       let maxSeq = 0;
+
       snap.docs.forEach((d) => {
         const sku = d.data().sku;
+
         if (typeof sku === 'string' && sku.startsWith(`ZEL-${code}-`)) {
           const parts = sku.split('-');
           const seq = parseInt(parts[2], 10);
           if (!isNaN(seq) && seq > maxSeq) maxSeq = seq;
         }
       });
-      const nextSeq = maxSeq + 1;
-      return `ZEL-${code}-${nextSeq.toString().padStart(4, '0')}`;
-    } catch (err) {
+
+      return `ZEL-${code}-${String(maxSeq + 1).padStart(4, '0')}`;
+    } catch {
       return `ZEL-${code}-0001`;
     }
   }, []);
@@ -269,6 +310,7 @@ export default function AdminProducts() {
   const handleCategoryChange = async (categoryName: string) => {
     setForm((prev) => ({ ...prev, category: categoryName, sku: '' }));
     if (!categoryName || editingId) return;
+
     setSkuLoading(true);
     try {
       const newSku = await generateSKU(categoryName);
@@ -283,6 +325,7 @@ export default function AdminProducts() {
       toast.error('প্রথমে ক্যাটাগরি সিলেক্ট করুন');
       return;
     }
+
     setSkuLoading(true);
     try {
       const newSku = await generateSKU(form.category);
@@ -293,7 +336,7 @@ export default function AdminProducts() {
   };
 
   const openAdd = () => {
-    setForm(emptyForm);
+    setForm({ ...emptyForm, imageUrls: [] });
     setEditingId(null);
     setModalOpen(true);
   };
@@ -304,7 +347,12 @@ export default function AdminProducts() {
       sku: product.sku,
       category: product.category,
       description: product.description,
-      imageUrls: product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : []),
+      imageUrls:
+        product.imageUrls.length > 0
+          ? product.imageUrls
+          : product.imageUrl
+            ? [product.imageUrl]
+            : [],
       colorsInput: product.colors.join(', '),
       sizesInput: product.sizes.join(', '),
       sourceUrl: product.sourceUrl,
@@ -314,54 +362,150 @@ export default function AdminProducts() {
       suggestedPrice: String(product.suggestedPrice),
       active: product.active,
     });
+
     setEditingId(product.id);
     setModalOpen(true);
   };
 
+  // প্রতিটি ছবির জন্য একটি আলাদা প্রোডাক্ট তৈরি করবে।
   const handleSave = async () => {
     if (!form.name.trim() || !form.sku.trim()) {
       toast.error('নাম এবং SKU অবশ্যই দিতে হবে');
       return;
     }
-    setSaving(true);
-    try {
-      const colors = form.colorsInput.split(',').map((c) => c.trim()).filter((c) => c.length > 0);
-      const sizes = form.sizesInput.split(',').map((s) => s.trim()).filter((s) => s.length > 0);
 
-      const payload = {
+    if (!form.category.trim()) {
+      toast.error('ক্যাটাগরি সিলেক্ট করুন');
+      return;
+    }
+
+    if (uploading) {
+      toast.error('ছবি আপলোড শেষ হওয়া পর্যন্ত অপেক্ষা করুন');
+      return;
+    }
+
+    const colors = form.colorsInput
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean);
+
+    const sizes = form.sizesInput
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (!editingId) {
+      if (form.imageUrls.length === 0) {
+        toast.error('কমপক্ষে একটি ছবি আপলোড করুন');
+        return;
+      }
+
+      if (colors.length !== form.imageUrls.length) {
+        toast.error(
+          `ছবি ${form.imageUrls.length}টি, তাই কালারের নামও ঠিক ${form.imageUrls.length}টি কমা দিয়ে লিখুন।`,
+        );
+        return;
+      }
+
+      if (form.imageUrls.length > MAX_IMAGES) {
+        toast.error(`সর্বোচ্চ ${MAX_IMAGES}টি ছবি আপলোড করা যাবে`);
+        return;
+      }
+    }
+
+    setSaving(true);
+
+    try {
+      const stock = Math.max(0, Number(form.stock) || 0);
+      const purchaseCost = Math.max(0, Number(form.purchaseCost) || 0);
+      const resellerPrice = Math.max(0, Number(form.resellerPrice) || 0);
+      const suggestedPrice = Math.max(0, Number(form.suggestedPrice) || 0);
+
+      const commonPayload = {
         name: form.name.trim(),
-        sku: form.sku.trim(),
         category: form.category,
         description: form.description.trim(),
-        imageUrl: form.imageUrls[0] || '',
-        imageUrls: form.imageUrls,
-        colors,
         sizes,
         sourceUrl: form.sourceUrl.trim(),
-        stock: Number(form.stock) || 0,
-        purchaseCost: Number(form.purchaseCost) || 0,
-        resellerPrice: Number(form.resellerPrice) || 0,
-        suggestedPrice: Number(form.suggestedPrice) || 0,
+        stock,
+        purchaseCost,
+        resellerPrice,
+        suggestedPrice,
         active: form.active,
       };
+
       if (editingId) {
-        await updateDoc(doc(db, 'products', editingId), payload);
+        const imageUrls = [...form.imageUrls];
+
+        await updateDoc(doc(db, 'products', editingId), {
+          ...commonPayload,
+          sku: form.sku.trim(),
+          colors,
+          color: colors[0] || '',
+          imageUrl: imageUrls[0] || '',
+          imageUrls,
+        });
+
         toast.success('✓ প্রোডাক্ট আপডেট হয়েছে!');
       } else {
-        await addDoc(collection(db, 'products'), { ...payload, createdAt: serverTimestamp() });
-        toast.success('✓ নতুন প্রোডাক্ট যোগ হয়েছে!');
+        // Firestore batch একবারে সব ভ্যারিয়েন্ট সেভ করবে।
+        const batch = writeBatch(db);
+
+        // একই কালার-গ্রুপের সব প্রোডাক্টে একই groupId।
+        const groupId = doc(collection(db, 'products')).id;
+        const createdAt = serverTimestamp();
+        const imageUrls = [...form.imageUrls];
+        const skuPrefix = form.sku.trim();
+
+        imageUrls.forEach((imageUrl, index) => {
+          const color = colors[index];
+
+          // প্রতিটি ভ্যারিয়েন্টের SKU আলাদা হবে।
+          const productSku =
+            imageUrls.length === 1
+              ? skuPrefix
+              : `${skuPrefix}-${String(index + 1).padStart(2, '0')}`;
+
+          const productRef = doc(collection(db, 'products'));
+
+          batch.set(productRef, {
+            ...commonPayload,
+            sku: productSku,
+            groupId,
+            color,
+            colors: [color],
+            imageUrl,
+            imageUrls: [imageUrl],
+            createdAt,
+          });
+        });
+
+        await batch.commit();
+
+        toast.success(
+          `✓ ${imageUrls.length}টি আলাদা কালারের প্রোডাক্ট তৈরি হয়েছে!`,
+        );
       }
+
       setModalOpen(false);
+      setForm({ ...emptyForm, imageUrls: [] });
+      setEditingId(null);
       await loadData();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Save failed.');
+      console.error('Failed to save product:', err);
+      toast.error(
+        err instanceof Error ? err.message : 'প্রোডাক্ট সেভ করা যায়নি।',
+      );
     } finally {
       setSaving(false);
     }
   };
 
   const handleDelete = async (id: string, name: string) => {
-    if (!window.confirm(`"${name}" ডিলিট করবেন? এটা ফেরত আনা যাবে না।`)) return;
+    if (!window.confirm(`"${name}" ডিলিট করবেন? এটা ফেরত আনা যাবে না।`)) {
+      return;
+    }
+
     try {
       await deleteDoc(doc(db, 'products', id));
       toast.success(`✓ "${name}" ডিলিট হয়েছে।`);
@@ -373,7 +517,9 @@ export default function AdminProducts() {
 
   const toggleActive = async (product: Product) => {
     try {
-      await updateDoc(doc(db, 'products', product.id), { active: !product.active });
+      await updateDoc(doc(db, 'products', product.id), {
+        active: !product.active,
+      });
       await loadData();
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Toggle failed.');
@@ -382,18 +528,30 @@ export default function AdminProducts() {
 
   const handleMultipleImageUpload = async (files: FileList) => {
     const remaining = MAX_IMAGES - form.imageUrls.length;
+
     if (remaining <= 0) {
       toast.error(`সর্বোচ্চ ${MAX_IMAGES}টি ছবি আপলোড করা যাবে`);
       return;
     }
+
     const filesToUpload = Array.from(files).slice(0, remaining);
     setUploading(true);
+
     try {
-      const uploadPromises = filesToUpload.map((file) => uploadImageToCloudinary(file));
+      const uploadPromises = filesToUpload.map((file) =>
+        uploadImageToCloudinary(file),
+      );
+
       const urls = await Promise.all(uploadPromises);
-      setForm((prev) => ({ ...prev, imageUrls: [...prev.imageUrls, ...urls] }));
+
+      setForm((prev) => ({
+        ...prev,
+        imageUrls: [...prev.imageUrls, ...urls],
+      }));
+
       toast.success(`✓ ${urls.length}টি ছবি আপলোড হয়েছে`);
     } catch (err) {
+      console.error('Image upload failed:', err);
       toast.error(err instanceof Error ? err.message : 'Upload failed.');
     } finally {
       setUploading(false);
@@ -401,14 +559,17 @@ export default function AdminProducts() {
   };
 
   const removeImage = (index: number) => {
-    setForm((prev) => ({ ...prev, imageUrls: prev.imageUrls.filter((_, i) => i !== index) }));
+    setForm((prev) => ({
+      ...prev,
+      imageUrls: prev.imageUrls.filter((_, i) => i !== index),
+    }));
   };
 
   const setPrimaryImage = (index: number) => {
     setForm((prev) => {
       const newUrls = [...prev.imageUrls];
       const [selected] = newUrls.splice(index, 1);
-      newUrls.unshift(selected);
+      if (selected) newUrls.unshift(selected);
       return { ...prev, imageUrls: newUrls };
     });
   };
@@ -417,31 +578,33 @@ export default function AdminProducts() {
     const matchesSearch =
       product.name.toLowerCase().includes(search.toLowerCase()) ||
       product.sku.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = !categoryFilter || product.category === categoryFilter;
+
+    const matchesCategory =
+      !categoryFilter || product.category === categoryFilter;
+
     return matchesSearch && matchesCategory;
   });
 
   const displayedProducts = filtered.slice(0, visibleCount);
 
-  const inputClass =
-    'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none';
-
-  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
       <div className="space-y-4">
         <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
           <div className="bg-zeluxe-cream px-4 py-3">
-            <div className="h-4 w-1/4 animate-pulse rounded bg-gray-300"></div>
+            <div className="h-4 w-1/4 animate-pulse rounded bg-gray-300" />
           </div>
           <div className="divide-y divide-zeluxe-lightgray">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between px-4 py-4 animate-pulse">
-                <div className="h-10 w-10 rounded-md bg-gray-200"></div>
-                <div className="h-4 w-1/4 rounded bg-gray-200"></div>
-                <div className="h-4 w-20 rounded bg-gray-200"></div>
-                <div className="h-4 w-16 rounded bg-gray-200"></div>
-                <div className="h-4 w-10 rounded bg-gray-200"></div>
+              <div
+                key={i}
+                className="flex animate-pulse items-center justify-between px-4 py-4"
+              >
+                <div className="h-10 w-10 rounded-md bg-gray-200" />
+                <div className="h-4 w-1/4 rounded bg-gray-200" />
+                <div className="h-4 w-20 rounded bg-gray-200" />
+                <div className="h-4 w-16 rounded bg-gray-200" />
+                <div className="h-4 w-10 rounded bg-gray-200" />
               </div>
             ))}
           </div>
@@ -453,8 +616,13 @@ export default function AdminProducts() {
   return (
     <>
       <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-zeluxe-black">প্রোডাক্ট ম্যানেজমেন্ট</h1>
-        <button onClick={openAdd} className="rounded-md bg-zeluxe-black px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800">
+        <h1 className="text-xl font-bold text-zeluxe-black">
+          প্রোডাক্ট ম্যানেজমেন্ট
+        </h1>
+        <button
+          onClick={openAdd}
+          className="rounded-md bg-zeluxe-black px-4 py-2 text-sm font-bold text-white transition hover:bg-gray-800"
+        >
           + নতুন
         </button>
       </div>
@@ -469,6 +637,7 @@ export default function AdminProducts() {
             className="w-full rounded-md border border-zeluxe-lightgray bg-white py-2.5 pl-10 pr-4 text-sm focus:border-zeluxe-gold focus:outline-none"
           />
         </div>
+
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value)}
@@ -476,71 +645,118 @@ export default function AdminProducts() {
         >
           <option value="">সব ক্যাটাগরি</option>
           {categories.map((cat) => (
-            <option key={cat.id} value={cat.name}>{getDisplayCategoryName(cat.name)}</option>
+            <option key={cat.id} value={cat.name}>
+              {getDisplayCategoryName(cat.name)}
+            </option>
           ))}
         </select>
       </div>
 
       {displayedProducts.length > 0 ? (
         <>
-          {/* Desktop table */}
           <div className="hidden overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white md:block">
             <table className="w-full text-left text-sm">
               <thead className="bg-zeluxe-cream">
                 <tr>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Image</th>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Name</th>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">SKU</th>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Category</th>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Stock</th>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Price</th>
-                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">Active</th>
-                  <th className="px-4 py-3"></th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Image
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Name
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    SKU
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Category / Color
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Stock
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Price
+                  </th>
+                  <th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wider text-gray-500">
+                    Active
+                  </th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
+
               <tbody>
                 {displayedProducts.map((product) => (
-                  <tr key={product.id} className="border-b border-zeluxe-lightgray last:border-0">
+                  <tr
+                    key={product.id}
+                    className="border-b border-zeluxe-lightgray last:border-0"
+                  >
                     <td className="px-4 py-3">
                       {product.imageUrl ? (
-                        <div className="relative">
-                          <img 
-                            src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_100/') : product.imageUrl} 
-                            alt={product.name} 
-                            loading="lazy"
-                            className="h-10 w-10 rounded-md object-cover" 
-                          />
-                          {product.imageUrls.length > 1 && (
-                            <span className="absolute -bottom-1 -right-1 rounded-full bg-zeluxe-black px-1.5 text-[9px] font-bold text-white">
-                              {product.imageUrls.length}
-                            </span>
-                          )}
-                        </div>
+                        <img
+                          src={
+                            product.imageUrl.includes('res.cloudinary.com')
+                              ? product.imageUrl.replace(
+                                  '/upload/',
+                                  '/upload/q_auto,f_auto,w_100/',
+                                )
+                              : product.imageUrl
+                          }
+                          alt={product.name}
+                          loading="lazy"
+                          className="h-10 w-10 rounded-md object-cover"
+                        />
                       ) : (
                         <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zeluxe-cream">
                           <Package className="h-5 w-5 text-gray-400" />
                         </div>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-medium text-zeluxe-black">{product.name}</td>
-                    <td className="px-4 py-3 font-mono text-xs text-gray-500">{product.sku}</td>
-                    <td className="px-4 py-3 text-xs text-gray-500">{getDisplayCategoryName(product.category)}</td>
-                    <td className="px-4 py-3 text-zeluxe-black">{product.stock}</td>
-                    <td className="px-4 py-3 font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</td>
+
+                    <td className="px-4 py-3 font-medium text-zeluxe-black">
+                      {product.name}
+                    </td>
+
+                    <td className="px-4 py-3 font-mono text-xs text-gray-500">
+                      {product.sku}
+                    </td>
+
+                    <td className="px-4 py-3 text-xs text-gray-500">
+                      {getDisplayCategoryName(product.category)}
+                      {product.color ? ` · ${product.color}` : ''}
+                    </td>
+
+                    <td className="px-4 py-3 text-zeluxe-black">
+                      {product.stock}
+                    </td>
+
+                    <td className="px-4 py-3 font-bold text-zeluxe-gold">
+                      Tk {product.resellerPrice.toLocaleString()}
+                    </td>
+
                     <td className="px-4 py-3">
                       <input
                         type="checkbox"
                         checked={product.active}
-                        onChange={() => toggleActive(product)}
+                        onChange={() => void toggleActive(product)}
                         className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
                       />
                     </td>
+
                     <td className="px-4 py-3">
                       <div className="flex gap-2">
-                        <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold hover:bg-zeluxe-cream">
+                        <button
+                          onClick={() => openEdit(product)}
+                          className="rounded-md p-1.5 text-zeluxe-gold hover:bg-zeluxe-cream"
+                          aria-label="প্রোডাক্ট এডিট"
+                        >
                           <Pencil className="h-4 w-4" />
                         </button>
-                        <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600 hover:bg-red-50">
+                        <button
+                          onClick={() =>
+                            void handleDelete(product.id, product.name)
+                          }
+                          className="rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                          aria-label="প্রোডাক্ট ডিলিট"
+                        >
                           <Trash2 className="h-4 w-4" />
                         </button>
                       </div>
@@ -551,51 +767,98 @@ export default function AdminProducts() {
             </table>
           </div>
 
-          {/* Mobile cards */}
           <div className="space-y-3 md:hidden">
             {displayedProducts.map((product) => (
-              <div key={product.id} className="rounded-lg border border-zeluxe-lightgray bg-white p-4">
+              <div
+                key={product.id}
+                className="rounded-lg border border-zeluxe-lightgray bg-white p-4"
+              >
                 <div className="flex items-start justify-between">
                   <div className="flex gap-3">
                     {product.imageUrl ? (
-                      <img 
-                        src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : product.imageUrl} 
-                        alt={product.name} 
+                      <img
+                        src={
+                          product.imageUrl.includes('res.cloudinary.com')
+                            ? product.imageUrl.replace(
+                                '/upload/',
+                                '/upload/q_auto,f_auto,w_150/',
+                              )
+                            : product.imageUrl
+                        }
+                        alt={product.name}
                         loading="lazy"
-                        className="h-12 w-12 rounded-md object-cover" 
+                        className="h-12 w-12 rounded-md object-cover"
                       />
                     ) : (
                       <div className="flex h-12 w-12 items-center justify-center rounded-md bg-zeluxe-cream">
                         <Package className="h-6 w-6 text-gray-400" />
                       </div>
                     )}
+
                     <div>
-                      <p className="font-medium text-zeluxe-black">{product.name}</p>
-                      <p className="font-mono text-[10px] text-gray-500">{product.sku}</p>
+                      <p className="font-medium text-zeluxe-black">
+                        {product.name}
+                      </p>
+                      <p className="font-mono text-[10px] text-gray-500">
+                        {product.sku}
+                      </p>
+                      {product.color && (
+                        <p className="mt-1 text-xs text-gray-500">
+                          কালার: {product.color}
+                        </p>
+                      )}
                     </div>
                   </div>
+
                   <div className="flex gap-2">
-                    <button onClick={() => openEdit(product)} className="rounded-md p-1.5 text-zeluxe-gold">
+                    <button
+                      onClick={() => openEdit(product)}
+                      className="rounded-md p-1.5 text-zeluxe-gold"
+                      aria-label="প্রোডাক্ট এডিট"
+                    >
                       <Pencil className="h-4 w-4" />
                     </button>
-                    <button onClick={() => handleDelete(product.id, product.name)} className="rounded-md p-1.5 text-red-600">
+                    <button
+                      onClick={() =>
+                        void handleDelete(product.id, product.name)
+                      }
+                      className="rounded-md p-1.5 text-red-600"
+                      aria-label="প্রোডাক্ট ডিলিট"
+                    >
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 </div>
+
                 <div className="mt-3 flex items-center justify-between text-xs">
-                  <span className="text-gray-500">{getDisplayCategoryName(product.category)} · Stock: {product.stock}</span>
-                  <span className="font-bold text-zeluxe-gold">Tk {product.resellerPrice.toLocaleString()}</span>
+                  <span className="text-gray-500">
+                    {getDisplayCategoryName(product.category)} · Stock:{' '}
+                    {product.stock}
+                  </span>
+                  <span className="font-bold text-zeluxe-gold">
+                    Tk {product.resellerPrice.toLocaleString()}
+                  </span>
                 </div>
+
+                <label className="mt-3 flex items-center gap-2 text-xs text-gray-600">
+                  <input
+                    type="checkbox"
+                    checked={product.active}
+                    onChange={() => void toggleActive(product)}
+                    className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold"
+                  />
+                  Active (রিসেলাররা দেখতে পাবে)
+                </label>
               </div>
             ))}
           </div>
 
-          {/* Load More Button */}
           {visibleCount < filtered.length && (
             <div className="mt-8 flex justify-center">
               <button
-                onClick={() => setVisibleCount((prev) => prev + LOAD_MORE_COUNT)}
+                onClick={() =>
+                  setVisibleCount((prev) => prev + LOAD_MORE_COUNT)
+                }
                 className="rounded-md border border-zeluxe-black bg-white px-8 py-3 text-sm font-bold text-zeluxe-black transition hover:bg-gray-50 active:scale-95"
               >
                 আরো প্রোডাক্ট দেখুন (Load More)
@@ -610,7 +873,6 @@ export default function AdminProducts() {
         </div>
       )}
 
-      {/* Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-lg bg-white p-6">
@@ -618,15 +880,25 @@ export default function AdminProducts() {
               <h2 className="text-lg font-bold text-zeluxe-black">
                 {editingId ? 'প্রোডাক্ট এডিট' : 'নতুন প্রোডাক্ট'}
               </h2>
-              <button onClick={() => setModalOpen(false)} className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream">
+              <button
+                onClick={() => setModalOpen(false)}
+                className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream"
+                aria-label="বন্ধ করুন"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <div className="space-y-4">
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ক্যাটাগরি *</label>
-                <select value={form.category} onChange={(e) => handleCategoryChange(e.target.value)} className={inputClass}>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                  ক্যাটাগরি *
+                </label>
+                <select
+                  value={form.category}
+                  onChange={(e) => void handleCategoryChange(e.target.value)}
+                  className={inputClass}
+                >
                   <option value="">ক্যাটাগরি সিলেক্ট করুন</option>
                   {categories.map((cat) => (
                     <option key={cat.id} value={cat.name}>
@@ -641,13 +913,14 @@ export default function AdminProducts() {
                   <span>SKU *</span>
                   <button
                     type="button"
-                    onClick={handleRegenerateSku}
-                    disabled={!form.category || skuLoading}
+                    onClick={() => void handleRegenerateSku()}
+                    disabled={!form.category || skuLoading || !!editingId}
                     className="flex items-center gap-1 text-[11px] font-medium text-zeluxe-gold hover:underline disabled:opacity-40"
                   >
                     <Wand2 size={12} /> Auto Generate
                   </button>
                 </label>
+
                 <div className="relative">
                   <input
                     value={skuLoading ? 'তৈরি হচ্ছে...' : form.sku}
@@ -656,27 +929,41 @@ export default function AdminProducts() {
                     className={`${inputClass} bg-zeluxe-cream font-mono text-gray-600 ${skuLoading ? 'animate-pulse' : ''}`}
                   />
                   {skuLoading && (
-                    <Loader2 size={16} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zeluxe-gold" />
+                    <Loader2
+                      size={16}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-zeluxe-gold"
+                    />
                   )}
                 </div>
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">প্রোডাক্টের নাম *</label>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                  প্রোডাক্টের নাম *
+                </label>
                 <input
                   value={form.name}
-                  onChange={(e) => setForm({ ...form, name: e.target.value })}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, name: e.target.value }))
+                  }
                   placeholder="যেমন: Premium Silk Saree"
                   className={inputClass}
                 />
               </div>
 
               <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">বিবরণ</label>
+                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                  বিবরণ
+                </label>
                 <textarea
                   rows={3}
                   value={form.description}
-                  onChange={(e) => setForm({ ...form, description: e.target.value })}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      description: e.target.value,
+                    }))
+                  }
                   placeholder="প্রোডাক্টের বিবরণ..."
                   className={inputClass}
                 />
@@ -690,8 +977,13 @@ export default function AdminProducts() {
                 <input
                   type="url"
                   value={form.sourceUrl}
-                  onChange={(e) => setForm({ ...form, sourceUrl: e.target.value })}
-                  placeholder="যেমন: https://lifegood.com/product/27480"
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      sourceUrl: e.target.value,
+                    }))
+                  }
+                  placeholder="যেমন: https://example.com/product"
                   className={inputClass}
                 />
               </div>
@@ -703,7 +995,12 @@ export default function AdminProducts() {
                 </label>
                 <input
                   value={form.sizesInput}
-                  onChange={(e) => setForm({ ...form, sizesInput: e.target.value })}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      sizesInput: e.target.value,
+                    }))
+                  }
                   placeholder="যেমন: S, M, L, XL, XXL"
                   className={inputClass}
                 />
@@ -712,49 +1009,72 @@ export default function AdminProducts() {
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <Palette size={14} className="text-zeluxe-gold" />
-                  <span>উপলব্ধ কালার</span>
+                  <span>কালারের নাম (ছবির একই ক্রমে)</span>
                 </label>
                 <input
                   value={form.colorsInput}
-                  onChange={(e) => setForm({ ...form, colorsInput: e.target.value })}
-                  placeholder="যেমন: Red, Blue, Green, Black"
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      colorsInput: e.target.value,
+                    }))
+                  }
+                  placeholder="যেমন: কালো, লাল, নীল"
                   className={inputClass}
                 />
+                {!editingId && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    নতুন প্রোডাক্টে প্রতিটি ছবির জন্য একটি কালারের নাম লিখবে।
+                    কমা দিয়ে আলাদা করবে।
+                  </p>
+                )}
               </div>
 
               <div>
                 <label className="mb-1.5 flex items-center justify-between text-sm font-medium text-zeluxe-black">
                   <span>প্রোডাক্টের ছবি</span>
-                  <span className="text-[11px] font-normal text-gray-500">{form.imageUrls.length}/{MAX_IMAGES}</span>
+                  <span className="text-[11px] font-normal text-gray-500">
+                    {form.imageUrls.length}/{MAX_IMAGES}
+                  </span>
                 </label>
 
                 {form.imageUrls.length > 0 && (
                   <div className="mb-3 grid grid-cols-3 gap-2">
                     {form.imageUrls.map((url, idx) => (
                       <div
-                        key={idx}
+                        key={`${url}-${idx}`}
                         className={`group relative aspect-square overflow-hidden rounded-md border-2 ${
-                          idx === 0 ? 'border-zeluxe-gold' : 'border-zeluxe-lightgray'
+                          idx === 0
+                            ? 'border-zeluxe-gold'
+                            : 'border-zeluxe-lightgray'
                         }`}
                       >
-                        <img src={url} alt={`Product ${idx + 1}`} className="h-full w-full object-cover" />
+                        <img
+                          src={url}
+                          alt={`Product ${idx + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+
                         {idx === 0 && (
                           <span className="absolute left-1 top-1 rounded bg-zeluxe-gold px-1.5 py-0.5 text-[9px] font-bold text-zeluxe-black">
                             Primary
                           </span>
                         )}
+
                         <button
                           type="button"
                           onClick={() => removeImage(idx)}
                           className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-md"
+                          aria-label="ছবি সরান"
                         >
                           <X size={11} />
                         </button>
+
                         {idx > 0 && (
                           <button
                             type="button"
                             onClick={() => setPrimaryImage(idx)}
-                            className="absolute bottom-1 left-1 right-1 rounded bg-black/70 px-2 py-1 text-[9px] font-medium text-white opacity-0 transition group-hover:opacity-100"
+                            className="absolute bottom-1 left-1 right-1 rounded bg-black/70 px-2 py-1 text-[9px] font-medium text-white opacity-100 transition sm:opacity-0 sm:group-hover:opacity-100"
                           >
                             Primary করুন
                           </button>
@@ -768,24 +1088,29 @@ export default function AdminProducts() {
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
+                    disabled={uploading || saving}
                     className="flex w-full flex-col items-center justify-center rounded-md border-2 border-dashed border-zeluxe-lightgray p-4 text-center transition hover:border-zeluxe-gold disabled:opacity-60"
                   >
                     {uploading ? (
                       <>
                         <Loader2 className="mx-auto h-6 w-6 animate-spin text-zeluxe-gold" />
-                        <p className="mt-2 text-xs text-gray-500">আপলোড হচ্ছে...</p>
+                        <p className="mt-2 text-xs text-gray-500">
+                          আপলোড হচ্ছে...
+                        </p>
                       </>
                     ) : (
                       <>
                         <Upload className="mx-auto h-6 w-6 text-zeluxe-gold" />
                         <p className="mt-2 text-sm font-medium text-zeluxe-black">
-                          {form.imageUrls.length === 0 ? 'ছবি আপলোড করুন' : 'আরো ছবি যোগ করুন'}
+                          {form.imageUrls.length === 0
+                            ? 'ছবি আপলোড করুন'
+                            : 'আরো ছবি যোগ করুন'}
                         </p>
                       </>
                     )}
                   </button>
                 )}
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -793,7 +1118,9 @@ export default function AdminProducts() {
                   multiple
                   onChange={(e) => {
                     const files = e.target.files;
-                    if (files && files.length > 0) void handleMultipleImageUpload(files);
+                    if (files?.length) {
+                      void handleMultipleImageUpload(files);
+                    }
                     e.target.value = '';
                   }}
                   className="hidden"
@@ -802,42 +1129,73 @@ export default function AdminProducts() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">স্টক</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    স্টক
+                  </label>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={form.stock}
-                    onChange={(e) => setForm({ ...form, stock: e.target.value.replace(/[^0-9]/g, '') })}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        stock: e.target.value.replace(/[^0-9]/g, ''),
+                      }))
+                    }
                     className={inputClass}
                   />
                 </div>
+
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">ক্রয় মূল্য (Tk)</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    ক্রয় মূল্য (Tk)
+                  </label>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={form.purchaseCost}
-                    onChange={(e) => setForm({ ...form, purchaseCost: e.target.value.replace(/[^0-9]/g, '') })}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        purchaseCost: e.target.value.replace(/[^0-9]/g, ''),
+                      }))
+                    }
                     className={inputClass}
                   />
                 </div>
+
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">রিসেলার মূল্য (Tk)</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    রিসেলার মূল্য (Tk)
+                  </label>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={form.resellerPrice}
-                    onChange={(e) => setForm({ ...form, resellerPrice: e.target.value.replace(/[^0-9]/g, '') })}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        resellerPrice: e.target.value.replace(/[^0-9]/g, ''),
+                      }))
+                    }
                     className={inputClass}
                   />
                 </div>
+
                 <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">সাজেস্টেড মূল্য (Tk)</label>
+                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
+                    সাজেস্টেড মূল্য (Tk)
+                  </label>
                   <input
                     type="text"
                     inputMode="numeric"
                     value={form.suggestedPrice}
-                    onChange={(e) => setForm({ ...form, suggestedPrice: e.target.value.replace(/[^0-9]/g, '') })}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        suggestedPrice: e.target.value.replace(/[^0-9]/g, ''),
+                      }))
+                    }
                     className={inputClass}
                   />
                 </div>
@@ -847,18 +1205,34 @@ export default function AdminProducts() {
                 <input
                   type="checkbox"
                   checked={form.active}
-                  onChange={(e) => setForm({ ...form, active: e.target.checked })}
+                  onChange={(e) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      active: e.target.checked,
+                    }))
+                  }
                   className="h-4 w-4 rounded border-zeluxe-lightgray text-zeluxe-gold focus:ring-zeluxe-gold"
                 />
-                <span className="text-sm text-zeluxe-black">Active (রিসেলাররা দেখতে পাবে)</span>
+                <span className="text-sm text-zeluxe-black">
+                  Active (রিসেলাররা দেখতে পাবে)
+                </span>
               </label>
             </div>
 
             <div className="mt-6 flex gap-3">
-              <button onClick={() => setModalOpen(false)} className="flex-1 rounded-md border border-zeluxe-lightgray py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-cream">
+              <button
+                onClick={() => setModalOpen(false)}
+                disabled={saving}
+                className="flex-1 rounded-md border border-zeluxe-lightgray py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-cream disabled:opacity-50"
+              >
                 বাতিল
               </button>
-              <button onClick={handleSave} disabled={saving} className="flex-1 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-60">
+
+              <button
+                onClick={() => void handleSave()}
+                disabled={saving || uploading || skuLoading}
+                className="flex-1 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-60"
+              >
                 {saving ? 'সেভ হচ্ছে...' : 'সেভ করুন'}
               </button>
             </div>
