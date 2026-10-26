@@ -225,7 +225,7 @@ export default function ResellerDashboard() {
 
       setLoadError(false);
 
-      // ১. নোটিফিকেশন লোড
+      // ১. নোটিফিকেশন
       getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)))
         .then((notifSnap) => {
           if (cancelled) return;
@@ -242,9 +242,9 @@ export default function ResellerDashboard() {
           fetchedNotifs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
           setNotifications(fetchedNotifs);
         })
-        .catch((err) => console.error('Notifications load error:', err));
+        .catch(() => {});
 
-      // ২. ফিচার্ড প্রোডাক্টস লোড
+      // ২. ফিচার্ড প্রোডাক্ট
       getDocs(collection(db, 'products'))
         .then((productsSnap) => {
           if (cancelled) return;
@@ -269,12 +269,12 @@ export default function ResellerDashboard() {
             });
           setFeaturedProducts(activeProducts);
         })
-        .catch((err) => console.error('Products load error:', err))
+        .catch(() => {})
         .finally(() => {
           if (!cancelled) setProductsLoading(false);
         });
 
-      // ৩. রেফারেল তথ্য লোড
+      // ৩. রেফারেল তথ্য
       getDoc(doc(db, 'users', uid))
         .then(async (userDoc) => {
           if (!userDoc.exists() || cancelled) return;
@@ -304,22 +304,22 @@ export default function ResellerDashboard() {
 
           if (!cancelled) setReferralInfo(refStats);
         })
-        .catch((err) => console.error('Referral load error:', err))
+        .catch(() => {})
         .finally(() => {
           if (!cancelled) setRefLoading(false);
         });
 
-      // ৪. মূল ব্যালেন্স, প্রফিট ও অর্ডার লোডিং (আইসোলেটেড এবং নিরাপদ ট্রাই-ক্যাচ)
+      // ৪. প্রফিট ও ব্যালেন্স হিসাব
       try {
         const userDocSnap = await getDoc(doc(db, 'users', uid)).catch(() => null);
         const userInfo = userDocSnap && userDocSnap.exists() ? userDocSnap.data() : null;
 
-        // অর্ডার লোড
+        // অর্ডার ফেচ
         const ordersSnapshot = await getDocs(
           query(collection(db, 'orders'), where('resellerId', '==', uid))
         );
 
-        // উইথড্র লোড (আলাদা ট্রাই-ক্যাচ যাতে এররে ক্র্যাশ না করে)
+        // উইথড্র ফেচ (ব্যর্থ হলেও যেন ০ ধরে বাকি হিসাব চলে)
         let totalWithdrawn = 0;
         try {
           const withdrawSnap = await getDocs(
@@ -329,8 +329,8 @@ export default function ResellerDashboard() {
             .map((d) => d.data())
             .filter((d) => d.status === 'approved' || d.status === 'paid')
             .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-        } catch (wErr) {
-          console.warn('Withdraw requests could not be loaded, defaulting to 0:', wErr);
+        } catch {
+          totalWithdrawn = 0;
         }
 
         const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
@@ -339,7 +339,7 @@ export default function ResellerDashboard() {
           const sellingPrice = Number(data.sellingPrice) || 0;
           const resellerPrice = Number(data.resellerPrice) || 0;
 
-          // ফায়ারস্টোরে সংরক্ষিত profit ফিল্ড সরাসরি পড়া
+          // ফায়ারস্টোরে সেভ থাকা profit কে প্রাধান্য দেওয়া
           let actualProfit = 0;
           if (typeof data.profit === 'number' && !isNaN(data.profit)) {
             actualProfit = data.profit;
@@ -378,7 +378,7 @@ export default function ResellerDashboard() {
           (order) => order.status.toLowerCase() === 'delivered'
         ).length;
 
-        // সকল সক্রিয় অর্ডারের মোট প্রফিট (বাতিল বাদে)
+        // সকল কার্যকর অর্ডারের মোট প্রফিট (বাতিল ছাড়া)
         const totalProfitSum = fetchedOrders
           .filter(
             (order) =>
@@ -389,9 +389,9 @@ export default function ResellerDashboard() {
 
         const referralBonus = Number(userInfo?.referralBonusEarned) || 0;
 
-        // 🌟 আসল সমাধান: ব্যালেন্স ক্যালকুলেশন
-        const calculatedBalance = totalProfitSum + referralBonus - totalWithdrawn;
-        const availableBalance = Math.max(0, calculatedBalance);
+        // 🌟 Available Balance হিসাব (সরাসরি কার্যকর প্রফিট + রেফারেল - উইথড্র)
+        const computedBalance = totalProfitSum + referralBonus - totalWithdrawn;
+        const availableBalance = Math.max(0, computedBalance);
 
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
@@ -404,7 +404,7 @@ export default function ResellerDashboard() {
           deliveredOrders,
           totalSales,
           actualProfit: totalProfitSum,
-          availableBalance, // ✅ এখন আর শূন্য থাকবে না
+          availableBalance,
           todayOrders: todayOrders.length,
           todaySales,
           referralBonus,
@@ -425,7 +425,7 @@ export default function ResellerDashboard() {
         setBonusProgress(progress);
         setBonusAchieved(achieved);
       } catch (error) {
-        console.error('Dashboard primary stats error:', error);
+        console.error('Stats computation failed:', error);
         if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setStatsLoading(false);
