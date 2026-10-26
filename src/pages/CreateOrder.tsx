@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   addDoc,
   collection,
+  doc,
+  getDoc,
   getDocs,
   query,
   serverTimestamp,
@@ -346,6 +348,12 @@ export default function CreateOrder() {
       return;
     }
 
+    // Firestore Rules অনুযায়ী একটি অর্ডারে সর্বোচ্চ ৫টি cart line রাখা হবে।
+    if (cart.length >= 5) {
+      toast.error('একটি অর্ডারে সর্বোচ্চ ৫টি প্রোডাক্ট লাইন যোগ করা যাবে।');
+      return;
+    }
+
     // একই productId আগে কার্টে থাকলে তার পরিমাণও হিসাব হবে।
     const alreadyInCart = cart
       .filter((item) => item.productId === selectedProduct.id)
@@ -427,6 +435,11 @@ export default function CreateOrder() {
       return;
     }
 
+    if (cart.length > 5) {
+      toast.error('একটি অর্ডারে সর্বোচ্চ ৫টি প্রোডাক্ট লাইন রাখা যাবে। কার্ট থেকে কিছু প্রোডাক্ট সরান।');
+      return;
+    }
+
     if (!customerName.trim() || !customerPhone.trim() || !address.trim()) {
       toast.error('কাস্টমারের সব তথ্য দিন।');
       return;
@@ -472,18 +485,42 @@ export default function CreateOrder() {
     }
 
     for (const [productId, requestedQuantity] of quantitiesByProduct) {
-      const product = products.find((item) => item.id === productId);
-
-      if (!product) {
-        toast.error(
-          'কার্টের একটি প্রোডাক্ট আর পাওয়া যাচ্ছে না। প্রোডাক্টটি আবার যোগ করুন।',
-        );
+      // পেজে লোড করা পুরোনো স্টকের বদলে Firebase থেকে সর্বশেষ তথ্য পড়ুন।
+      let latestSnap: Awaited<ReturnType<typeof getDoc>>;
+      try {
+        latestSnap = await getDoc(doc(db, 'products', productId));
+      } catch (readError) {
+        console.error('Latest product stock read failed:', readError);
+        toast.error('স্টক যাচাই করা যায়নি। আবার চেষ্টা করুন।');
         return;
       }
 
-      if (requestedQuantity > product.stock) {
+      if (!latestSnap.exists()) {
+        toast.error('কার্টের একটি প্রোডাক্ট আর পাওয়া যাচ্ছে না। সেটি সরিয়ে আবার যোগ করুন।');
+        return;
+      }
+
+      const latestData = latestSnap.data();
+      const latestName = typeof latestData.name === 'string' ? latestData.name : 'প্রোডাক্ট';
+      const latestStock = latestData.stock;
+
+      if (latestData.active === false) {
+        toast.error(`${latestName} বর্তমানে বিক্রির জন্য বন্ধ।`);
+        return;
+      }
+
+      if (
+        typeof latestStock !== 'number' ||
+        !Number.isFinite(latestStock) ||
+        latestStock < 0
+      ) {
+        toast.error(`${latestName}: স্টকের তথ্য সঠিক নয়।`);
+        return;
+      }
+
+      if (requestedQuantity > latestStock) {
         toast.error(
-          `${product.name}: পর্যাপ্ত স্টক নেই। বর্তমান স্টক ${product.stock}, অর্ডারের পরিমাণ ${requestedQuantity}।`,
+          `${latestName}: পর্যাপ্ত স্টক নেই। বর্তমান স্টক ${latestStock}, অর্ডারের পরিমাণ ${requestedQuantity}।`,
         );
         return;
       }
