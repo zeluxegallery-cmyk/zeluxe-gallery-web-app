@@ -3,19 +3,19 @@ import {
   doc,
   runTransaction,
   serverTimestamp,
-} from "firebase/firestore";
+} from 'firebase/firestore';
 
-import { db } from "./firebase";
+import { db } from '../firebase';
 
 export async function generateOrderId(): Promise<string> {
   const now = new Date();
 
   const year = String(now.getFullYear()).slice(-2);
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
 
   const datePrefix = `${year}${month}${day}`;
-  const counterRef = doc(db, "settings", "orderCounter");
+  const counterRef = doc(db, 'settings', 'orderCounter');
 
   return runTransaction(db, async (transaction) => {
     const counterSnapshot = await transaction.get(counterRef);
@@ -42,6 +42,6 @@ export async function generateOrderId(): Promise<string> {
       updatedAt: serverTimestamp(),
     });
 
-    return `ZEL-${datePrefix}-${String(nextSequence).padStart(4, "0")}`;
+    return `ZEL-${datePrefix}-${String(nextSequence).padStart(4, '0')}`;
   });
 }
