@@ -1,16 +1,12 @@
-
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
   limit,
   query,
-  serverTimestamp,
-  setDoc,
   where,
 } from 'firebase/firestore';
 import {
@@ -22,12 +18,11 @@ import {
   Check,
   Minus,
   Plus,
-  X,
   ChevronDown,
   ShoppingCart,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { auth, db } from '../firebase';
+import { db } from '../firebase';
 import { downloadSingleImage } from '../lib/imageDownloader';
 
 type Product = {
@@ -43,14 +38,9 @@ type Product = {
   stock: number;
   resellerPrice: number;
   suggestedPrice: number;
+  purchaseCost?: number;
   active: boolean;
 };
-
-const DISTRICTS = ['ঢাকার ভিতরে', 'ঢাকার বাইরে'];
-const PAYMENT_METHODS = ['Cash on Delivery', 'bKash Advance', 'Full Advance'];
-
-const inputClass =
-  'w-full rounded-md border border-zeluxe-lightgray bg-white px-4 py-3 text-sm text-zeluxe-black placeholder:text-zeluxe-gray focus:border-zeluxe-gold focus:outline-none';
 
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
@@ -93,6 +83,8 @@ export default function ProductDetail() {
           typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
         suggestedPrice:
           typeof data.suggestedPrice === 'number' ? data.suggestedPrice : 0,
+        purchaseCost:
+          typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
         active: true,
       };
     }
@@ -107,27 +99,15 @@ export default function ProductDetail() {
   const [selectedSize, setSelectedSize] = useState(product?.sizes?.[0] || '');
 
   const [quantity, setQuantity] = useState(1);
+  const [sellingPrice, setSellingPrice] = useState(
+    product ? String(product.suggestedPrice) : '',
+  );
   const [copied, setCopied] = useState(false);
   const [downloadingIdx, setDownloadingIdx] = useState<number | null>(null);
 
   // Cart state
   const [cartCount, setCartCount] = useState(0);
   const [cartTotal, setCartTotal] = useState(0);
-
-  // Order modal
-  const [orderModalOpen, setOrderModalOpen] = useState(false);
-  const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
-  const [address, setAddress] = useState('');
-  const [district, setDistrict] = useState('ঢাকার ভিতরে');
-  const [sellingPrice, setSellingPrice] = useState(
-    product ? String(product.suggestedPrice) : '',
-  );
-  const [deliveryCharge, setDeliveryCharge] = useState('70');
-  const [discount, setDiscount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery');
-  const [note, setNote] = useState('');
-  const [submitting, setSubmitting] = useState(false);
 
   const updateCartState = () => {
     try {
@@ -223,6 +203,8 @@ export default function ProductDetail() {
             typeof data.suggestedPrice === 'number'
               ? data.suggestedPrice
               : 0,
+          purchaseCost:
+            typeof data.purchaseCost === 'number' ? data.purchaseCost : 0,
           active: typeof data.active === 'boolean' ? data.active : true,
         };
 
@@ -231,14 +213,8 @@ export default function ProductDetail() {
           setSellingPrice((current) =>
             current || String(loadedProduct.suggestedPrice),
           );
-
-          setSelectedColor((current) =>
-            current || colors[0] || '',
-          );
-
-          setSelectedSize((current) =>
-            current || sizes[0] || '',
-          );
+          setSelectedColor((current) => current || colors[0] || '');
+          setSelectedSize((current) => current || sizes[0] || '');
         }
 
         if (loadedProduct.category) {
@@ -334,15 +310,20 @@ export default function ProductDetail() {
       return;
     }
 
+    const itemColor = selectedColor || (product.colors[0] || 'N/A');
+    const itemSize = selectedSize || (product.sizes[0] || 'N/A');
+
     const newItem = {
       productId: product.id,
       name: product.name,
       sku: product.sku,
       imageUrl: product.imageUrl,
-      size: selectedSize || 'N/A',
+      color: itemColor,
+      size: itemSize,
       quantity,
       sellingPrice: price,
       resellerPrice: product.resellerPrice,
+      purchaseCost: product.purchaseCost || 0,
     };
 
     try {
@@ -354,16 +335,17 @@ export default function ProductDetail() {
         if (Array.isArray(parsed)) existingCart = parsed;
       }
 
+      // Check variant by productId + color + size
       const existingIdx = existingCart.findIndex(
         (item: any) =>
           item.productId === newItem.productId &&
-          item.size === newItem.size,
+          (item.color || 'N/A') === newItem.color &&
+          (item.size || 'N/A') === newItem.size,
       );
 
       if (existingIdx > -1) {
         const newQuantity =
-          (Number(existingCart[existingIdx].quantity) || 0) +
-          newItem.quantity;
+          (Number(existingCart[existingIdx].quantity) || 0) + newItem.quantity;
 
         if (newQuantity > product.stock) {
           toast.error(`পর্যাপ্ত স্টক নেই। বর্তমানে স্টক: ${product.stock}টি`);
@@ -386,17 +368,31 @@ export default function ProductDetail() {
     }
   };
 
-  const numQty = Number(quantity) || 0;
-  const numSelling = Number(sellingPrice) || 0;
-  const numDiscount = Number(discount) || 0;
-  const numDelivery = Number(deliveryCharge) || 0;
+  const handleOrderNow = () => {
+    if (!product) return;
 
-  const profit = product
-    ? (numSelling - product.resellerPrice) * numQty
-    : 0;
+    if (product.active === false || product.stock <= 0) {
+      toast.error('প্রোডাক্টটি বর্তমানে বিক্রির জন্য উপলব্ধ নয়');
+      return;
+    }
 
-  const itemTotal = numQty * numSelling;
-  const total = itemTotal + numDelivery - numDiscount;
+    if (product.sizes.length > 0 && !selectedSize) {
+      toast.error('অনুগ্রহ করে সাইজ সিলেক্ট করুন');
+      return;
+    }
+
+    const finalPrice = Number(sellingPrice) || product.suggestedPrice;
+
+    // সরাসরি /orders/new পেজে রিডাইরেক্ট (কোনো ইন-পেজ মডাল পপআপ ছাড়া)
+    navigate(`/orders/new?productId=${product.id}`, {
+      state: {
+        selectedColor,
+        selectedSize,
+        quantity,
+        sellingPrice: finalPrice,
+      },
+    });
+  };
 
   const handleCopyDetails = async () => {
     if (!product) return;
@@ -423,180 +419,12 @@ export default function ProductDetail() {
 
     try {
       await downloadSingleImage(url, `${product.sku}-${idx + 1}.jpg`);
+      toast.success('✓ ছবি ডাউনলোড সম্পন্ন হয়েছে');
+    } catch (err) {
+      console.error('Image download failed:', err);
+      toast.error('ছবি ডাউনলোড করতে সমস্যা হয়েছে');
     } finally {
       setDownloadingIdx(null);
-    }
-  };
-
-  const handleSubmitOrder = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    const user = auth.currentUser;
-
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    if (!product) return;
-
-    if (
-      !customerName.trim() ||
-      !customerPhone.trim() ||
-      !address.trim() ||
-      !sellingPrice
-    ) {
-      toast.error('সব প্রয়োজনীয় তথ্য দিন');
-      return;
-    }
-
-    if (product.sizes.length > 0 && !selectedSize) {
-      toast.error('অনুগ্রহ করে সাইজ সিলেক্ট করুন');
-      return;
-    }
-
-    if (!Number.isFinite(numSelling) || numSelling <= 0) {
-      toast.error('সঠিক বিক্রয় মূল্য দিন');
-      return;
-    }
-
-    if (!Number.isInteger(numQty) || numQty < 1) {
-      toast.error('সঠিক পণ্যের পরিমাণ দিন');
-      return;
-    }
-
-    if (
-      !Number.isFinite(numDelivery) ||
-      numDelivery < 0 ||
-      !Number.isFinite(numDiscount) ||
-      numDiscount < 0
-    ) {
-      toast.error('ডেলিভারি চার্জ বা ডিসকাউন্ট সঠিক নয়');
-      return;
-    }
-
-    if (numDiscount > itemTotal + numDelivery) {
-      toast.error('ডিসকাউন্ট মোট মূল্যের চেয়ে বেশি হতে পারবে না');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      // Firebase থেকে সর্বশেষ পণ্যের তথ্য ও reseller price যাচাই
-      const productRef = doc(db, 'products', product.id);
-      const latestProductSnap = await getDoc(productRef);
-
-      if (!latestProductSnap.exists()) {
-        toast.error('প্রোডাক্টটি আর পাওয়া যাচ্ছে না');
-        return;
-      }
-
-      const latestProduct = latestProductSnap.data();
-      const currentStock = latestProduct.stock;
-
-      if (latestProduct.active === false) {
-        toast.error('প্রোডাক্টটি বর্তমানে বিক্রির জন্য বন্ধ');
-        return;
-      }
-
-      if (
-        typeof currentStock !== 'number' ||
-        !Number.isFinite(currentStock) ||
-        currentStock < 0
-      ) {
-        toast.error('প্রোডাক্টের স্টক তথ্য সঠিক নয়');
-        return;
-      }
-
-      if (numQty > currentStock) {
-        toast.error(`পর্যাপ্ত স্টক নেই। বর্তমানে স্টক: ${currentStock}টি`);
-        return;
-      }
-
-      if (
-        typeof latestProduct.resellerPrice !== 'number' ||
-        !Number.isFinite(latestProduct.resellerPrice) ||
-        latestProduct.resellerPrice < 0
-      ) {
-        toast.error('প্রোডাক্টের reseller price সঠিক নয়');
-        return;
-      }
-
-      // সর্বশেষ Firebase reseller price ব্যবহার করা হচ্ছে।
-      const verifiedResellerPrice = latestProduct.resellerPrice;
-
-      // অর্ডার নম্বর তৈরি
-      const counterRef = doc(db, 'settings', 'orderCounter');
-      const counterSnap = await getDoc(counterRef);
-      const now = new Date();
-      const year = now.getFullYear().toString().slice(-2);
-      const month = (now.getMonth() + 1).toString().padStart(2, '0');
-      const currentMonth = `${year}${month}`;
-
-      let sequence = 1;
-
-      if (counterSnap.exists()) {
-        const data = counterSnap.data();
-
-        if (data.currentMonth === currentMonth) {
-          sequence = (data.currentSequence || 0) + 1;
-        }
-      }
-
-      const orderId = `ZEL-${currentMonth}-${sequence
-        .toString()
-        .padStart(4, '0')}`;
-
-      await addDoc(collection(db, 'orders'), {
-        orderId,
-        resellerId: user.uid,
-        resellerEmail: user.email,
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        address: address.trim(),
-        district,
-        productId: product.id,
-        productName: product.name,
-        productSku: product.sku,
-        productColor: selectedColor || '',
-        productSize: selectedSize || '',
-        quantity: numQty,
-
-        // Rules-এ products/{productId}.resellerPrice-এর সঙ্গে যাচাই হবে।
-        resellerPrice: verifiedResellerPrice,
-
-        sellingPrice: numSelling,
-        deliveryCharge: numDelivery,
-        discount: numDiscount,
-        total: Number(total),
-        paymentMethod,
-        note: note.trim(),
-        status: 'pending',
-        createdAt: serverTimestamp(),
-      });
-
-      await setDoc(
-        counterRef,
-        {
-          currentMonth,
-          currentSequence: sequence,
-          updatedAt: new Date().toISOString(),
-        },
-        { merge: true },
-      );
-
-      toast.success('✓ অর্ডার সফলভাবে তৈরি হয়েছে!');
-      setOrderModalOpen(false);
-      navigate('/orders');
-    } catch (err) {
-      console.error('Order creation failed:', err);
-      toast.error(
-        'অর্ডার তৈরি করা যায়নি: ' +
-          (err instanceof Error ? err.message : 'Unknown error'),
-      );
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -650,7 +478,7 @@ export default function ProductDetail() {
                     <button
                       type="button"
                       onClick={() =>
-                        handleDownloadSingle(
+                        void handleDownloadSingle(
                           product.imageUrls[activeImage],
                           activeImage,
                         )
@@ -699,7 +527,7 @@ export default function ProductDetail() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        handleDownloadSingle(url, idx);
+                        void handleDownloadSingle(url, idx);
                       }}
                       disabled={downloadingIdx === idx}
                       className="absolute bottom-1 right-1 flex h-6 w-6 items-center justify-center rounded bg-zeluxe-black/70 text-white backdrop-blur-sm transition hover:bg-zeluxe-black disabled:opacity-50"
@@ -877,7 +705,7 @@ export default function ProductDetail() {
 
                 <button
                   type="button"
-                  onClick={() => setOrderModalOpen(true)}
+                  onClick={handleOrderNow}
                   disabled={product.stock <= 0 || product.active === false}
                   className="flex items-center justify-center gap-2 rounded-md bg-zeluxe-black py-3 text-sm font-bold text-white transition hover:bg-gray-800 disabled:opacity-50"
                 >
@@ -890,7 +718,7 @@ export default function ProductDetail() {
             <div className="mt-3">
               <button
                 type="button"
-                onClick={handleCopyDetails}
+                onClick={() => void handleCopyDetails()}
                 className="flex w-full items-center justify-center gap-2 rounded-md border border-zeluxe-lightgray bg-white py-3 text-xs font-bold text-zeluxe-black transition hover:border-zeluxe-gold"
               >
                 {copied ? (
@@ -996,282 +824,6 @@ export default function ProductDetail() {
               </p>
             </div>
           </button>
-        </div>
-      )}
-
-      {/* Order Modal */}
-      {orderModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-lg bg-white p-6 shadow-xl">
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-zeluxe-black">
-                অর্ডার করুন
-              </h2>
-
-              <button
-                type="button"
-                onClick={() => setOrderModalOpen(false)}
-                className="rounded-md p-1.5 text-gray-500 hover:bg-zeluxe-cream"
-                aria-label="বন্ধ করুন"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitOrder} className="space-y-4">
-              <div className="flex items-start gap-3 rounded-md border border-zeluxe-lightgray bg-white p-3 shadow-sm">
-                <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-md border border-zeluxe-lightgray bg-zeluxe-cream">
-                  {product.imageUrl ? (
-                    <img
-                      src={product.imageUrl}
-                      alt={product.name}
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex h-full w-full items-center justify-center">
-                      <Package size={20} className="text-gray-400" />
-                    </div>
-                  )}
-
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-zeluxe-black text-[10px] font-bold text-white shadow-sm">
-                    {quantity}
-                  </span>
-                </div>
-
-                <div className="flex-1">
-                  <p className="line-clamp-2 text-sm font-bold text-zeluxe-black">
-                    {product.name}
-                  </p>
-
-                  <p className="mt-0.5 font-mono text-[10px] text-gray-500">
-                    SKU: {product.sku}
-                  </p>
-
-                  <div className="mt-1.5 flex flex-wrap gap-2 text-[11px]">
-                    {selectedColor && (
-                      <span className="rounded border border-zeluxe-lightgray bg-zeluxe-cream px-2 py-1 font-medium text-gray-700">
-                        Color: {selectedColor}
-                      </span>
-                    )}
-
-                    {selectedSize && (
-                      <span className="rounded border border-zeluxe-lightgray bg-zeluxe-cream px-2 py-1 font-medium text-gray-700">
-                        Size: {selectedSize}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  কাস্টমারের নাম *
-                </label>
-
-                <input
-                  value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
-                  required
-                  maxLength={100}
-                  placeholder="পূর্ণ নাম"
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  মোবাইল নাম্বার *
-                </label>
-
-                <input
-                  type="tel"
-                  value={customerPhone}
-                  onChange={(e) => setCustomerPhone(e.target.value)}
-                  required
-                  maxLength={20}
-                  placeholder="01XXXXXXXXX"
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  ঠিকানা *
-                </label>
-
-                <textarea
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  required
-                  maxLength={500}
-                  rows={2}
-                  placeholder="সম্পূর্ণ ঠিকানা"
-                  className={inputClass}
-                />
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  এলাকা
-                </label>
-
-                <select
-                  value={district}
-                  onChange={(e) => {
-                    setDistrict(e.target.value);
-                    setDeliveryCharge(
-                      e.target.value === 'ঢাকার ভিতরে' ? '70' : '120',
-                    );
-                  }}
-                  className={inputClass}
-                >
-                  {DISTRICTS.map((d) => (
-                    <option key={d} value={d}>
-                      {d}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    বিক্রয় মূল্য (Tk)
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={sellingPrice}
-                    onChange={(e) => setSellingPrice(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    required
-                    className={inputClass}
-                  />
-                </div>
-
-                <div>
-                  <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                    ডিসকাউন্ট (Tk)
-                  </label>
-
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={discount}
-                    onChange={(e) => setDiscount(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0"
-                    className={inputClass}
-                  />
-                </div>
-              </div>
-
-              {numSelling > 0 && (
-                <div
-                  className={`flex items-center justify-between rounded-md p-3 ${
-                    profit >= 0
-                      ? 'border border-green-200 bg-green-50'
-                      : 'border border-red-200 bg-red-50'
-                  }`}
-                >
-                  <span
-                    className={`text-xs font-medium ${
-                      profit >= 0 ? 'text-green-700' : 'text-red-700'
-                    }`}
-                  >
-                    {profit >= 0 ? 'আপনার লাভ:' : 'লস হচ্ছে:'}
-                  </span>
-
-                  <span
-                    className={`text-base font-bold ${
-                      profit >= 0 ? 'text-green-700' : 'text-red-700'
-                    }`}
-                  >
-                    Tk {Math.abs(profit)}
-                  </span>
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  পেমেন্ট পদ্ধতি
-                </label>
-
-                <select
-                  value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className={inputClass}
-                >
-                  {PAYMENT_METHODS.map((m) => (
-                    <option key={m} value={m}>
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="mb-1.5 block text-sm font-medium text-zeluxe-black">
-                  নোট (ঐচ্ছিক)
-                </label>
-
-                <textarea
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  maxLength={500}
-                  rows={2}
-                  placeholder="বিশেষ নির্দেশনা..."
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="rounded-md bg-zeluxe-black p-4 text-white">
-                <div className="space-y-1.5 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">আইটেম মোট</span>
-                    <span>Tk {itemTotal.toLocaleString()}</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">ডেলিভারি</span>
-                    <span>Tk {numDelivery.toLocaleString()}</span>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <span className="text-gray-400">ডিসকাউন্ট</span>
-                    <span>-Tk {numDiscount.toLocaleString()}</span>
-                  </div>
-
-                  <div className="my-2 border-t border-white/20" />
-
-                  <div className="flex justify-between text-sm font-bold">
-                    <span>সর্বমোট</span>
-                    <span className="text-zeluxe-gold">
-                      Tk {total.toLocaleString()}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={submitting}
-                className="w-full rounded-md bg-zeluxe-gold py-3 text-sm font-bold text-zeluxe-black transition hover:brightness-110 disabled:opacity-60"
-              >
-                {submitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    অর্ডার হচ্ছে...
-                  </span>
-                ) : (
-                  '✓ অর্ডার কনফার্ম করুন'
-                )}
-              </button>
-            </form>
-          </div>
         </div>
       )}
     </div>
