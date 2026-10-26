@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { collection, getDocs, query, where, doc, getDoc, updateDoc, writeBatch, setDoc } from 'firebase/firestore';
+import {
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  getDoc,
+  updateDoc,
+  writeBatch,
+  setDoc,
+} from 'firebase/firestore';
 import { getToken } from 'firebase/messaging';
 import {
   Package,
@@ -61,6 +71,7 @@ type Stats = {
   deliveredOrders: number;
   totalSales: number;
   actualProfit: number;
+  pendingProfit: number;
   availableBalance: number;
   todayOrders: number;
   todaySales: number;
@@ -79,25 +90,36 @@ const initialStats: Stats = {
   deliveredOrders: 0,
   totalSales: 0,
   actualProfit: 0,
+  pendingProfit: 0,
   availableBalance: 0,
   todayOrders: 0,
   todaySales: 0,
   referralBonus: 0,
 };
 
-const PENDING_STATUSES = ['pending', 'confirmed', 'shipped'];
+const PENDING_STATUSES = ['pending', 'confirmed', 'shipped', 'processing'];
 const WELCOME_BONUS_TARGET = 5;
 const WELCOME_BONUS_AMOUNT = 100;
 const WELCOME_BONUS_DAYS = 30;
 
 function getStatusBadgeClass(status: string) {
   switch (status.toLowerCase()) {
-    case 'pending': return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
-    case 'confirmed': return 'bg-blue-50 text-blue-700 border border-blue-200';
-    case 'shipped': return 'bg-purple-50 text-purple-700 border border-purple-200';
-    case 'delivered': return 'bg-green-50 text-green-700 border border-green-200';
-    case 'cancelled': return 'bg-red-50 text-red-700 border border-red-200';
-    default: return 'bg-gray-50 text-gray-700 border border-gray-200';
+    case 'pending':
+      return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
+    case 'confirmed':
+      return 'bg-blue-50 text-blue-700 border border-blue-200';
+    case 'processing':
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
+    case 'shipped':
+      return 'bg-purple-50 text-purple-700 border border-purple-200';
+    case 'delivered':
+      return 'bg-green-50 text-green-700 border border-green-200';
+    case 'cancelled':
+      return 'bg-red-50 text-red-700 border border-red-200';
+    case 'returned':
+      return 'bg-red-50 text-red-700 border border-red-200';
+    default:
+      return 'bg-gray-50 text-gray-700 border border-gray-200';
   }
 }
 
@@ -105,6 +127,7 @@ function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
     pending: 'অপেক্ষমাণ',
     confirmed: 'কনফার্মড',
+    processing: 'প্রসেসিং',
     shipped: 'শিপড',
     delivered: 'ডেলিভারড',
     cancelled: 'বাতিল',
@@ -116,7 +139,20 @@ function getStatusLabel(status: string) {
 function formatDate(seconds?: number) {
   if (!seconds) return '—';
   const d = new Date(seconds * 1000);
-  const months = ['জানু', 'ফেব', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্ট', 'অক্টো', 'নভে', 'ডিসে'];
+  const months = [
+    'জানু',
+    'ফেব',
+    'মার্চ',
+    'এপ্রিল',
+    'মে',
+    'জুন',
+    'জুলাই',
+    'আগস্ট',
+    'সেপ্ট',
+    'অক্টো',
+    'নভে',
+    'ডিসে',
+  ];
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
@@ -155,24 +191,43 @@ function updateDashboardCache(uid: string, patch: Partial<DashboardCache>) {
 }
 
 function SkeletonBlock({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-gray-200/70 ${className}`} />;
+  return (
+    <div className={`animate-pulse rounded-2xl bg-gray-200/70 ${className}`} />
+  );
 }
 
-type OrderItemLike = { resellerPrice?: number; sellingPrice?: number; quantity?: number };
+type OrderItemLike = {
+  resellerPrice?: number;
+  sellingPrice?: number;
+  quantity?: number;
+};
 
 export default function ResellerDashboard() {
   const currentUid = auth.currentUser?.uid;
-  const cached = dashboardCache && dashboardCache.uid === currentUid ? dashboardCache : null;
+  const cached =
+    dashboardCache && dashboardCache.uid === currentUid ? dashboardCache : null;
 
   const [stats, setStats] = useState<Stats>(cached?.stats ?? initialStats);
   const [orders, setOrders] = useState<Order[]>(cached?.orders ?? []);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(cached?.featuredProducts ?? []);
-  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(cached?.referralInfo ?? null);
-  const [notifications, setNotifications] = useState<Notification[]>(cached?.notifications ?? []);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(
+    cached?.featuredProducts ?? [],
+  );
+  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(
+    cached?.referralInfo ?? null,
+  );
+  const [notifications, setNotifications] = useState<Notification[]>(
+    cached?.notifications ?? [],
+  );
   const [bonusProgress, setBonusProgress] = useState(cached?.bonusProgress ?? 0);
-  const [bonusAchieved, setBonusAchieved] = useState(cached?.bonusAchieved ?? false);
-  const [bonusDaysLeft, setBonusDaysLeft] = useState(cached?.bonusDaysLeft ?? 0);
-  const [bonusStartDate, setBonusStartDate] = useState<number>(cached?.bonusStartDate ?? 0);
+  const [bonusAchieved, setBonusAchieved] = useState(
+    cached?.bonusAchieved ?? false,
+  );
+  const [bonusDaysLeft, setBonusDaysLeft] = useState(
+    cached?.bonusDaysLeft ?? 0,
+  );
+  const [bonusStartDate, setBonusStartDate] = useState<number>(
+    cached?.bonusStartDate ?? 0,
+  );
 
   const [statsLoading, setStatsLoading] = useState(!cached);
   const [productsLoading, setProductsLoading] = useState(!cached);
@@ -182,7 +237,6 @@ export default function ResellerDashboard() {
 
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  // ═══ ফায়ারবেস পুশ নোটিফিকেশন পারমিশন ও টোকেন রিকোয়েস্ট ═══
   useEffect(() => {
     const requestNotificationPermission = async () => {
       try {
@@ -191,18 +245,19 @@ export default function ResellerDashboard() {
         if (permission === 'granted') {
           const uid = auth.currentUser?.uid;
           if (!uid) return;
-          
-          const currentToken = await getToken(messaging, {
-            vapidKey: 'BC... (আপনার ফায়ারবেস ওয়েব পুশ সার্টিফিকেট কি থাকলে দিতে পারেন, অথবা খালি রাখা যায়)'
-          }).catch(() => null);
+
+          const currentToken = await getToken(messaging).catch(() => null);
 
           if (currentToken) {
-            // ইউজারের ডিভাইসের FCM টোকেন ফায়ারস্টোরে সেভ করে রাখা
-            await setDoc(doc(db, 'fcmTokens', `${uid}_${currentToken.slice(-10)}`), {
-              uid,
-              token: currentToken,
-              updatedAt: new Date().toISOString()
-            }, { merge: true });
+            await setDoc(
+              doc(db, 'fcmTokens', `${uid}_${currentToken.slice(-10)}`),
+              {
+                uid,
+                token: currentToken,
+                updatedAt: new Date().toISOString(),
+              },
+              { merge: true },
+            );
           }
         }
       } catch (err) {
@@ -230,9 +285,18 @@ export default function ResellerDashboard() {
 
       const userP = getDoc(doc(db, 'users', uid));
       const productsP = getDocs(collection(db, 'products'));
-      const ordersP = getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid)));
-      const withdrawP = getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid)));
-      const notifP = getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)));
+      const ordersP = getDocs(
+        query(collection(db, 'orders'), where('resellerId', '==', uid)),
+      );
+      const withdrawP = getDocs(
+        query(
+          collection(db, 'withdrawRequests'),
+          where('resellerId', '==', uid),
+        ),
+      );
+      const notifP = getDocs(
+        query(collection(db, 'notifications'), where('userId', '==', uid)),
+      );
 
       void notifP
         .then((notifSnap) => {
@@ -246,7 +310,10 @@ export default function ResellerDashboard() {
               createdAt: data.createdAt,
             };
           });
-          fetchedNotifs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+          fetchedNotifs.sort(
+            (a, b) =>
+              (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+          );
           if (cancelled) return;
           setNotifications(fetchedNotifs);
           updateDashboardCache(uid, { notifications: fetchedNotifs });
@@ -258,13 +325,18 @@ export default function ResellerDashboard() {
           const productMap: Record<string, number> = {};
           productsSnap.docs.forEach((p) => {
             const data = p.data();
-            productMap[p.id] = typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
+            productMap[p.id] =
+              typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
           });
 
           const activeProducts: Product[] = productsSnap.docs
             .filter((d) => {
               const data = d.data();
-              return data.active === true && typeof data.imageUrl === 'string' && data.imageUrl.length > 0;
+              return (
+                data.active === true &&
+                typeof data.imageUrl === 'string' &&
+                data.imageUrl.length > 0
+              );
             })
             .slice(0, 6)
             .map((d) => {
@@ -272,8 +344,12 @@ export default function ResellerDashboard() {
               return {
                 id: d.id,
                 name: typeof data.name === 'string' ? data.name : 'Product',
-                imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
-                resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+                imageUrl:
+                  typeof data.imageUrl === 'string' ? data.imageUrl : '',
+                resellerPrice:
+                  typeof data.resellerPrice === 'number'
+                    ? data.resellerPrice
+                    : 0,
               };
             });
 
@@ -298,9 +374,18 @@ export default function ResellerDashboard() {
           const userInfo = userDoc.data();
 
           let refStats: ReferralInfo = {
-            referralCode: typeof userInfo.referralCode === 'string' ? userInfo.referralCode : '',
-            referralCount: typeof userInfo.referralCount === 'number' ? userInfo.referralCount : 0,
-            referralBonusEarned: typeof userInfo.referralBonusEarned === 'number' ? userInfo.referralBonusEarned : 0,
+            referralCode:
+              typeof userInfo.referralCode === 'string'
+                ? userInfo.referralCode
+                : '',
+            referralCount:
+              typeof userInfo.referralCount === 'number'
+                ? userInfo.referralCount
+                : 0,
+            referralBonusEarned:
+              typeof userInfo.referralBonusEarned === 'number'
+                ? userInfo.referralBonusEarned
+                : 0,
           };
 
           if (!refStats.referralCode) {
@@ -312,10 +397,17 @@ export default function ResellerDashboard() {
                 referralBonusEarned: 0,
               });
 
-              const userName = (userInfo.name as string) || auth.currentUser?.email?.split('@')[0] || 'Reseller';
+              const userName =
+                (userInfo.name as string) ||
+                auth.currentUser?.email?.split('@')[0] ||
+                'Reseller';
               await publishReferralCode(uid, userName, newCode);
 
-              refStats = { referralCode: newCode, referralCount: 0, referralBonusEarned: 0 };
+              refStats = {
+                referralCode: newCode,
+                referralCount: 0,
+                referralBonusEarned: 0,
+              };
             } catch (err) {
               console.error('Failed to generate referral code:', err);
             }
@@ -332,67 +424,124 @@ export default function ResellerDashboard() {
       })();
 
       try {
-        const [userDoc, ordersSnapshot, withdrawSnap] = await Promise.all([userP, ordersP, withdrawP]);
+        const [userDoc, ordersSnapshot, withdrawSnap] = await Promise.all([
+          userP,
+          ordersP,
+          withdrawP,
+        ]);
         const userInfo = userDoc.exists() ? userDoc.data() : null;
 
         const needsProductPrices = ordersSnapshot.docs.some((d) => {
-          const items = d.data().items;
-          return !(Array.isArray(items) && items.length > 0);
+          const data = d.data();
+          return typeof data.profit !== 'number' && (!Array.isArray(data.items) || data.items.length === 0);
         });
-        const productMap: Record<string, number> = needsProductPrices ? await productMapP : {};
+        const productMap: Record<string, number> = needsProductPrices
+          ? await productMapP
+          : {};
 
-        const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
-          const data = orderDocument.data();
-          const quantity = typeof data.quantity === 'number' ? data.quantity : 0;
-          const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
-          const productId = typeof data.productId === 'string' ? data.productId : '';
+        const fetchedOrders: Order[] = ordersSnapshot.docs.map(
+          (orderDocument) => {
+            const data = orderDocument.data();
+            const quantity =
+              typeof data.quantity === 'number' ? data.quantity : 0;
+            const sellingPrice =
+              typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
+            const productId =
+              typeof data.productId === 'string' ? data.productId : '';
 
-          let actualProfit = 0;
-          if (Array.isArray(data.items) && data.items.length > 0) {
-            actualProfit = (data.items as OrderItemLike[]).reduce((sum, item) => {
-              const resP = item.resellerPrice || 0;
-              const sellP = item.sellingPrice || 0;
-              const qty = item.quantity || 0;
-              return sum + (sellP - resP) * qty;
-            }, 0);
-          } else {
-            const resellerPrice = productMap[productId] || 0;
-            actualProfit = (sellingPrice - resellerPrice) * quantity;
-          }
+            // ফায়ারস্টোর থেকে সরাসরি profit অগ্রাধিকার দিয়ে পড়া হচ্ছে
+            let actualProfit = 0;
+            if (typeof data.profit === 'number' && Number.isFinite(data.profit)) {
+              actualProfit = data.profit;
+            } else if (Array.isArray(data.items) && data.items.length > 0) {
+              actualProfit = (data.items as OrderItemLike[]).reduce(
+                (sum, item) => {
+                  const resP = Number(item.resellerPrice || 0);
+                  const sellP = Number(item.sellingPrice || 0);
+                  const qty = Number(item.quantity || 0);
+                  return sum + (sellP - resP) * qty;
+                },
+                0,
+              );
+            } else {
+              const resellerPrice =
+                typeof data.resellerPrice === 'number'
+                  ? data.resellerPrice
+                  : productMap[productId] || 0;
+              actualProfit = (sellingPrice - resellerPrice) * quantity;
+            }
 
-          return {
-            id: orderDocument.id,
-            orderId: typeof data.orderId === 'string' ? data.orderId : orderDocument.id,
-            productName: typeof data.productName === 'string' ? data.productName : 'Product',
-            status: typeof data.status === 'string' ? data.status : 'pending',
-            total: typeof data.total === 'number' ? data.total : 0,
-            quantity,
-            sellingPrice,
-            productId,
-            createdAt: data.createdAt,
-            actualProfit,
-          };
-        });
+            return {
+              id: orderDocument.id,
+              orderId:
+                typeof data.orderId === 'string'
+                  ? data.orderId
+                  : orderDocument.id,
+              productName:
+                typeof data.productName === 'string'
+                  ? data.productName
+                  : data.items?.[0]?.name || 'Product',
+              status:
+                typeof data.status === 'string' ? data.status : 'pending',
+              total: typeof data.total === 'number' ? data.total : 0,
+              quantity,
+              sellingPrice,
+              productId,
+              createdAt: data.createdAt,
+              actualProfit,
+            };
+          },
+        );
 
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
           .filter((d) => d.status === 'approved' || d.status === 'paid')
-          .reduce((sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0), 0);
+          .reduce(
+            (sum, d) =>
+              sum + (typeof d.amount === 'number' ? d.amount : 0),
+            0,
+          );
 
-        const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
-        const pendingOrders = fetchedOrders.filter((order) => PENDING_STATUSES.includes(order.status)).length;
-        const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered').length;
+        const totalSales = fetchedOrders.reduce(
+          (sum, order) => sum + order.total,
+          0,
+        );
+        const pendingOrders = fetchedOrders.filter((order) =>
+          PENDING_STATUSES.includes(order.status.toLowerCase()),
+        ).length;
+        const deliveredOrders = fetchedOrders.filter(
+          (order) => order.status.toLowerCase() === 'delivered',
+        ).length;
 
-        const actualProfit = fetchedOrders
-          .filter((order) => order.status === 'delivered')
+        // শুধুমাত্র সফলভাবে ডেলিভার্ড অর্ডারের লাভ
+        const deliveredProfit = fetchedOrders
+          .filter((order) => order.status.toLowerCase() === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
-        const referralBonus = typeof userInfo?.referralBonusEarned === 'number' ? userInfo.referralBonusEarned : 0;
-        const availableBalance = actualProfit + referralBonus - totalWithdrawn;
+        // অপেক্ষমাণ (পেন্ডিং/শিপড) অর্ডারের লাভ
+        const pendingProfit = fetchedOrders
+          .filter((order) => PENDING_STATUSES.includes(order.status.toLowerCase()))
+          .reduce((sum, order) => sum + order.actualProfit, 0);
+
+        const referralBonus =
+          typeof userInfo?.referralBonusEarned === 'number'
+            ? userInfo.referralBonusEarned
+            : 0;
+
+        // Available Balance = ডেলিভার্ড প্রফিট + রেফারেল বোনাস - উইথড্র
+        const availableBalance =
+          deliveredProfit + referralBonus - totalWithdrawn;
 
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
-        const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
+        const todayStart =
+          new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+          ).getTime() / 1000;
+        const todayOrders = fetchedOrders.filter(
+          (o) => (o.createdAt?.seconds || 0) >= todayStart,
+        );
         const todaySales = todayOrders.reduce((sum, o) => sum + o.total, 0);
 
         const newStats: Stats = {
@@ -400,7 +549,8 @@ export default function ResellerDashboard() {
           pendingOrders,
           deliveredOrders,
           totalSales,
-          actualProfit,
+          actualProfit: deliveredProfit,
+          pendingProfit,
           availableBalance: availableBalance > 0 ? availableBalance : 0,
           todayOrders: todayOrders.length,
           todaySales,
@@ -409,8 +559,12 @@ export default function ResellerDashboard() {
 
         const userCreatedAt = userInfo?.createdAt?.seconds || 0;
         const nowSec = Math.floor(Date.now() / 1000);
-        const bonusDeadline = userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
-        const daysLeft = Math.max(0, Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)));
+        const bonusDeadline =
+          userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
+        const daysLeft = Math.max(
+          0,
+          Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)),
+        );
         const progress = Math.min(deliveredOrders, WELCOME_BONUS_TARGET);
         const achieved = deliveredOrders >= WELCOME_BONUS_TARGET;
 
@@ -445,7 +599,7 @@ export default function ResellerDashboard() {
 
   const handleOpenNotifications = async () => {
     setIsNotifOpen(true);
-    const unreadNotifs = notifications.filter(n => !n.read);
+    const unreadNotifs = notifications.filter((n) => !n.read);
     if (unreadNotifs.length === 0) return;
 
     try {
@@ -454,9 +608,9 @@ export default function ResellerDashboard() {
         batch.update(doc(db, 'notifications', n.id), { read: true });
       });
       await batch.commit();
-      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     } catch (err) {
-      console.error("Failed to mark notifications as read", err);
+      console.error('Failed to mark notifications as read', err);
     }
   };
 
@@ -469,8 +623,10 @@ export default function ResellerDashboard() {
     auth.currentUser?.email?.split('@')[0] ||
     'Reseller';
 
-  const bonusPercent = Math.round((bonusProgress / WELCOME_BONUS_TARGET) * 100);
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const bonusPercent = Math.round(
+    (bonusProgress / WELCOME_BONUS_TARGET) * 100,
+  );
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
     <div className="mx-auto max-w-2xl pb-10">
@@ -483,8 +639,8 @@ export default function ResellerDashboard() {
             আজকের ব্যবসার আপডেট দেখুন
           </p>
         </div>
-        
-        <button 
+
+        <button
           onClick={handleOpenNotifications}
           className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white shadow-card border border-gray-50 text-zeluxe-black transition hover:-translate-y-0.5 hover:text-zeluxe-gold"
         >
@@ -500,7 +656,9 @@ export default function ResellerDashboard() {
 
       {loadError && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-2xl border border-red-100 bg-red-50 p-4">
-          <p className="text-sm font-medium text-red-700">ডাটা লোড করা যায়নি। ইন্টারনেট চেক করে আবার চেষ্টা করুন।</p>
+          <p className="text-sm font-medium text-red-700">
+            ডাটা লোড করা যায়নি। ইন্টারনেট চেক করে আবার চেষ্টা করুন।
+          </p>
           <button
             onClick={() => {
               setStatsLoading(true);
@@ -523,7 +681,9 @@ export default function ResellerDashboard() {
           </div>
           <div className="flex items-center gap-3 text-xs font-number">
             <span className="text-gray-500">{stats.todayOrders}টি অর্ডার</span>
-            <span className="font-bold text-zeluxe-black">Tk {stats.todaySales.toLocaleString()}</span>
+            <span className="font-bold text-zeluxe-black">
+              Tk {stats.todaySales.toLocaleString()}
+            </span>
           </div>
         </div>
       )}
@@ -600,6 +760,7 @@ export default function ResellerDashboard() {
         </div>
       ) : null}
 
+      {/* Available Balance Card */}
       {statsLoading ? (
         <SkeletonBlock className="mb-5 h-32" />
       ) : (
@@ -617,18 +778,35 @@ export default function ResellerDashboard() {
               <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black font-number">
                 Tk {stats.availableBalance.toLocaleString()}
               </p>
-              
+
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
-                  Profit: <strong className="text-zeluxe-black font-number">Tk {stats.actualProfit.toLocaleString()}</strong>
+                  Delivered Profit:{' '}
+                  <strong className="text-zeluxe-black font-number">
+                    Tk {stats.actualProfit.toLocaleString()}
+                  </strong>
                 </span>
+
+                {stats.pendingProfit > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-yellow-50 px-2 py-1 text-[11px] font-medium text-yellow-700 border border-yellow-200">
+                    Pending Profit:{' '}
+                    <strong className="text-yellow-800 font-number">
+                      Tk {stats.pendingProfit.toLocaleString()}
+                    </strong>
+                  </span>
+                )}
+
                 {stats.referralBonus > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
-                    Referral: <strong className="text-green-800 font-number">+Tk {stats.referralBonus.toLocaleString()}</strong>
+                    Referral:{' '}
+                    <strong className="text-green-800 font-number">
+                      +Tk {stats.referralBonus.toLocaleString()}
+                    </strong>
                   </span>
                 )}
               </div>
             </div>
+
             <Link
               to="/withdraw"
               className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
@@ -640,6 +818,7 @@ export default function ResellerDashboard() {
         </div>
       )}
 
+      {/* Quick Actions */}
       <div className="mb-6">
         <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
           Quick Actions
@@ -667,6 +846,7 @@ export default function ResellerDashboard() {
         </div>
       </div>
 
+      {/* My Progress */}
       {statsLoading ? (
         <SkeletonBlock className="mb-6 h-36" />
       ) : (
@@ -675,20 +855,28 @@ export default function ResellerDashboard() {
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               My Progress
             </p>
-            <Link to="/earnings" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+            <Link
+              to="/earnings"
+              className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline"
+            >
               বিস্তারিত <ChevronRight size={12} />
             </Link>
           </div>
 
           <div className="grid grid-cols-3 gap-2.5">
-            <Link to="/orders" className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:shadow-md flex flex-col items-center justify-center text-center">
+            <Link
+              to="/orders"
+              className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 transition hover:shadow-md flex flex-col items-center justify-center text-center"
+            >
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-2">
                 <ShoppingBag size={16} />
               </div>
               <p className="text-lg font-bold tracking-tight text-zeluxe-black font-number">
                 {stats.totalOrders}
               </p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Orders</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
+                Orders
+              </p>
             </Link>
 
             <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
@@ -696,9 +884,14 @@ export default function ResellerDashboard() {
                 <TrendingUp size={16} />
               </div>
               <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
-                Tk {stats.totalSales > 9999 ? (stats.totalSales / 1000).toFixed(1) + 'k' : stats.totalSales.toLocaleString()}
+                Tk{' '}
+                {stats.totalSales > 9999
+                  ? (stats.totalSales / 1000).toFixed(1) + 'k'
+                  : stats.totalSales.toLocaleString()}
               </p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Sales</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
+                Sales
+              </p>
             </div>
 
             <div className="rounded-2xl bg-white p-3 shadow-card border border-gray-50 flex flex-col items-center justify-center text-center">
@@ -706,92 +899,118 @@ export default function ResellerDashboard() {
                 <Wallet size={16} />
               </div>
               <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
-                Tk {stats.actualProfit > 9999 ? (stats.actualProfit / 1000).toFixed(1) + 'k' : stats.actualProfit.toLocaleString()}
+                Tk{' '}
+                {stats.actualProfit > 9999
+                  ? (stats.actualProfit / 1000).toFixed(1) + 'k'
+                  : stats.actualProfit.toLocaleString()}
               </p>
-              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">Profit</p>
+              <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
+                Profit
+              </p>
             </div>
           </div>
         </div>
       )}
 
+      {/* Featured Products */}
       {productsLoading ? (
         <SkeletonBlock className="mb-6 h-44" />
-      ) : featuredProducts.length > 0 && (
-        <div className="mb-6">
-          <div className="mb-2 flex items-center justify-between">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
-              Featured Products
-            </p>
-            <Link to="/products" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
-              সব দেখুন <ChevronRight size={12} />
-            </Link>
-          </div>
-
-          <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-2 snap-x hide-scrollbar">
-            {featuredProducts.map((product) => (
+      ) : (
+        featuredProducts.length > 0 && (
+          <div className="mb-6">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
+                Featured Products
+              </p>
               <Link
-                key={product.id}
-                to={`/products/${product.id}`}
-                className="min-w-[130px] snap-start overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
+                to="/products"
+                className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline"
               >
-                <div className="aspect-square bg-zeluxe-cream">
-                  <img
-                    src={product.imageUrl.includes('res.cloudinary.com') ? product.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_300/') : product.imageUrl}
-                    alt={product.name}
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
-                <div className="p-2.5">
-                  <p className="line-clamp-2 text-[11px] font-bold text-zeluxe-black leading-tight">
-                    {product.name}
-                  </p>
-                  <p className="mt-1 text-[12px] font-bold text-zeluxe-gold font-number">
-                    Tk {product.resellerPrice.toLocaleString()}
-                  </p>
-                </div>
+                সব দেখুন <ChevronRight size={12} />
               </Link>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
 
-      {refLoading ? (
-        <SkeletonBlock className="mb-6 h-24" />
-      ) : referralInfo && referralInfo.referralCode && (
-        <Link
-          to="/refer"
-          className="mb-6 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 shadow-card border border-zeluxe-gold/20 transition hover:border-zeluxe-gold"
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
-            <Users className="text-zeluxe-black" size={18} />
-          </span>
-          <div className="flex-1">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
-              Refer & Earn
-            </p>
-            <p className="mt-0.5 text-xs font-bold text-zeluxe-black">
-              বন্ধুকে রিসেলার বানান, Tk {REFERRAL_BONUS_AMOUNT} পান
-            </p>
-            <div className="mt-1 flex items-center gap-2 text-[10px] font-number">
-              <span className="text-gray-600">
-                {referralInfo.referralCount}টি referral
-              </span>
-              <span className="font-bold text-green-600">
-                Tk {referralInfo.referralBonusEarned.toLocaleString()} earned
-              </span>
+            <div className="-mx-4 flex gap-2.5 overflow-x-auto px-4 pb-2 snap-x hide-scrollbar">
+              {featuredProducts.map((product) => (
+                <Link
+                  key={product.id}
+                  to={`/products/${product.id}`}
+                  className="min-w-[130px] snap-start overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
+                >
+                  <div className="aspect-square bg-zeluxe-cream">
+                    <img
+                      src={
+                        product.imageUrl.includes('res.cloudinary.com')
+                          ? product.imageUrl.replace(
+                              '/upload/',
+                              '/upload/q_auto,f_auto,w_300/',
+                            )
+                          : product.imageUrl
+                      }
+                      alt={product.name}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div className="p-2.5">
+                    <p className="line-clamp-2 text-[11px] font-bold text-zeluxe-black leading-tight">
+                      {product.name}
+                    </p>
+                    <p className="mt-1 text-[12px] font-bold text-zeluxe-gold font-number">
+                      Tk {product.resellerPrice.toLocaleString()}
+                    </p>
+                  </div>
+                </Link>
+              ))}
             </div>
           </div>
-          <ArrowRight size={16} className="shrink-0 text-zeluxe-gold" />
-        </Link>
+        )
       )}
 
+      {/* Referral */}
+      {refLoading ? (
+        <SkeletonBlock className="mb-6 h-24" />
+      ) : (
+        referralInfo &&
+        referralInfo.referralCode && (
+          <Link
+            to="/refer"
+            className="mb-6 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-br from-zeluxe-gold/10 to-transparent p-4 shadow-card border border-zeluxe-gold/20 transition hover:border-zeluxe-gold"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
+              <Users className="text-zeluxe-black" size={18} />
+            </span>
+            <div className="flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
+                Refer &amp; Earn
+              </p>
+              <p className="mt-0.5 text-xs font-bold text-zeluxe-black">
+                বন্ধুকে রিসেলার বানান, Tk {REFERRAL_BONUS_AMOUNT} পান
+              </p>
+              <div className="mt-1 flex items-center gap-2 text-[10px] font-number">
+                <span className="text-gray-600">
+                  {referralInfo.referralCount}টি referral
+                </span>
+                <span className="font-bold text-green-600">
+                  Tk {referralInfo.referralBonusEarned.toLocaleString()} earned
+                </span>
+              </div>
+            </div>
+            <ArrowRight size={16} className="shrink-0 text-zeluxe-gold" />
+          </Link>
+        )
+      )}
+
+      {/* Recent Orders */}
       <section>
         <div className="mb-2 flex items-center justify-between">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
             Recent Orders
           </p>
-          <Link to="/orders" className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline">
+          <Link
+            to="/orders"
+            className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline"
+          >
             সব দেখুন <ChevronRight size={12} />
           </Link>
         </div>
@@ -819,7 +1038,11 @@ export default function ResellerDashboard() {
                       {order.productName}
                     </p>
                     <div className="mt-1.5 flex items-center gap-2">
-                      <span className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(order.status)}`}>
+                      <span
+                        className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(
+                          order.status,
+                        )}`}
+                      >
                         {getStatusLabel(order.status)}
                       </span>
                       <span className="text-[9px] font-medium text-gray-400">
@@ -856,16 +1079,18 @@ export default function ResellerDashboard() {
         )}
       </section>
 
+      {/* Notifications Modal */}
       {isNotifOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-0 sm:p-4 backdrop-blur-sm">
           <div className="w-full max-w-md max-h-[85vh] rounded-t-3xl sm:rounded-2xl bg-white shadow-2xl flex flex-col animate-in slide-in-from-bottom-10 fade-in duration-300">
-            
             <div className="flex items-center justify-between border-b border-gray-100 p-4 sm:p-5">
               <div className="flex items-center gap-2">
                 <Bell className="text-zeluxe-gold" size={20} />
-                <h2 className="text-lg font-bold text-zeluxe-black">নোটিফিকেশন</h2>
+                <h2 className="text-lg font-bold text-zeluxe-black">
+                  নোটিফিকেশন
+                </h2>
               </div>
-              <button 
+              <button
                 onClick={() => setIsNotifOpen(false)}
                 className="rounded-full p-2 bg-gray-50 text-gray-500 hover:bg-gray-100 transition"
               >
@@ -879,18 +1104,41 @@ export default function ResellerDashboard() {
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-50 mb-4">
                     <BellOff size={28} className="text-gray-400" />
                   </div>
-                  <p className="text-sm font-bold text-zeluxe-black">কোনো নোটিফিকেশন নেই</p>
-                  <p className="mt-1 text-xs text-gray-500">নতুন অফার বা আপডেট এখানে দেখা যাবে</p>
+                  <p className="text-sm font-bold text-zeluxe-black">
+                    কোনো নোটিফিকেশন নেই
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500">
+                    নতুন অফার বা আপডেট এখানে দেখা যাবে
+                  </p>
                 </div>
               ) : (
                 notifications.map((notif) => (
-                  <div key={notif.id} className={`rounded-xl border p-4 transition ${notif.read ? 'bg-white border-gray-100' : 'bg-zeluxe-gold/5 border-zeluxe-gold/30'}`}>
+                  <div
+                    key={notif.id}
+                    className={`rounded-xl border p-4 transition ${
+                      notif.read
+                        ? 'bg-white border-gray-100'
+                        : 'bg-zeluxe-gold/5 border-zeluxe-gold/30'
+                    }`}
+                  >
                     <div className="flex items-start gap-3">
-                      <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${notif.read ? 'bg-gray-100 text-gray-500' : 'bg-zeluxe-gold/20 text-zeluxe-gold'}`}>
+                      <div
+                        className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                          notif.read
+                            ? 'bg-gray-100 text-gray-500'
+                            : 'bg-zeluxe-gold/20 text-zeluxe-gold'
+                        }`}
+                      >
                         <Sparkles size={14} />
                       </div>
                       <div>
-                        <p className={`text-sm ${notif.read ? 'font-medium text-gray-700' : 'font-bold text-zeluxe-black'}`}>
+                        <p
+                          className={`text-sm ${
+                            notif.read
+                              ? 'font-medium text-gray-700'
+                              : 'font-bold text-zeluxe-black'
+                          }`}
+                        >
                           {notif.title}
                         </p>
                         <p className="mt-1 text-xs text-gray-600 leading-relaxed">
@@ -905,7 +1153,6 @@ export default function ResellerDashboard() {
                 ))
               )}
             </div>
-
           </div>
         </div>
       )}
