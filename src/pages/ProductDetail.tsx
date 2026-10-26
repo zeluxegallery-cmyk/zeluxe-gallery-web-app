@@ -317,8 +317,44 @@ export default function ProductDetail() {
       return;
     }
 
+    if (!Number.isInteger(numQty) || numQty < 1) {
+      toast.error('সঠিক পণ্যের পরিমাণ দিন');
+      return;
+    }
+
     setSubmitting(true);
     try {
+      // অর্ডার তৈরির আগে Firebase থেকে সর্বশেষ স্টক যাচাই
+      const productRef = doc(db, 'products', product.id);
+      const latestProductSnap = await getDoc(productRef);
+
+      if (!latestProductSnap.exists()) {
+        toast.error('প্রোডাক্টটি আর পাওয়া যাচ্ছে না');
+        return;
+      }
+
+      const latestProduct = latestProductSnap.data();
+      const currentStock = latestProduct.stock;
+
+      if (latestProduct.active === false) {
+        toast.error('প্রোডাক্টটি বর্তমানে বিক্রির জন্য বন্ধ');
+        return;
+      }
+
+      if (
+        typeof currentStock !== 'number' ||
+        !Number.isFinite(currentStock) ||
+        currentStock < 0
+      ) {
+        toast.error('প্রোডাক্টের স্টক তথ্য সঠিক নয়');
+        return;
+      }
+
+      if (numQty > currentStock) {
+        toast.error(`পর্যাপ্ত স্টক নেই। বর্তমানে স্টক: ${currentStock}টি`);
+        return;
+      }
+
       const counterRef = doc(db, 'settings', 'orderCounter');
       const counterSnap = await getDoc(counterRef);
       const now = new Date();
@@ -738,3 +774,4 @@ export default function ProductDetail() {
     </div>
   );
 }
+
