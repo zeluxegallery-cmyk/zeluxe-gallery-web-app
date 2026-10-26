@@ -160,12 +160,6 @@ function SkeletonBlock({ className = '' }: { className?: string }) {
   );
 }
 
-type OrderItemLike = {
-  resellerPrice?: number;
-  sellingPrice?: number;
-  quantity?: number;
-};
-
 export default function ResellerDashboard() {
   const [stats, setStats] = useState<Stats>(initialStats);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -231,23 +225,10 @@ export default function ResellerDashboard() {
 
       setLoadError(false);
 
-      const userP = getDoc(doc(db, 'users', uid));
-      const productsP = getDocs(collection(db, 'products'));
-      const ordersP = getDocs(
-        query(collection(db, 'orders'), where('resellerId', '==', uid)),
-      );
-      const withdrawP = getDocs(
-        query(
-          collection(db, 'withdrawRequests'),
-          where('resellerId', '==', uid),
-        ),
-      );
-      const notifP = getDocs(
-        query(collection(db, 'notifications'), where('userId', '==', uid)),
-      );
-
-      void notifP
+      // ১. নোটিফিকেশন লোড
+      getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)))
         .then((notifSnap) => {
+          if (cancelled) return;
           const fetchedNotifs: Notification[] = notifSnap.docs.map((d) => {
             const data = d.data();
             return {
@@ -258,24 +239,15 @@ export default function ResellerDashboard() {
               createdAt: data.createdAt,
             };
           });
-          fetchedNotifs.sort(
-            (a, b) =>
-              (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
-          );
-          if (cancelled) return;
+          fetchedNotifs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
           setNotifications(fetchedNotifs);
         })
         .catch((err) => console.error('Notifications load error:', err));
 
-      const productMapP: Promise<Record<string, number>> = productsP
+      // ২. ফিচার্ড প্রোডাক্টস লোড
+      getDocs(collection(db, 'products'))
         .then((productsSnap) => {
-          const productMap: Record<string, number> = {};
-          productsSnap.docs.forEach((p) => {
-            const data = p.data();
-            productMap[p.id] =
-              typeof data.resellerPrice === 'number' ? data.resellerPrice : 0;
-          });
-
+          if (cancelled) return;
           const activeProducts: Product[] = productsSnap.docs
             .filter((d) => {
               const data = d.data();
@@ -291,47 +263,27 @@ export default function ResellerDashboard() {
               return {
                 id: d.id,
                 name: typeof data.name === 'string' ? data.name : 'Product',
-                imageUrl:
-                  typeof data.imageUrl === 'string' ? data.imageUrl : '',
-                resellerPrice:
-                  typeof data.resellerPrice === 'number'
-                    ? data.resellerPrice
-                    : 0,
+                imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
+                resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
               };
             });
-
-          if (!cancelled) {
-            setFeaturedProducts(activeProducts);
-          }
-          return productMap;
+          setFeaturedProducts(activeProducts);
         })
-        .catch((err) => {
-          console.error('Products load error:', err);
-          return {} as Record<string, number>;
-        })
+        .catch((err) => console.error('Products load error:', err))
         .finally(() => {
           if (!cancelled) setProductsLoading(false);
         });
 
-      void (async () => {
-        try {
-          const userDoc = await userP;
-          if (!userDoc.exists()) return;
+      // ৩. রেফারেল তথ্য লোড
+      getDoc(doc(db, 'users', uid))
+        .then(async (userDoc) => {
+          if (!userDoc.exists() || cancelled) return;
           const userInfo = userDoc.data();
 
           let refStats: ReferralInfo = {
-            referralCode:
-              typeof userInfo.referralCode === 'string'
-                ? userInfo.referralCode
-                : '',
-            referralCount:
-              typeof userInfo.referralCount === 'number'
-                ? userInfo.referralCount
-                : 0,
-            referralBonusEarned:
-              typeof userInfo.referralBonusEarned === 'number'
-                ? userInfo.referralBonusEarned
-                : 0,
+            referralCode: typeof userInfo.referralCode === 'string' ? userInfo.referralCode : '',
+            referralCount: typeof userInfo.referralCount === 'number' ? userInfo.referralCount : 0,
+            referralBonusEarned: typeof userInfo.referralBonusEarned === 'number' ? userInfo.referralBonusEarned : 0,
           };
 
           if (!refStats.referralCode) {
@@ -342,164 +294,108 @@ export default function ResellerDashboard() {
                 referralCount: 0,
                 referralBonusEarned: 0,
               });
-
-              const userName =
-                (userInfo.name as string) ||
-                auth.currentUser?.email?.split('@')[0] ||
-                'Reseller';
+              const userName = (userInfo.name as string) || auth.currentUser?.email?.split('@')[0] || 'Reseller';
               await publishReferralCode(uid, userName, newCode);
-
-              refStats = {
-                referralCode: newCode,
-                referralCount: 0,
-                referralBonusEarned: 0,
-              };
+              refStats = { referralCode: newCode, referralCount: 0, referralBonusEarned: 0 };
             } catch (err) {
               console.error('Failed to generate referral code:', err);
             }
           }
 
-          if (cancelled) return;
-          setReferralInfo(refStats);
-        } catch (err) {
-          console.error('Referral load error:', err);
-        } finally {
+          if (!cancelled) setReferralInfo(refStats);
+        })
+        .catch((err) => console.error('Referral load error:', err))
+        .finally(() => {
           if (!cancelled) setRefLoading(false);
-        }
-      })();
-
-      try {
-        const [userDoc, ordersSnapshot, withdrawSnap] = await Promise.all([
-          userP,
-          ordersP,
-          withdrawP,
-        ]);
-        const userInfo = userDoc.exists() ? userDoc.data() : null;
-
-        const needsProductPrices = ordersSnapshot.docs.some((d) => {
-          const data = d.data();
-          return (
-            typeof data.profit !== 'number' &&
-            (!Array.isArray(data.items) || data.items.length === 0)
-          );
         });
-        const productMap: Record<string, number> = needsProductPrices
-          ? await productMapP
-          : {};
 
-        const fetchedOrders: Order[] = ordersSnapshot.docs.map(
-          (orderDocument) => {
-            const data = orderDocument.data();
-            const quantity =
-              typeof data.quantity === 'number' && Number.isFinite(data.quantity)
-                ? data.quantity
-                : 0;
-            const sellingPrice =
-              typeof data.sellingPrice === 'number' && Number.isFinite(data.sellingPrice)
-                ? data.sellingPrice
-                : 0;
-            const productId =
-              typeof data.productId === 'string' ? data.productId : '';
+      // ৪. মূল ব্যালেন্স, প্রফিট ও অর্ডার লোডিং (আইসোলেটেড এবং নিরাপদ ট্রাই-ক্যাচ)
+      try {
+        const userDocSnap = await getDoc(doc(db, 'users', uid)).catch(() => null);
+        const userInfo = userDocSnap && userDocSnap.exists() ? userDocSnap.data() : null;
 
-            // ফায়ারস্টোর থেকে সরাসরি লাভ পড়া
-            let actualProfit = 0;
-            if (typeof data.profit === 'number' && Number.isFinite(data.profit)) {
-              actualProfit = data.profit;
-            } else if (Array.isArray(data.items) && data.items.length > 0) {
-              actualProfit = (data.items as OrderItemLike[]).reduce(
-                (sum, item) => {
-                  const resP = Number(item.resellerPrice) || 0;
-                  const sellP = Number(item.sellingPrice) || 0;
-                  const qty = Number(item.quantity) || 0;
-                  return sum + (sellP - resP) * qty;
-                },
-                0,
-              );
-            } else {
-              const resellerPrice =
-                typeof data.resellerPrice === 'number' && Number.isFinite(data.resellerPrice)
-                  ? data.resellerPrice
-                  : productMap[productId] || 0;
-              actualProfit = (sellingPrice - resellerPrice) * quantity;
-            }
-
-            actualProfit = Number.isFinite(actualProfit) ? Math.max(0, actualProfit) : 0;
-
-            return {
-              id: orderDocument.id,
-              orderId:
-                typeof data.orderId === 'string'
-                  ? data.orderId
-                  : orderDocument.id,
-              productName:
-                typeof data.productName === 'string'
-                  ? data.productName
-                  : data.items?.[0]?.name || 'Product',
-              status:
-                typeof data.status === 'string' ? data.status : 'pending',
-              total:
-                typeof data.total === 'number' && Number.isFinite(data.total)
-                  ? data.total
-                  : 0,
-              quantity,
-              sellingPrice,
-              productId,
-              createdAt: data.createdAt,
-              actualProfit,
-            };
-          },
+        // অর্ডার লোড
+        const ordersSnapshot = await getDocs(
+          query(collection(db, 'orders'), where('resellerId', '==', uid))
         );
 
-        // শুধুমাত্র সফলভাবে উত্তোলিত টাকা হিসাব
-        const totalWithdrawn = withdrawSnap.docs
-          .map((d) => d.data())
-          .filter((d) => d.status === 'approved' || d.status === 'paid')
-          .reduce(
-            (sum, d) =>
-              sum + (typeof d.amount === 'number' && Number.isFinite(d.amount) ? d.amount : 0),
-            0,
+        // উইথড্র লোড (আলাদা ট্রাই-ক্যাচ যাতে এররে ক্র্যাশ না করে)
+        let totalWithdrawn = 0;
+        try {
+          const withdrawSnap = await getDocs(
+            query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid))
           );
+          totalWithdrawn = withdrawSnap.docs
+            .map((d) => d.data())
+            .filter((d) => d.status === 'approved' || d.status === 'paid')
+            .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+        } catch (wErr) {
+          console.warn('Withdraw requests could not be loaded, defaulting to 0:', wErr);
+        }
 
-        const totalSales = fetchedOrders.reduce(
-          (sum, order) => sum + order.total,
-          0,
-        );
+        const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
+          const data = orderDocument.data();
+          const quantity = Number(data.quantity) || 1;
+          const sellingPrice = Number(data.sellingPrice) || 0;
+          const resellerPrice = Number(data.resellerPrice) || 0;
+
+          // ফায়ারস্টোরে সংরক্ষিত profit ফিল্ড সরাসরি পড়া
+          let actualProfit = 0;
+          if (typeof data.profit === 'number' && !isNaN(data.profit)) {
+            actualProfit = data.profit;
+          } else if (Array.isArray(data.items) && data.items.length > 0) {
+            actualProfit = data.items.reduce((sum: number, item: any) => {
+              const rPrice = Number(item.resellerPrice) || 0;
+              const sPrice = Number(item.sellingPrice) || 0;
+              const qty = Number(item.quantity) || 1;
+              return sum + (sPrice - rPrice) * qty;
+            }, 0);
+          } else {
+            actualProfit = (sellingPrice - resellerPrice) * quantity;
+          }
+
+          actualProfit = isNaN(actualProfit) ? 0 : Math.max(0, actualProfit);
+
+          return {
+            id: orderDocument.id,
+            orderId: typeof data.orderId === 'string' ? data.orderId : orderDocument.id,
+            productName: typeof data.productName === 'string' ? data.productName : (data.items?.[0]?.name || 'Product'),
+            status: typeof data.status === 'string' ? data.status : 'pending',
+            total: Number(data.total) || 0,
+            quantity,
+            sellingPrice,
+            productId: typeof data.productId === 'string' ? data.productId : '',
+            createdAt: data.createdAt,
+            actualProfit,
+          };
+        });
+
+        const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
         const pendingOrders = fetchedOrders.filter((order) =>
-          PENDING_STATUSES.includes(order.status.toLowerCase()),
+          PENDING_STATUSES.includes(order.status.toLowerCase())
         ).length;
         const deliveredOrders = fetchedOrders.filter(
-          (order) => order.status.toLowerCase() === 'delivered',
+          (order) => order.status.toLowerCase() === 'delivered'
         ).length;
 
-        // বাতিল বা ফেরত ছাড়া সব বৈধ অর্ডারের মোট লাভ
-        const activeTotalProfit = fetchedOrders
+        // সকল সক্রিয় অর্ডারের মোট প্রফিট (বাতিল বাদে)
+        const totalProfitSum = fetchedOrders
           .filter(
             (order) =>
               order.status.toLowerCase() !== 'cancelled' &&
-              order.status.toLowerCase() !== 'returned',
+              order.status.toLowerCase() !== 'returned'
           )
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
-        const referralBonus =
-          typeof userInfo?.referralBonusEarned === 'number' &&
-          Number.isFinite(userInfo.referralBonusEarned)
-            ? userInfo.referralBonusEarned
-            : 0;
+        const referralBonus = Number(userInfo?.referralBonusEarned) || 0;
 
-        // Available Balance ক্যালকুলেশন
-        const calculatedBalance = activeTotalProfit + referralBonus - totalWithdrawn;
+        // 🌟 আসল সমাধান: ব্যালেন্স ক্যালকুলেশন
+        const calculatedBalance = totalProfitSum + referralBonus - totalWithdrawn;
         const availableBalance = Math.max(0, calculatedBalance);
 
         const now = new Date();
-        const todayStart =
-          new Date(
-            now.getFullYear(),
-            now.getMonth(),
-            now.getDate(),
-          ).getTime() / 1000;
-        const todayOrders = fetchedOrders.filter(
-          (o) => (o.createdAt?.seconds || 0) >= todayStart,
-        );
+        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
+        const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
         const todaySales = todayOrders.reduce((sum, o) => sum + o.total, 0);
 
         const newStats: Stats = {
@@ -507,8 +403,8 @@ export default function ResellerDashboard() {
           pendingOrders,
           deliveredOrders,
           totalSales,
-          actualProfit: activeTotalProfit,
-          availableBalance,
+          actualProfit: totalProfitSum,
+          availableBalance, // ✅ এখন আর শূন্য থাকবে না
           todayOrders: todayOrders.length,
           todaySales,
           referralBonus,
@@ -516,12 +412,8 @@ export default function ResellerDashboard() {
 
         const userCreatedAt = userInfo?.createdAt?.seconds || 0;
         const nowSec = Math.floor(Date.now() / 1000);
-        const bonusDeadline =
-          userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
-        const daysLeft = Math.max(
-          0,
-          Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)),
-        );
+        const bonusDeadline = userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
+        const daysLeft = Math.max(0, Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)));
         const progress = Math.min(deliveredOrders, WELCOME_BONUS_TARGET);
         const achieved = deliveredOrders >= WELCOME_BONUS_TARGET;
 
@@ -533,7 +425,7 @@ export default function ResellerDashboard() {
         setBonusProgress(progress);
         setBonusAchieved(achieved);
       } catch (error) {
-        console.error('Dashboard load error:', error);
+        console.error('Dashboard primary stats error:', error);
         if (!cancelled) setLoadError(true);
       } finally {
         if (!cancelled) setStatsLoading(false);
@@ -573,7 +465,7 @@ export default function ResellerDashboard() {
     'Reseller';
 
   const bonusPercent = Math.round(
-    (bonusProgress / WELCOME_BONUS_TARGET) * 100,
+    (bonusProgress / WELCOME_BONUS_TARGET) * 100
   );
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -709,7 +601,7 @@ export default function ResellerDashboard() {
         </div>
       ) : null}
 
-      {/* Available Balance Card */}
+      {/* 🌟 Available Balance Card 🌟 */}
       {statsLoading ? (
         <SkeletonBlock className="mb-5 h-32" />
       ) : (
