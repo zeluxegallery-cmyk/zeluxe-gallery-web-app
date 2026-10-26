@@ -4,7 +4,7 @@ import { lazy, Suspense } from 'react';
 import { Loader2 } from 'lucide-react';
 import ScrollToTop from './components/ScrollToTop';
 
-// ═══ মূল পেজগুলো স্ট্যাটিক ইমপোর্ট করা (ইনস্ট্যান্ট ওপেন হওয়ার জন্য) ═══
+// মূল পেজগুলো
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -29,7 +29,7 @@ import Withdraw from './pages/Withdraw';
 import Layout from './components/Layout';
 import AdminLayout from './components/AdminLayout';
 
-// ═══ ভারী এডমিন পেজগুলো Lazy Load করা (শুধু এডমিন সেকশনের জন্য) ═══
+// Admin পেজগুলো Lazy Load
 const AdminMemberships = lazy(() => import('./pages/AdminMemberships'));
 const AdminOverview = lazy(() => import('./pages/admin/AdminOverview'));
 const AdminProducts = lazy(() => import('./pages/admin/AdminProducts'));
@@ -40,7 +40,6 @@ const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications')
 const AdminWithdrawals = lazy(() => import('./pages/admin/AdminWithdrawals'));
 const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
 
-// হালকা লোডিং কম্পোনেন্ট (শুধু এডমিনের জন্য)
 const AdminLoader = () => (
   <div className="flex h-[50vh] items-center justify-center">
     <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
@@ -52,9 +51,9 @@ export default function App() {
     <>
       <BrowserRouter>
         <ScrollToTop />
-        
+
         <Routes>
-          {/* ═══ Public Routes ═══ */}
+          {/* Public Routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
@@ -64,14 +63,26 @@ export default function App() {
           <Route path="/legal" element={<Legal />} />
           <Route path="/faq" element={<FAQ />} />
 
-          {/* ═══ Reseller Routes (কোনো লোডিং ছাড়াই ইনস্ট্যান্ট কাজ করবে) ═══ */}
+          {/* Reseller Routes */}
           <Route element={<Layout />}>
-            <Route path="/reseller-dashboard" element={<ResellerDashboard />} />
+            <Route
+              path="/reseller-dashboard"
+              element={<ResellerDashboard />}
+            />
+
             <Route path="/products" element={<Products />} />
             <Route path="/products/:id" element={<ProductDetail />} />
+
             <Route path="/orders" element={<Orders />} />
+
+            {/* মূল Create Order Route */}
             <Route path="/orders/new" element={<CreateOrder />} />
+
+            {/* Checkout Route Alias */}
+            <Route path="/checkout" element={<CreateOrder />} />
+
             <Route path="/orders/:id" element={<OrderDetails />} />
+
             <Route path="/earnings" element={<Earnings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/withdraw" element={<Withdraw />} />
@@ -79,25 +90,65 @@ export default function App() {
             <Route path="/support" element={<Support />} />
           </Route>
 
-          {/* ═══ Admin Routes (Suspense সহ) ═══ */}
-          <Route element={
-            <Suspense fallback={<AdminLoader />}>
-              <AdminLayout />
-            </Suspense>
-          }>
-            <Route path="/admin-dashboard" element={<AdminOverview />} />
-            <Route path="/admin/memberships" element={<AdminMemberships />} />
-            <Route path="/admin/products" element={<AdminProducts />} />
-            <Route path="/admin/categories" element={<AdminCategories />} />
-            <Route path="/admin/orders" element={<AdminOrders />} />
-            <Route path="/admin/resellers" element={<AdminResellers />} />
-            <Route path="/admin/notifications" element={<AdminNotifications />} />
-            <Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
-            <Route path="/admin/reports" element={<AdminReports />} />
+          {/* Admin Routes */}
+          <Route
+            element={
+              <Suspense fallback={<AdminLoader />}>
+                <AdminLayout />
+              </Suspense>
+            }
+          >
+            <Route
+              path="/admin-dashboard"
+              element={<AdminOverview />}
+            />
+
+            <Route
+              path="/admin/memberships"
+              element={<AdminMemberships />}
+            />
+
+            <Route
+              path="/admin/products"
+              element={<AdminProducts />}
+            />
+
+            <Route
+              path="/admin/categories"
+              element={<AdminCategories />}
+            />
+
+            <Route
+              path="/admin/orders"
+              element={<AdminOrders />}
+            />
+
+            <Route
+              path="/admin/resellers"
+              element={<AdminResellers />}
+            />
+
+            <Route
+              path="/admin/notifications"
+              element={<AdminNotifications />}
+            />
+
+            <Route
+              path="/admin/withdrawals"
+              element={<AdminWithdrawals />}
+            />
+
+            <Route
+              path="/admin/reports"
+              element={<AdminReports />}
+            />
           </Route>
 
-          {/* ═══ 404 Redirect ═══ */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
+          {/* 404 Redirect */}
+          <Route
+            path="*"
+            element={<Navigate to="/login" replace />}
+          />
         </Routes>
       </BrowserRouter>
 
