@@ -16,7 +16,6 @@ export default function LogoutModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
-        
         {/* লাল হেডার সেকশন — সেন্টারেড এবং সঠিক প্যাডিং */}
         <div className="bg-red-600 px-6 py-6 text-center text-white">
           <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
@@ -52,7 +51,6 @@ export default function LogoutModal({
             আবার লগইন করতে পারবেন যেকোনো সময়
           </p>
         </div>
-
       </div>
     </div>
   );
