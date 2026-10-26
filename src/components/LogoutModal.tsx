@@ -1,65 +1,58 @@
-import { LogOut, X } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 
-type Props = {
+type LogoutModalProps = {
   isOpen: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 };
 
-export default function LogoutModal({ isOpen, onConfirm, onCancel }: Props) {
+export default function LogoutModal({
+  isOpen,
+  onConfirm,
+  onCancel,
+}: LogoutModalProps) {
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-      onClick={onCancel}
-    >
-      <div
-        className="w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl animate-in"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {/* Top red gradient band */}
-        <div className="relative bg-gradient-to-br from-red-500 to-red-600 px-6 py-8 text-center">
-          <button
-            onClick={onCancel}
-            className="absolute right-3 top-3 rounded-full bg-white/20 p-1.5 text-white transition hover:bg-white/30"
-            aria-label="Close"
-          >
-            <X size={16} />
-          </button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200">
+        
+        {/* লাল হেডার সেকশন — সেন্টারেড এবং সঠিক প্যাডিং */}
+        <div className="bg-red-600 px-6 py-6 text-center text-white">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-white/20">
+            <LogOut size={20} className="text-white" />
+          </div>
+          <h3 className="text-base font-bold leading-snug">
+            আপনি কি নিশ্চিত যে আপনি লগআউট করতে চান?
+          </h3>
+        </div>
 
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
-            <LogOut className="text-white" size={28} />
+        {/* বাটনসমূহ */}
+        <div className="p-6">
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-xl border border-gray-200 bg-white py-3 text-sm font-bold text-gray-700 transition hover:bg-gray-50 active:scale-95"
+            >
+              না, থাকব
+            </button>
+
+            <button
+              type="button"
+              onClick={onConfirm}
+              className="flex items-center justify-center gap-1.5 rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-95"
+            >
+              <LogOut size={16} />
+              হ্যাঁ, লগআউট
+            </button>
           </div>
 
-          <h2 className="mt-4 text-xl font-bold text-white">
-            লগআউট করবেন?
-          </h2>
-          <p className="mt-2 text-sm text-red-50">
-            আপনি কি নিশ্চিত যে আপনি লগআউট করতে চান?
+          <p className="mt-4 text-center text-xs text-gray-400">
+            আবার লগইন করতে পারবেন যেকোনো সময়
           </p>
         </div>
 
-        {/* Buttons */}
-        <div className="flex gap-3 p-5">
-          <button
-            onClick={onCancel}
-            className="flex-1 rounded-xl border-2 border-zeluxe-lightgray bg-white py-3 text-sm font-bold text-zeluxe-black transition hover:bg-zeluxe-fieldbg active:scale-[0.97]"
-          >
-            না, থাকব
-          </button>
-          <button
-            onClick={onConfirm}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-red-600 py-3 text-sm font-bold text-white transition hover:bg-red-700 active:scale-[0.97]"
-          >
-            <LogOut size={16} />
-            হ্যাঁ, লগআউট
-          </button>
-        </div>
-
-        <p className="pb-4 text-center text-xs text-gray-400">
-          আবার লগইন করতে পারবেন যেকোনো সময়
-        </p>
       </div>
     </div>
   );
