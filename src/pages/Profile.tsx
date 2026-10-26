@@ -33,7 +33,7 @@ let profileCache: any = null;
 
 export default function Profile() {
   const navigate = useNavigate();
-  
+
   // ক্যাশ থাকলে ইনস্ট্যান্ট লোড হবে, কোনো স্পিনার দেখাবে না
   const [userData, setUserData] = useState<any>(profileCache);
   const [loading, setLoading] = useState(!profileCache);
@@ -133,13 +133,13 @@ export default function Profile() {
         businessLogo: form.businessLogo.trim(),
       };
       await updateDoc(doc(db, 'users', auth.currentUser.uid), updatePayload);
-      
+
       setUserData((prev: any) => {
         const updated = { ...prev, ...updatePayload };
         profileCache = updated;
         return updated;
       });
-      
+
       setEditOpen(false);
       toast.success('✓ ব্যবসার তথ্য আপডেট হয়েছে!');
     } catch (err) {
@@ -150,10 +150,20 @@ export default function Profile() {
   };
 
   const confirmLogout = async () => {
-    setShowLogout(false);
-    profileCache = null; // লগআউট করলে ক্যাশ ক্লিয়ার
-    await signOut(auth);
-    navigate('/login');
+    try {
+      setShowLogout(false);
+      profileCache = null; // গ্লোবাল ক্যাশ ক্লিয়ার
+      try {
+        localStorage.removeItem('zeluxe_cart'); // কার্ট ডেটা ক্লিয়ার
+      } catch (storageErr) {
+        console.warn('Cart clearing failed:', storageErr);
+      }
+      await signOut(auth);
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Logout failed:', err);
+      toast.error('লগআউট করতে সমস্যা হয়েছে। আবার চেষ্টা করুন।');
+    }
   };
 
   const formatDate = (timestamp: any) => {
@@ -372,7 +382,7 @@ export default function Profile() {
       {/* সোশ্যাল মিডিয়া লিংক সেকশন */}
       <div className="mb-4 space-y-3 rounded-xl border border-zeluxe-lightgray bg-white p-4">
         <h3 className="text-sm font-bold text-zeluxe-black mb-1">আমাদের সাথে যুক্ত থাকুন</h3>
-        
+
         <a
           href="https://t.me/+NX7sLkCLMPk0YWI1"
           target="_blank"
@@ -457,7 +467,7 @@ export default function Profile() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
           <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
             <div className="mb-4 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-zeluxe-black">ব্যব사의 তথ্য</h2>
+              <h2 className="text-lg font-bold text-zeluxe-black">ব্যবসার তথ্য</h2>
               <button
                 onClick={() => setEditOpen(false)}
                 className="rounded-lg p-1.5 text-zeluxe-gray hover:bg-zeluxe-fieldbg"
