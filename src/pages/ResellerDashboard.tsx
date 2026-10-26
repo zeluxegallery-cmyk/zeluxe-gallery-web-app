@@ -154,40 +154,6 @@ function formatDate(seconds?: number) {
   return `${d.getDate()} ${months[d.getMonth()]}`;
 }
 
-type DashboardCache = {
-  uid: string;
-  stats: Stats;
-  orders: Order[];
-  featuredProducts: Product[];
-  referralInfo: ReferralInfo | null;
-  notifications: Notification[];
-  bonusProgress: number;
-  bonusAchieved: boolean;
-  bonusDaysLeft: number;
-  bonusStartDate: number;
-};
-
-let dashboardCache: DashboardCache | null = null;
-
-function updateDashboardCache(uid: string, patch: Partial<DashboardCache>) {
-  const base: DashboardCache =
-    dashboardCache && dashboardCache.uid === uid
-      ? dashboardCache
-      : {
-          uid,
-          stats: initialStats,
-          orders: [],
-          featuredProducts: [],
-          referralInfo: null,
-          notifications: [],
-          bonusProgress: 0,
-          bonusAchieved: false,
-          bonusDaysLeft: 0,
-          bonusStartDate: 0,
-        };
-  dashboardCache = { ...base, ...patch };
-}
-
 function SkeletonBlock({ className = '' }: { className?: string }) {
   return (
     <div className={`animate-pulse rounded-2xl bg-gray-200/70 ${className}`} />
@@ -201,35 +167,19 @@ type OrderItemLike = {
 };
 
 export default function ResellerDashboard() {
-  const currentUid = auth.currentUser?.uid;
-  const cached =
-    dashboardCache && dashboardCache.uid === currentUid ? dashboardCache : null;
+  const [stats, setStats] = useState<Stats>(initialStats);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [featuredProducts, setFeaturedProducts] = useState<Product[]>([]);
+  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(null);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [bonusProgress, setBonusProgress] = useState(0);
+  const [bonusAchieved, setBonusAchieved] = useState(false);
+  const [bonusDaysLeft, setBonusDaysLeft] = useState(0);
+  const [bonusStartDate, setBonusStartDate] = useState<number>(0);
 
-  const [stats, setStats] = useState<Stats>(cached?.stats ?? initialStats);
-  const [orders, setOrders] = useState<Order[]>(cached?.orders ?? []);
-  const [featuredProducts, setFeaturedProducts] = useState<Product[]>(
-    cached?.featuredProducts ?? [],
-  );
-  const [referralInfo, setReferralInfo] = useState<ReferralInfo | null>(
-    cached?.referralInfo ?? null,
-  );
-  const [notifications, setNotifications] = useState<Notification[]>(
-    cached?.notifications ?? [],
-  );
-  const [bonusProgress, setBonusProgress] = useState(cached?.bonusProgress ?? 0);
-  const [bonusAchieved, setBonusAchieved] = useState(
-    cached?.bonusAchieved ?? false,
-  );
-  const [bonusDaysLeft, setBonusDaysLeft] = useState(
-    cached?.bonusDaysLeft ?? 0,
-  );
-  const [bonusStartDate, setBonusStartDate] = useState<number>(
-    cached?.bonusStartDate ?? 0,
-  );
-
-  const [statsLoading, setStatsLoading] = useState(!cached);
-  const [productsLoading, setProductsLoading] = useState(!cached);
-  const [refLoading, setRefLoading] = useState(!cached);
+  const [statsLoading, setStatsLoading] = useState(true);
+  const [productsLoading, setProductsLoading] = useState(true);
+  const [refLoading, setRefLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
@@ -314,7 +264,6 @@ export default function ResellerDashboard() {
           );
           if (cancelled) return;
           setNotifications(fetchedNotifs);
-          updateDashboardCache(uid, { notifications: fetchedNotifs });
         })
         .catch((err) => console.error('Notifications load error:', err));
 
@@ -353,7 +302,6 @@ export default function ResellerDashboard() {
 
           if (!cancelled) {
             setFeaturedProducts(activeProducts);
-            updateDashboardCache(uid, { featuredProducts: activeProducts });
           }
           return productMap;
         })
@@ -413,7 +361,6 @@ export default function ResellerDashboard() {
 
           if (cancelled) return;
           setReferralInfo(refStats);
-          updateDashboardCache(uid, { referralInfo: refStats });
         } catch (err) {
           console.error('Referral load error:', err);
         } finally {
@@ -454,7 +401,7 @@ export default function ResellerDashboard() {
             const productId =
               typeof data.productId === 'string' ? data.productId : '';
 
-            // লাভ হিসাব: data.profit কে সর্বোচ্চ প্রাধান্য দেওয়া হচ্ছে
+            // ফায়ারস্টোর থেকে সরাসরি লাভ পড়া
             let actualProfit = 0;
             if (typeof data.profit === 'number' && Number.isFinite(data.profit)) {
               actualProfit = data.profit;
@@ -503,6 +450,7 @@ export default function ResellerDashboard() {
           },
         );
 
+        // শুধুমাত্র সফলভাবে উত্তোলিত টাকা হিসাব
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
           .filter((d) => d.status === 'approved' || d.status === 'paid')
@@ -523,8 +471,8 @@ export default function ResellerDashboard() {
           (order) => order.status.toLowerCase() === 'delivered',
         ).length;
 
-        // বাতিল ও ফেরত ছাড়া সকল কার্যকর অর্ডারের লাভ
-        const allActiveProfit = fetchedOrders
+        // বাতিল বা ফেরত ছাড়া সব বৈধ অর্ডারের মোট লাভ
+        const activeTotalProfit = fetchedOrders
           .filter(
             (order) =>
               order.status.toLowerCase() !== 'cancelled' &&
@@ -538,9 +486,9 @@ export default function ResellerDashboard() {
             ? userInfo.referralBonusEarned
             : 0;
 
-        // Available Balance হিসাব
-        const computedBalance = allActiveProfit + referralBonus - totalWithdrawn;
-        const availableBalance = Math.max(0, computedBalance);
+        // Available Balance ক্যালকুলেশন
+        const calculatedBalance = activeTotalProfit + referralBonus - totalWithdrawn;
+        const availableBalance = Math.max(0, calculatedBalance);
 
         const now = new Date();
         const todayStart =
@@ -559,7 +507,7 @@ export default function ResellerDashboard() {
           pendingOrders,
           deliveredOrders,
           totalSales,
-          actualProfit: allActiveProfit,
+          actualProfit: activeTotalProfit,
           availableBalance,
           todayOrders: todayOrders.length,
           todaySales,
@@ -584,14 +532,6 @@ export default function ResellerDashboard() {
         setBonusDaysLeft(daysLeft);
         setBonusProgress(progress);
         setBonusAchieved(achieved);
-        updateDashboardCache(uid, {
-          orders: fetchedOrders,
-          stats: newStats,
-          bonusStartDate: userCreatedAt,
-          bonusDaysLeft: daysLeft,
-          bonusProgress: progress,
-          bonusAchieved: achieved,
-        });
       } catch (error) {
         console.error('Dashboard load error:', error);
         if (!cancelled) setLoadError(true);
