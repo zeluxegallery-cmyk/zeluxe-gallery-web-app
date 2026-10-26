@@ -1,53 +1,47 @@
-import { doc, runTransaction } from 'firebase/firestore';
-import { db } from '../firebase';
 
-/**
- * Zeluxe Order ID Generator
- * Format: ZEL-YYMM-NNNN
- * Example: ZEL-2510-0001 (October 2025's 1st order)
- * 
- * Sequence resets every month.
- */
+import {
+  doc,
+  runTransaction,
+  serverTimestamp,
+} from "firebase/firestore";
+
+import { db } from "./firebase";
+
 export async function generateOrderId(): Promise<string> {
-  const counterRef = doc(db, 'settings', 'orderCounter');
-
-  // Get current year and month
   const now = new Date();
-  const year = now.getFullYear().toString().slice(-2);           // "25"
-  const month = (now.getMonth() + 1).toString().padStart(2, '0'); // "10"
-  const currentMonth = `${year}${month}`;                         // "2510"
 
-  return await runTransaction(db, async (transaction) => {
-    const counterDoc = await transaction.get(counterRef);
+  const year = String(now.getFullYear()).slice(-2);
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
 
-    let sequence = 1;
+  const datePrefix = `${year}${month}${day}`;
+  const counterRef = doc(db, "settings", "orderCounter");
 
-    if (counterDoc.exists()) {
-      const data = counterDoc.data();
-      const storedMonth = data.currentMonth || '';
+  return runTransaction(db, async (transaction) => {
+    const counterSnapshot = await transaction.get(counterRef);
 
-      if (storedMonth === currentMonth) {
-        // Same month — increase sequence
-        sequence = (data.currentSequence || 0) + 1;
-      } else {
-        // New month — reset sequence
-        sequence = 1;
+    let nextSequence = 1;
+
+    if (counterSnapshot.exists()) {
+      const counterData = counterSnapshot.data();
+      const savedDate = counterData.currentMonth;
+      const savedSequence = counterData.currentSequence;
+
+      if (
+        savedDate === datePrefix &&
+        Number.isInteger(savedSequence) &&
+        savedSequence >= 1
+      ) {
+        nextSequence = savedSequence + 1;
       }
     }
 
-    // Update counter
-    transaction.set(
-      counterRef,
-      {
-        currentMonth,
-        currentSequence: sequence,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    transaction.set(counterRef, {
+      currentMonth: datePrefix,
+      currentSequence: nextSequence,
+      updatedAt: serverTimestamp(),
+    });
 
-    // Build Order ID
-    const seqStr = sequence.toString().padStart(4, '0');
-    return `ZEL-${currentMonth}-${seqStr}`;
+    return `ZEL-${datePrefix}-${String(nextSequence).padStart(4, "0")}`;
   });
 }
