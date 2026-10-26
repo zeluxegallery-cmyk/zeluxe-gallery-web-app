@@ -71,7 +71,6 @@ type Stats = {
   deliveredOrders: number;
   totalSales: number;
   actualProfit: number;
-  pendingProfit: number;
   availableBalance: number;
   todayOrders: number;
   todaySales: number;
@@ -90,14 +89,13 @@ const initialStats: Stats = {
   deliveredOrders: 0,
   totalSales: 0,
   actualProfit: 0,
-  pendingProfit: 0,
   availableBalance: 0,
   todayOrders: 0,
   todaySales: 0,
   referralBonus: 0,
 };
 
-const PENDING_STATUSES = ['pending', 'confirmed', 'shipped', 'processing'];
+const PENDING_STATUSES = ['pending', 'confirmed', 'processing', 'shipped'];
 const WELCOME_BONUS_TARGET = 5;
 const WELCOME_BONUS_AMOUNT = 100;
 const WELCOME_BONUS_DAYS = 30;
@@ -433,7 +431,10 @@ export default function ResellerDashboard() {
 
         const needsProductPrices = ordersSnapshot.docs.some((d) => {
           const data = d.data();
-          return typeof data.profit !== 'number' && (!Array.isArray(data.items) || data.items.length === 0);
+          return (
+            typeof data.profit !== 'number' &&
+            (!Array.isArray(data.items) || data.items.length === 0)
+          );
         });
         const productMap: Record<string, number> = needsProductPrices
           ? await productMapP
@@ -443,33 +444,39 @@ export default function ResellerDashboard() {
           (orderDocument) => {
             const data = orderDocument.data();
             const quantity =
-              typeof data.quantity === 'number' ? data.quantity : 0;
+              typeof data.quantity === 'number' && Number.isFinite(data.quantity)
+                ? data.quantity
+                : 0;
             const sellingPrice =
-              typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
+              typeof data.sellingPrice === 'number' && Number.isFinite(data.sellingPrice)
+                ? data.sellingPrice
+                : 0;
             const productId =
               typeof data.productId === 'string' ? data.productId : '';
 
-            // ফায়ারস্টোর থেকে সরাসরি profit অগ্রাধিকার দিয়ে পড়া হচ্ছে
+            // লাভ হিসাব: data.profit কে সর্বোচ্চ প্রাধান্য দেওয়া হচ্ছে
             let actualProfit = 0;
             if (typeof data.profit === 'number' && Number.isFinite(data.profit)) {
               actualProfit = data.profit;
             } else if (Array.isArray(data.items) && data.items.length > 0) {
               actualProfit = (data.items as OrderItemLike[]).reduce(
                 (sum, item) => {
-                  const resP = Number(item.resellerPrice || 0);
-                  const sellP = Number(item.sellingPrice || 0);
-                  const qty = Number(item.quantity || 0);
+                  const resP = Number(item.resellerPrice) || 0;
+                  const sellP = Number(item.sellingPrice) || 0;
+                  const qty = Number(item.quantity) || 0;
                   return sum + (sellP - resP) * qty;
                 },
                 0,
               );
             } else {
               const resellerPrice =
-                typeof data.resellerPrice === 'number'
+                typeof data.resellerPrice === 'number' && Number.isFinite(data.resellerPrice)
                   ? data.resellerPrice
                   : productMap[productId] || 0;
               actualProfit = (sellingPrice - resellerPrice) * quantity;
             }
+
+            actualProfit = Number.isFinite(actualProfit) ? Math.max(0, actualProfit) : 0;
 
             return {
               id: orderDocument.id,
@@ -483,7 +490,10 @@ export default function ResellerDashboard() {
                   : data.items?.[0]?.name || 'Product',
               status:
                 typeof data.status === 'string' ? data.status : 'pending',
-              total: typeof data.total === 'number' ? data.total : 0,
+              total:
+                typeof data.total === 'number' && Number.isFinite(data.total)
+                  ? data.total
+                  : 0,
               quantity,
               sellingPrice,
               productId,
@@ -498,7 +508,7 @@ export default function ResellerDashboard() {
           .filter((d) => d.status === 'approved' || d.status === 'paid')
           .reduce(
             (sum, d) =>
-              sum + (typeof d.amount === 'number' ? d.amount : 0),
+              sum + (typeof d.amount === 'number' && Number.isFinite(d.amount) ? d.amount : 0),
             0,
           );
 
@@ -513,24 +523,24 @@ export default function ResellerDashboard() {
           (order) => order.status.toLowerCase() === 'delivered',
         ).length;
 
-        // শুধুমাত্র সফলভাবে ডেলিভার্ড অর্ডারের লাভ
-        const deliveredProfit = fetchedOrders
-          .filter((order) => order.status.toLowerCase() === 'delivered')
-          .reduce((sum, order) => sum + order.actualProfit, 0);
-
-        // অপেক্ষমাণ (পেন্ডিং/শিপড) অর্ডারের লাভ
-        const pendingProfit = fetchedOrders
-          .filter((order) => PENDING_STATUSES.includes(order.status.toLowerCase()))
+        // বাতিল ও ফেরত ছাড়া সকল কার্যকর অর্ডারের লাভ
+        const allActiveProfit = fetchedOrders
+          .filter(
+            (order) =>
+              order.status.toLowerCase() !== 'cancelled' &&
+              order.status.toLowerCase() !== 'returned',
+          )
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
         const referralBonus =
-          typeof userInfo?.referralBonusEarned === 'number'
+          typeof userInfo?.referralBonusEarned === 'number' &&
+          Number.isFinite(userInfo.referralBonusEarned)
             ? userInfo.referralBonusEarned
             : 0;
 
-        // Available Balance = ডেলিভার্ড প্রফিট + রেফারেল বোনাস - উইথড্র
-        const availableBalance =
-          deliveredProfit + referralBonus - totalWithdrawn;
+        // Available Balance হিসাব
+        const computedBalance = allActiveProfit + referralBonus - totalWithdrawn;
+        const availableBalance = Math.max(0, computedBalance);
 
         const now = new Date();
         const todayStart =
@@ -549,9 +559,8 @@ export default function ResellerDashboard() {
           pendingOrders,
           deliveredOrders,
           totalSales,
-          actualProfit: deliveredProfit,
-          pendingProfit,
-          availableBalance: availableBalance > 0 ? availableBalance : 0,
+          actualProfit: allActiveProfit,
+          availableBalance,
           todayOrders: todayOrders.length,
           todaySales,
           referralBonus,
@@ -781,21 +790,11 @@ export default function ResellerDashboard() {
 
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
-                  Delivered Profit:{' '}
+                  Profit:{' '}
                   <strong className="text-zeluxe-black font-number">
                     Tk {stats.actualProfit.toLocaleString()}
                   </strong>
                 </span>
-
-                {stats.pendingProfit > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-md bg-yellow-50 px-2 py-1 text-[11px] font-medium text-yellow-700 border border-yellow-200">
-                    Pending Profit:{' '}
-                    <strong className="text-yellow-800 font-number">
-                      Tk {stats.pendingProfit.toLocaleString()}
-                    </strong>
-                  </span>
-                )}
-
                 {stats.referralBonus > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
                     Referral:{' '}
@@ -806,7 +805,6 @@ export default function ResellerDashboard() {
                 )}
               </div>
             </div>
-
             <Link
               to="/withdraw"
               className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
