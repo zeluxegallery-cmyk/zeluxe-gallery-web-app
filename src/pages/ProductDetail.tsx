@@ -47,11 +47,11 @@ export default function ProductDetail() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // পূর্ববর্তী পেজ থেকে আসা ক্যাটাগরি বা সেশন থেকে রিড করা
+  // পূর্ববর্তী ক্যাটাগরি উদ্ধার
   const previousCategory =
     (location.state as { fromCategory?: string } | null)?.fromCategory ||
     sessionStorage.getItem('zeluxe_selected_category') ||
-    'All';
+    'All Categories';
 
   const [product, setProduct] = useState<Product | null>(() => {
     // @ts-ignore
@@ -71,7 +71,6 @@ export default function ProductDetail() {
         ? data.colors.filter((c: any) => typeof c === 'string')
         : [];
 
-      // সাইজ অ্যারে থেকে অনাকাঙ্ক্ষিত URL ফিল্টার করা
       const sizes: string[] = Array.isArray(data.sizes)
         ? data.sizes
             .filter((s: any) => typeof s === 'string')
@@ -189,7 +188,6 @@ export default function ProductDetail() {
             )
           : [];
 
-        // সাইজ স্যানিটাইজেশন
         const sizes: string[] = Array.isArray(data.sizes)
           ? data.sizes
               .filter((s: unknown): s is string => typeof s === 'string')
@@ -291,14 +289,15 @@ export default function ProductDetail() {
     };
   }, [id]);
 
-  // স্মার্ট ব্যাক নেভিগেশন যা আগের ক্যাটাগরি বজায় রাখে
+  // স্মার্ট ব্যাক নেভিগেশন (আগের ক্যাটাগরি অক্ষত রাখা)
   const handleBackToProducts = () => {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate(`/products?category=${encodeURIComponent(previousCategory)}`, {
-        state: { selectedCategory: previousCategory },
-      });
+      const url = previousCategory === 'All Categories' 
+        ? '/products' 
+        : `/products?category=${encodeURIComponent(previousCategory)}`;
+      navigate(url);
     }
   };
 
@@ -484,7 +483,7 @@ export default function ProductDetail() {
 
       <div className="rounded-lg border border-zeluxe-lightgray bg-white p-5 shadow-sm md:p-6">
         <div className="grid gap-6 md:grid-cols-2 md:gap-8">
-          {/* LEFT — Images (Aspect Ratio ও রেসপনসিভ হাইট ফিক্সড) */}
+          {/* LEFT — Images: উচ্চতা সীমাবদ্ধ এবং রেস্পনসিভ ফিক্স */}
           <div>
             <div className="group relative aspect-square max-h-[460px] w-full overflow-hidden rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream flex items-center justify-center">
               {product.imageUrls.length > 0 ? (
