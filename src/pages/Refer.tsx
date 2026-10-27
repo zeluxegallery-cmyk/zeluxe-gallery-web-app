@@ -188,7 +188,7 @@ export default function Refer() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl pb-10 transform-gpu">
+    <div className="mx-auto max-w-2xl pb-10">
       {/* HEADER */}
       <div className="mb-5">
         <h1 className="text-xl font-bold text-zeluxe-black md:text-2xl">
@@ -438,3 +438,4 @@ export default function Refer() {
     </div>
   );
 }
+
