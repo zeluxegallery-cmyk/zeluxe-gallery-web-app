@@ -56,12 +56,13 @@ type Breakdown = {
 const BREAKDOWN_CONFIG: { status: string; label: string; textClass: string }[] = [
   { status: 'pending', label: 'অপেক্ষমাণ', textClass: 'text-yellow-700' },
   { status: 'confirmed', label: 'কনফার্মড', textClass: 'text-blue-700' },
+  { status: 'processing', label: 'প্রসেসিং', textClass: 'text-indigo-700' },
   { status: 'shipped', label: 'শিপড', textClass: 'text-purple-700' },
   { status: 'delivered', label: 'ডেলিভারড', textClass: 'text-green-700' },
   { status: 'cancelled', label: 'বাতিল', textClass: 'text-red-700' },
 ];
 
-const PENDING_STATUSES = ['pending', 'confirmed', 'shipped'];
+const PENDING_STATUSES = ['pending', 'confirmed', 'processing', 'shipped'];
 
 function getStatusBadgeClass(status: string) {
   switch (status.toLowerCase()) {
@@ -69,11 +70,15 @@ function getStatusBadgeClass(status: string) {
       return 'bg-yellow-50 text-yellow-700 border border-yellow-200';
     case 'confirmed':
       return 'bg-blue-50 text-blue-700 border border-blue-200';
+    case 'processing':
+      return 'bg-indigo-50 text-indigo-700 border border-indigo-200';
     case 'shipped':
       return 'bg-purple-50 text-purple-700 border border-purple-200';
     case 'delivered':
       return 'bg-green-50 text-green-700 border border-green-200';
     case 'cancelled':
+      return 'bg-red-50 text-red-700 border border-red-200';
+    case 'returned':
       return 'bg-red-50 text-red-700 border border-red-200';
     default:
       return 'bg-gray-50 text-gray-700 border border-gray-200';
@@ -84,6 +89,7 @@ function getStatusLabel(status: string) {
   const labels: Record<string, string> = {
     pending: 'অপেক্ষমাণ',
     confirmed: 'কনফার্মড',
+    processing: 'প্রসেসিং',
     shipped: 'শিপড',
     delivered: 'ডেলিভারড',
     cancelled: 'বাতিল',
@@ -144,7 +150,6 @@ export default function Earnings() {
           const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
           
-          // Same profit rule as Dashboard and Withdraw (src/lib/profit.ts)
           const actualProfit = getOrderProfit(data, productMap);
 
           return {
@@ -161,16 +166,17 @@ export default function Earnings() {
         });
 
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
-        const deliveredOrders = fetchedOrders.filter((order) => order.status === 'delivered');
+        const deliveredOrders = fetchedOrders.filter((order) => order.status.toLowerCase() === 'delivered');
         const deliveredSales = deliveredOrders.reduce((sum, order) => sum + order.total, 0);
         const pendingAmount = fetchedOrders
-          .filter((order) => PENDING_STATUSES.includes(order.status))
+          .filter((order) => PENDING_STATUSES.includes(order.status.toLowerCase()))
           .reduce((sum, order) => sum + order.total, 0);
         const actualProfit = deliveredOrders.reduce((sum, order) => sum + order.actualProfit, 0);
 
+        // pending, approved এবং paid সব রিকোয়েস্টই কেটে ব্যালেন্স সুরক্ষিত রাখা হয়েছে
         const totalWithdrawn = withdrawSnap.docs
           .map((d) => d.data())
-          .filter((d) => d.status === 'approved' || d.status === 'paid')
+          .filter((d) => ['pending', 'approved', 'paid'].includes(d.status))
           .reduce((sum, d) => sum + (typeof d.amount === 'number' ? d.amount : 0), 0);
 
         const availableBalance = actualProfit + referralBonus - totalWithdrawn;
@@ -205,7 +211,7 @@ export default function Earnings() {
   ];
 
   const breakdown: Breakdown[] = BREAKDOWN_CONFIG.map(({ status, textClass }) => {
-    const matching = orders.filter((order) => order.status === status);
+    const matching = orders.filter((order) => order.status.toLowerCase() === status);
     return {
       status,
       count: matching.length,
@@ -296,7 +302,7 @@ export default function Earnings() {
 
             {stats.totalWithdrawn > 0 && (
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-400">আগে তুলেছেন</span>
+                <span className="text-gray-400">উত্তোলন / প্রক্রিয়াধীন</span>
                 <span className="font-bold text-red-400">
                   -Tk {stats.totalWithdrawn.toLocaleString()}
                 </span>
