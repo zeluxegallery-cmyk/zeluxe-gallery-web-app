@@ -31,12 +31,41 @@ import {
   BellOff,
 } from 'lucide-react';
 import { auth, db, messaging } from '../firebase';
-import { getOrderProfit } from '../lib/profit';
 import {
   REFERRAL_BONUS_AMOUNT,
   generateUniqueReferralCode,
   publishReferralCode,
 } from '../lib/referral';
+
+type OrderItemLike = {
+  resellerPrice?: number;
+  sellingPrice?: number;
+  quantity?: number;
+};
+
+function calculateProfit(data: any, productMap?: Record<string, number>): number {
+  if (typeof data.profit === 'number' && Number.isFinite(data.profit)) {
+    return data.profit;
+  }
+
+  if (Array.isArray(data.items) && data.items.length > 0) {
+    return (data.items as OrderItemLike[]).reduce((sum, item) => {
+      const resP = Number(item.resellerPrice) || 0;
+      const sellP = Number(item.sellingPrice) || 0;
+      const qty = Number(item.quantity) || 1;
+      return sum + (sellP - resP) * qty;
+    }, 0);
+  }
+
+  const quantity = Number(data.quantity) || 1;
+  const sellingPrice = Number(data.sellingPrice) || 0;
+  const resellerPrice =
+    Number(data.resellerPrice) ||
+    (productMap && data.productId ? productMap[data.productId] || 0 : 0);
+
+  const profit = (sellingPrice - resellerPrice) * quantity;
+  return Number.isFinite(profit) ? Math.max(0, profit) : 0;
+}
 
 type Order = {
   id: string;
@@ -71,7 +100,9 @@ type Stats = {
   pendingOrders: number;
   deliveredOrders: number;
   totalSales: number;
-  actualProfit: number;
+  deliveredProfit: number;
+  pendingProfit: number;
+  totalProfit: number;
   availableBalance: number;
   todayOrders: number;
   todaySales: number;
@@ -89,7 +120,9 @@ const initialStats: Stats = {
   pendingOrders: 0,
   deliveredOrders: 0,
   totalSales: 0,
-  actualProfit: 0,
+  deliveredProfit: 0,
+  pendingProfit: 0,
+  totalProfit: 0,
   availableBalance: 0,
   todayOrders: 0,
   todaySales: 0,
@@ -226,7 +259,7 @@ export default function ResellerDashboard() {
 
       setLoadError(false);
 
-      // ১. নোটিফিকেশন
+      // ১. নোটিফিকেশন লোড
       getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)))
         .then((notifSnap) => {
           if (cancelled) return;
@@ -245,7 +278,7 @@ export default function ResellerDashboard() {
         })
         .catch(() => {});
 
-      // ২. ফিচার্ড প্রোডাক্ট
+      // ২. ফিচার্ড প্রোডাক্টস লোড
       getDocs(collection(db, 'products'))
         .then((productsSnap) => {
           if (cancelled) return;
@@ -275,7 +308,7 @@ export default function ResellerDashboard() {
           if (!cancelled) setProductsLoading(false);
         });
 
-      // ৩. রেফারেল তথ্য
+      // ৩. রেফারেল তথ্য লোড
       getDoc(doc(db, 'users', uid))
         .then(async (userDoc) => {
           if (!userDoc.exists() || cancelled) return;
@@ -310,37 +343,21 @@ export default function ResellerDashboard() {
           if (!cancelled) setRefLoading(false);
         });
 
-      // ৪. প্রফিট ও ব্যালেন্স হিসাব
+      // ৪. ব্যালেন্স ও প্রফিট হিসাব (Withdraw পেজের সাথে ১০০% মিল রাখা হলো)
       try {
         const userDocSnap = await getDoc(doc(db, 'users', uid)).catch(() => null);
         const userInfo = userDocSnap && userDocSnap.exists() ? userDocSnap.data() : null;
 
-        // অর্ডার ফেচ
-        const ordersSnapshot = await getDocs(
-          query(collection(db, 'orders'), where('resellerId', '==', uid))
-        );
-
-        // উইথড্র ফেচ (ব্যর্থ হলেও যেন ০ ধরে বাকি হিসাব চলে)
-        let totalWithdrawn = 0;
-        try {
-          const withdrawSnap = await getDocs(
-            query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid))
-          );
-          totalWithdrawn = withdrawSnap.docs
-            .map((d) => d.data())
-            .filter((d) => ['pending', 'approved', 'paid'].includes(d.status))
-            .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
-        } catch {
-          totalWithdrawn = 0;
-        }
+        const [ordersSnapshot, withdrawSnap] = await Promise.all([
+          getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid))),
+          getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid))).catch(() => ({ docs: [] } as any)),
+        ]);
 
         const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
           const data = orderDocument.data();
           const quantity = Number(data.quantity) || 1;
           const sellingPrice = Number(data.sellingPrice) || 0;
-
-          // Same profit rule as Earnings and Withdraw (src/lib/profit.ts)
-          const actualProfit = getOrderProfit(data);
+          const actualProfit = calculateProfit(data);
 
           return {
             id: orderDocument.id,
@@ -356,6 +373,12 @@ export default function ResellerDashboard() {
           };
         });
 
+        // মোট উত্তোলন বা পেন্ডিং উত্তোলন
+        const totalWithdrawn = withdrawSnap.docs
+          .map((d: any) => d.data())
+          .filter((d: any) => ['pending', 'approved', 'paid'].includes(d.status))
+          .reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+
         const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
         const pendingOrders = fetchedOrders.filter((order) =>
           PENDING_STATUSES.includes(order.status.toLowerCase())
@@ -364,15 +387,29 @@ export default function ResellerDashboard() {
           (order) => order.status.toLowerCase() === 'delivered'
         ).length;
 
-        // Only delivered orders count as profit (same as Earnings and Withdraw)
-        const totalProfitSum = fetchedOrders
+        // ✅ শুধুমাত্র সফলভাবে ডেলিভার্ড হওয়া অর্ডারের লাভ (Withdraw পেজের মতো)
+        const deliveredProfit = fetchedOrders
           .filter((order) => order.status.toLowerCase() === 'delivered')
+          .reduce((sum, order) => sum + order.actualProfit, 0);
+
+        // অপেক্ষমাণ (পেন্ডিং/শিপড) অর্ডারের লাভ
+        const pendingProfit = fetchedOrders
+          .filter((order) => PENDING_STATUSES.includes(order.status.toLowerCase()))
+          .reduce((sum, order) => sum + order.actualProfit, 0);
+
+        // সব অর্ডারের মোট লাভ
+        const totalProfit = fetchedOrders
+          .filter(
+            (order) =>
+              order.status.toLowerCase() !== 'cancelled' &&
+              order.status.toLowerCase() !== 'returned'
+          )
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
         const referralBonus = Number(userInfo?.referralBonusEarned) || 0;
 
-        // Available Balance = ডেলিভারড প্রফিট + রেফারেল - (pending/approved/paid উইথড্র)
-        const computedBalance = totalProfitSum + referralBonus - totalWithdrawn;
+        // ✅ Available Balance = ডেলিভার্ড প্রফিট + রেফারেল বোনাস - মোট উইথড্র
+        const computedBalance = deliveredProfit + referralBonus - totalWithdrawn;
         const availableBalance = Math.max(0, computedBalance);
 
         const now = new Date();
@@ -385,8 +422,10 @@ export default function ResellerDashboard() {
           pendingOrders,
           deliveredOrders,
           totalSales,
-          actualProfit: totalProfitSum,
-          availableBalance,
+          deliveredProfit,
+          pendingProfit,
+          totalProfit,
+          availableBalance, // এখন Withdraw পেজের মতো সমান দেখাবে
           todayOrders: todayOrders.length,
           todaySales,
           referralBonus,
@@ -583,7 +622,7 @@ export default function ResellerDashboard() {
         </div>
       ) : null}
 
-      {/* 🌟 Available Balance Card 🌟 */}
+      {/* ═══ AVAILABLE BALANCE CARD ═══ */}
       {statsLoading ? (
         <SkeletonBlock className="mb-5 h-32" />
       ) : (
@@ -604,11 +643,21 @@ export default function ResellerDashboard() {
 
               <div className="mt-2.5 flex flex-wrap items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-md bg-gray-50 px-2 py-1 text-[11px] font-medium text-gray-600 border border-gray-100">
-                  Profit:{' '}
+                  Delivered Profit:{' '}
                   <strong className="text-zeluxe-black font-number">
-                    Tk {stats.actualProfit.toLocaleString()}
+                    Tk {stats.deliveredProfit.toLocaleString()}
                   </strong>
                 </span>
+
+                {stats.pendingProfit > 0 && (
+                  <span className="inline-flex items-center gap-1.5 rounded-md bg-yellow-50 px-2 py-1 text-[11px] font-medium text-yellow-700 border border-yellow-200">
+                    Pending Profit:{' '}
+                    <strong className="text-yellow-800 font-number">
+                      Tk {stats.pendingProfit.toLocaleString()}
+                    </strong>
+                  </span>
+                )}
+
                 {stats.referralBonus > 0 && (
                   <span className="inline-flex items-center gap-1.5 rounded-md bg-green-50 px-2 py-1 text-[11px] font-medium text-green-700 border border-green-100">
                     Referral:{' '}
@@ -712,12 +761,12 @@ export default function ResellerDashboard() {
               </div>
               <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
                 Tk{' '}
-                {stats.actualProfit > 9999
-                  ? (stats.actualProfit / 1000).toFixed(1) + 'k'
-                  : stats.actualProfit.toLocaleString()}
+                {stats.totalProfit > 9999
+                  ? (stats.totalProfit / 1000).toFixed(1) + 'k'
+                  : stats.totalProfit.toLocaleString()}
               </p>
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
-                Profit
+                Total Profit
               </p>
             </div>
           </div>
