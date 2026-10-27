@@ -102,7 +102,8 @@ export default function AdminReports() {
           report.totalSales += order.total;
 
           let orderProfit = 0;
-          if (order.items && order.items.length > 0) {
+          // Admin profit counts only delivered orders (cancelled, returned and pending orders earn nothing)
+          if (order.status === 'delivered' && order.items && order.items.length > 0) {
             orderProfit = order.items.reduce((sum, item) => {
               const resellerP = item.resellerPrice || 0;
               const purchaseP = item.purchaseCost || 0;
