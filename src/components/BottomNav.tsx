@@ -17,12 +17,19 @@ const items: NavEntry[] = [
 ];
 
 export default function BottomNav() {
-  const location =useLocation();
+  const location = useLocation();
 
-  const isActive = (path: string) => location.pathname === path;
+  // /products/123 এ গেলেও "Products" ট্যাব জ্বলে থাকবে
+  const isActive = (path: string) => {
+    const current = location.pathname;
+    if (path === '/orders') {
+      return current === '/orders' || (current.startsWith('/orders/') && current !== '/orders/new');
+    }
+    return current === path || current.startsWith(`${path}/`);
+  };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-[99999] grid h-16 grid-cols-5 border-t border-zeluxe-lightgray bg-white/95 backdrop-blur-md shadow-[0_-4px_25px_rgba(0,0,0,0.1)] md:hidden pb-[env(safe-area-inset-bottom)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-20 grid h-16 grid-cols-5 border-t border-zeluxe-lightgray bg-white/95 backdrop-blur-md shadow-[0_-4px_25px_rgba(0,0,0,0.1)] md:hidden pb-[env(safe-area-inset-bottom)]">
       {items.map(({ label, path, icon: Icon, elevated }) => {
         const active = isActive(path);
 
@@ -34,7 +41,7 @@ export default function BottomNav() {
               className="flex flex-col items-center justify-center relative"
               aria-label="New order"
             >
-              <span className="-mt-6 flex h-13 w-13 items-center justify-center rounded-full bg-zeluxe-gold text-zeluxe-black shadow-xl transition transform active:scale-95">
+              <span className="-mt-6 flex h-14 w-14 items-center justify-center rounded-full bg-zeluxe-gold text-zeluxe-black shadow-xl transition transform active:scale-95">
                 <Icon size={26} />
               </span>
             </Link>
@@ -57,3 +64,4 @@ export default function BottomNav() {
     </nav>
   );
 }
+
