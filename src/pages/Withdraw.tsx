@@ -96,8 +96,20 @@ export default function Withdraw() {
   }, []);
 
   // Order Profit (only delivered)
+  // Same rule as Dashboard and Earnings: new orders use the prices saved inside items[],
+  // old orders (no items[]) fall back to the product's current reseller price.
   const orderProfit = orders.reduce((sum, order) => {
     if (order.status !== 'delivered') return sum;
+    if (Array.isArray(order.items) && order.items.length > 0) {
+      const itemsProfit = order.items.reduce(
+        (itemSum: number, item: { sellingPrice?: number; resellerPrice?: number; quantity?: number }) =>
+          itemSum +
+          ((Number(item.sellingPrice) || 0) - (Number(item.resellerPrice) || 0)) *
+            (Number(item.quantity) || 0),
+        0,
+      );
+      return sum + itemsProfit;
+    }
     const product = products.find((p) => p.id === order.productId);
     if (!product) return sum;
     const resellerPrice = Number(product.resellerPrice) || 0;
