@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { auth, db } from '../firebase';
+import { getOrderProfit } from '../lib/profit';
 
 type Order = {
   id: string;
@@ -143,18 +144,8 @@ export default function Earnings() {
           const sellingPrice = typeof data.sellingPrice === 'number' ? data.sellingPrice : 0;
           const productId = typeof data.productId === 'string' ? data.productId : '';
           
-          let actualProfit = 0;
-          if (Array.isArray(data.items) && data.items.length > 0) {
-            actualProfit = data.items.reduce((sum: number, item: any) => {
-              const sellP = item.sellingPrice || 0;
-              const resP = item.resellerPrice || 0;
-              const qty = item.quantity || 0;
-              return sum + ((sellP - resP) * qty);
-            }, 0);
-          } else {
-            const resellerPrice = productMap[productId] || 0;
-            actualProfit = (sellingPrice - resellerPrice) * quantity;
-          }
+          // Same profit rule as Dashboard and Withdraw (src/lib/profit.ts)
+          const actualProfit = getOrderProfit(data, productMap);
 
           return {
             id: orderDoc.id,
