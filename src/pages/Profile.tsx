@@ -228,7 +228,7 @@ export default function Profile() {
     userData.bio;
 
   return (
-    <div className="mx-auto max-w-2xl pb-10 transform-gpu">
+    <div className="mx-auto max-w-2xl pb-10">
       {/* Avatar Section */}
       <div className="mb-6 text-center">
         <div className="relative mx-auto inline-block">
@@ -659,3 +659,4 @@ function InfoRow({ icon: Icon, label, value, isLast = false }: any) {
     </div>
   );
 }
+
