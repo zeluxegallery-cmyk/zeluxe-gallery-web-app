@@ -31,6 +31,7 @@ import {
   BellOff,
 } from 'lucide-react';
 import { auth, db, messaging } from '../firebase';
+import { getOrderProfit } from '../lib/profit';
 import {
   REFERRAL_BONUS_AMOUNT,
   generateUniqueReferralCode,
@@ -327,7 +328,7 @@ export default function ResellerDashboard() {
           );
           totalWithdrawn = withdrawSnap.docs
             .map((d) => d.data())
-            .filter((d) => d.status === 'approved' || d.status === 'paid')
+            .filter((d) => ['pending', 'approved', 'paid'].includes(d.status))
             .reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
         } catch {
           totalWithdrawn = 0;
@@ -337,24 +338,9 @@ export default function ResellerDashboard() {
           const data = orderDocument.data();
           const quantity = Number(data.quantity) || 1;
           const sellingPrice = Number(data.sellingPrice) || 0;
-          const resellerPrice = Number(data.resellerPrice) || 0;
 
-          // ফায়ারস্টোরে সেভ থাকা profit কে প্রাধান্য দেওয়া
-          let actualProfit = 0;
-          if (typeof data.profit === 'number' && !isNaN(data.profit)) {
-            actualProfit = data.profit;
-          } else if (Array.isArray(data.items) && data.items.length > 0) {
-            actualProfit = data.items.reduce((sum: number, item: any) => {
-              const rPrice = Number(item.resellerPrice) || 0;
-              const sPrice = Number(item.sellingPrice) || 0;
-              const qty = Number(item.quantity) || 1;
-              return sum + (sPrice - rPrice) * qty;
-            }, 0);
-          } else {
-            actualProfit = (sellingPrice - resellerPrice) * quantity;
-          }
-
-          actualProfit = isNaN(actualProfit) ? 0 : Math.max(0, actualProfit);
+          // Same profit rule as Earnings and Withdraw (src/lib/profit.ts)
+          const actualProfit = getOrderProfit(data);
 
           return {
             id: orderDocument.id,
@@ -378,18 +364,14 @@ export default function ResellerDashboard() {
           (order) => order.status.toLowerCase() === 'delivered'
         ).length;
 
-        // সকল কার্যকর অর্ডারের মোট প্রফিট (বাতিল ছাড়া)
+        // Only delivered orders count as profit (same as Earnings and Withdraw)
         const totalProfitSum = fetchedOrders
-          .filter(
-            (order) =>
-              order.status.toLowerCase() !== 'cancelled' &&
-              order.status.toLowerCase() !== 'returned'
-          )
+          .filter((order) => order.status.toLowerCase() === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
         const referralBonus = Number(userInfo?.referralBonusEarned) || 0;
 
-        // 🌟 Available Balance হিসাব (সরাসরি কার্যকর প্রফিট + রেফারেল - উইথড্র)
+        // Available Balance = ডেলিভারড প্রফিট + রেফারেল - (pending/approved/paid উইথড্র)
         const computedBalance = totalProfitSum + referralBonus - totalWithdrawn;
         const availableBalance = Math.max(0, computedBalance);
 
