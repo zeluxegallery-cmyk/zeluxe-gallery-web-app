@@ -8,6 +8,7 @@ import {
   serverTimestamp,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import {
   CheckCircle,
@@ -117,15 +118,27 @@ export default function AdminMemberships() {
     if (!window.confirm(`${req.name} এর membership approve করবেন?`)) return;
     setProcessingId(req.id);
     try {
-      await updateDoc(doc(db, 'users', req.uid), {
+      const requestRef = doc(db, 'membershipRequests', req.id);
+
+      // Read the latest status first: a second click or a second admin must not approve (and pay the referral bonus) twice
+      const freshSnap = await getDoc(requestRef);
+      if (!freshSnap.exists() || freshSnap.data().status !== 'pending') {
+        toast.error('এই রিকোয়েস্ট আগেই প্রসেস করা হয়েছে');
+        await loadRequests();
+        return;
+      }
+
+      // User and request change together, or not at all
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', req.uid), {
         accountStatus: 'active',
         membershipStatus: 'approved',
       });
-
-      await updateDoc(doc(db, 'membershipRequests', req.id), {
+      batch.update(requestRef, {
         status: 'approved',
         approvedAt: serverTimestamp(),
       });
+      await batch.commit();
 
       if (req.referredBy) {
         const credited = await creditReferrer(req.referredBy);
