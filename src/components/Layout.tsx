@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { signOut } from 'firebase/auth';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
 import {
   LayoutDashboard,
   LogOut,
@@ -15,7 +16,7 @@ import {
   Headphones,
   Gift,
 } from 'lucide-react';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import BottomNav from './BottomNav';
 import LogoutModal from './LogoutModal';
 
@@ -44,17 +45,57 @@ export default function Layout() {
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showLogout, setShowLogout] = useState(false);
-  
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  // ফায়ারস্টোর থেকে ইউজারের আপলোড করা আসল প্রোফাইল ছবি (avatarUrl) লোড করা
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAvatar = async () => {
+      await auth.authStateReady();
+      const user = auth.currentUser;
+      if (!user) return;
+
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        if (userDoc.exists() && !cancelled) {
+          const data = userDoc.data();
+          if (typeof data.avatarUrl === 'string' && data.avatarUrl.trim() !== '') {
+            setAvatarUrl(data.avatarUrl);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to load user avatar:', err);
+      }
+    };
+
+    void loadAvatar();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pathname]); // প্রোফাইলে ছবি পরিবর্তন করে অন্য পেজে এলে সাথে সাথে আপডেট হবে
+
   const confirmLogout = async () => {
-    setShowLogout(false);
-    await signOut(auth);
-    navigate('/login');
+    try {
+      setShowLogout(false);
+      localStorage.removeItem('zeluxe_cart');
+      await signOut(auth);
+      navigate('/login', { replace: true });
+    } catch (err) {
+      console.error('Logout failed:', err);
+    }
   };
 
   const isActive = (path: string) => {
     if (path === '/reseller-dashboard') return location.pathname === path;
     return location.pathname.startsWith(path);
   };
+
+  const userInitial =
+    auth.currentUser?.displayName?.charAt(0).toUpperCase() ||
+    auth.currentUser?.email?.charAt(0).toUpperCase() ||
+    'U';
 
   return (
     <div className="min-h-screen bg-zeluxe-cream">
@@ -67,25 +108,33 @@ export default function Layout() {
         >
           <Menu className="h-6 w-6" />
         </button>
+
         <img
           src={LOGO_URL}
           alt="Zeluxe Gallery"
           className="h-8 w-auto object-contain"
         />
-        {/* ═══ User Profile Picture / Initial Avatar ═══ */}
-        <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-zeluxe-black text-sm font-bold text-zeluxe-gold border border-zeluxe-gold/30">
-          {auth.currentUser?.photoURL ? (
-            <img 
-              src={auth.currentUser.photoURL} 
-              alt="Profile" 
+
+        {/* ═══ User Profile Picture / Clickable Avatar ═══ */}
+        <Link
+          to="/profile"
+          className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-full border-2 border-zeluxe-gold/50 bg-zeluxe-black text-sm font-bold text-zeluxe-gold shadow-sm transition active:scale-95 hover:border-zeluxe-gold"
+          title="প্রোফাইল দেখুন"
+        >
+          {avatarUrl ? (
+            <img
+              src={
+                avatarUrl.includes('res.cloudinary.com')
+                  ? avatarUrl.replace('/upload/', '/upload/q_auto,f_auto,w_100/')
+                  : avatarUrl
+              }
+              alt="Profile"
               className="h-full w-full object-cover"
             />
           ) : (
-            auth.currentUser?.displayName?.charAt(0).toUpperCase() ||
-            auth.currentUser?.email?.charAt(0).toUpperCase() ||
-            'U'
+            <span>{userInitial}</span>
           )}
-        </div>
+        </Link>
       </header>
 
       {isOpen && (
@@ -117,7 +166,29 @@ export default function Layout() {
           </button>
         </div>
 
-        <nav className="flex-1 space-y-1 px-3 overflow-y-auto" aria-label="Main navigation">
+        {/* Desktop Profile Quick View */}
+        <div className="hidden border-b border-zeluxe-lightgray px-4 py-3 md:flex md:items-center md:gap-3">
+          <Link
+            to="/profile"
+            className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full border border-zeluxe-gold/40 bg-zeluxe-black font-bold text-zeluxe-gold"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
+            ) : (
+              <span>{userInitial}</span>
+            )}
+          </Link>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-bold text-zeluxe-black">
+              {auth.currentUser?.displayName || 'Reseller'}
+            </p>
+            <p className="truncate text-[10px] text-gray-400">
+              {auth.currentUser?.email}
+            </p>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-1 px-3 overflow-y-auto pt-2" aria-label="Main navigation">
           {resellerNav.map(({ label, path, icon: Icon }) => (
             <Link
               key={path}
@@ -158,7 +229,7 @@ export default function Layout() {
         </div>
       </main>
 
-      {/* ═══ Portal ব্যবহার করে সরাসরি body-তে রেন্ডার করা হলো ═══ */}
+      {/* ═══ BottomNav Portal ═══ */}
       {createPortal(<BottomNav />, document.body)}
 
       {/* Custom Logout Modal */}
