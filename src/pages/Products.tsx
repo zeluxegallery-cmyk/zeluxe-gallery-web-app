@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   collection,
   getDocs,
@@ -84,6 +84,7 @@ const getOrderIndex = (name: string) => {
 const INITIAL_VISIBLE_COUNT = 20;
 const LOAD_MORE_COUNT = 20;
 const ALL_CATEGORIES = 'All Categories';
+const CATEGORY_STORAGE_KEY = 'zeluxe_selected_category';
 
 type ProductsCache = {
   uid: string;
@@ -143,12 +144,20 @@ function buildCategories(docs: QueryDocumentSnapshot<DocumentData>[]): Category[
 }
 
 export default function Products() {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // ক্যাটাগরি প্রিজার্ভেশন লজিক (URL Search Params ও sessionStorage সিঙ্ক)
+  const categoryFromUrl = searchParams.get('category');
+  const savedCategory = sessionStorage.getItem(CATEGORY_STORAGE_KEY);
+  const initialCategory = categoryFromUrl || savedCategory || ALL_CATEGORIES;
+
   const cached = productsCache && productsCache.uid === auth.currentUser?.uid ? productsCache : null;
 
   const [products, setProducts] = useState<Product[]>(cached?.products ?? []);
   const [categories, setCategories] = useState<Category[]>(cached?.categories ?? []);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORIES);
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory);
   const [visibleCount, setVisibleCount] = useState(INITIAL_VISIBLE_COUNT);
   const [loading, setLoading] = useState(!cached);
   const [allLoaded, setAllLoaded] = useState(!!cached);
@@ -158,6 +167,27 @@ export default function Products() {
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+
+  // URL পরিবর্তন হলে স্টেট আপডেট
+  useEffect(() => {
+    if (categoryFromUrl && categoryFromUrl !== selectedCategory) {
+      setSelectedCategory(categoryFromUrl);
+      sessionStorage.setItem(CATEGORY_STORAGE_KEY, categoryFromUrl);
+    }
+  }, [categoryFromUrl]);
+
+  // ক্যাটাগরি নির্বাচনের কেন্দ্রীয় হ্যান্ডলার
+  const handleSelectCategory = (catName: string) => {
+    setSelectedCategory(catName);
+    sessionStorage.setItem(CATEGORY_STORAGE_KEY, catName);
+    if (catName === ALL_CATEGORIES) {
+      searchParams.delete('category');
+      setSearchParams(searchParams, { replace: true });
+    } else {
+      searchParams.set('category', catName);
+      setSearchParams(searchParams, { replace: true });
+    }
+  };
 
   const prefetchProduct = (productId: string) => {
     if (productDetailCache.has(productId)) return;
@@ -335,7 +365,7 @@ export default function Products() {
         
         <div className="flex gap-4 overflow-x-auto pb-3 snap-x hide-scrollbar">
           <button
-            onClick={() => setSelectedCategory(ALL_CATEGORIES)}
+            onClick={() => handleSelectCategory(ALL_CATEGORIES)}
             className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
           >
             <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === ALL_CATEGORIES ? 'border-zeluxe-gold bg-zeluxe-gold/10 shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
@@ -348,13 +378,14 @@ export default function Products() {
 
           {displayedCategories.map((cat) => {
             const displayName = getDisplayCategoryName(cat.name);
+            const isSelected = selectedCategory === cat.name || selectedCategory === displayName;
             return (
               <button
                 key={cat.id}
-                onClick={() => setSelectedCategory(cat.name)}
+                onClick={() => handleSelectCategory(cat.name)}
                 className="flex flex-col items-center gap-2 min-w-[72px] snap-start group"
               >
-                <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name || selectedCategory === displayName ? 'border-zeluxe-gold shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
+                <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${isSelected ? 'border-zeluxe-gold shadow-sm' : 'border-gray-200 bg-white group-hover:border-zeluxe-gold/50'}`}>
                   {cat.imageUrl ? (
                     <img 
                       src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
@@ -366,7 +397,7 @@ export default function Products() {
                     <Package size={24} className="text-gray-400" />
                   )}
                 </div>
-                <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[72px] ${selectedCategory === cat.name || selectedCategory === displayName ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[72px] ${isSelected ? 'text-zeluxe-black' : 'text-gray-500'}`}>
                   {displayName}
                 </span>
               </button>
@@ -415,12 +446,16 @@ export default function Products() {
         <>
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
             {displayedProducts.map((product, index) => (
-              <Link
+              <div
                 key={product.id}
-                to={`/products/${product.id}`}
+                onClick={() => {
+                  navigate(`/products/${product.id}`, {
+                    state: { fromCategory: selectedCategory },
+                  });
+                }}
                 onMouseEnter={() => prefetchProduct(product.id)}
                 onTouchStart={() => prefetchProduct(product.id)}
-                className="group flex flex-col overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
+                className="group flex flex-col cursor-pointer overflow-hidden rounded-2xl bg-white shadow-card border border-gray-50 transition hover:-translate-y-0.5 hover:shadow-md"
               >
                 <div className="relative aspect-square overflow-hidden bg-zeluxe-cream">
                   {product.imageUrl ? (
@@ -509,7 +544,7 @@ export default function Products() {
                     </div>
                   </div>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
 
@@ -549,7 +584,7 @@ export default function Products() {
             <button
               onClick={() => {
                 setSearchTerm('');
-                setSelectedCategory(ALL_CATEGORIES);
+                handleSelectCategory(ALL_CATEGORIES);
               }}
               className="mt-3 text-sm font-bold text-zeluxe-gold hover:underline"
             >
@@ -576,7 +611,7 @@ export default function Products() {
             <div className="flex-1 overflow-y-auto p-4">
               <div className="grid grid-cols-3 gap-y-6 gap-x-2">
                 <button
-                  onClick={() => { setSelectedCategory(ALL_CATEGORIES); setIsCategoryModalOpen(false); }}
+                  onClick={() => { handleSelectCategory(ALL_CATEGORIES); setIsCategoryModalOpen(false); }}
                   className="flex flex-col items-center gap-2 group"
                 >
                   <div className={`flex h-16 w-16 items-center justify-center rounded-full border-2 transition-all ${selectedCategory === ALL_CATEGORIES ? 'border-zeluxe-gold bg-zeluxe-gold/10' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
@@ -589,13 +624,14 @@ export default function Products() {
 
                 {categories.map((cat) => {
                   const displayName = getDisplayCategoryName(cat.name);
+                  const isSelected = selectedCategory === cat.name || selectedCategory === displayName;
                   return (
                     <button
                       key={cat.id}
-                      onClick={() => { setSelectedCategory(cat.name); setIsCategoryModalOpen(false); }}
+                      onClick={() => { handleSelectCategory(cat.name); setIsCategoryModalOpen(false); }}
                       className="flex flex-col items-center gap-2 group"
                     >
-                      <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${selectedCategory === cat.name || selectedCategory === displayName ? 'border-zeluxe-gold' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
+                      <div className={`flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 transition-all ${isSelected ? 'border-zeluxe-gold' : 'border-gray-100 bg-gray-50 group-hover:border-zeluxe-gold/50'}`}>
                         {cat.imageUrl ? (
                           <img 
                             src={cat.imageUrl.includes('res.cloudinary.com') ? cat.imageUrl.replace('/upload/', '/upload/q_auto,f_auto,w_150/') : cat.imageUrl} 
@@ -607,7 +643,7 @@ export default function Products() {
                           <Package size={24} className="text-gray-400" />
                         )}
                       </div>
-                      <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[76px] ${selectedCategory === cat.name || selectedCategory === displayName ? 'text-zeluxe-black' : 'text-gray-500'}`}>
+                      <span className={`text-[11px] font-bold text-center line-clamp-2 leading-tight w-[76px] ${isSelected ? 'text-zeluxe-black' : 'text-gray-500'}`}>
                         {displayName}
                       </span>
                     </button>
