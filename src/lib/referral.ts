@@ -7,6 +7,7 @@ import {
   query,
   where,
   updateDoc,
+  increment,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -140,9 +141,10 @@ export async function creditReferrer(referrerUid: string): Promise<boolean> {
     const newBonus = currentBonus + REFERRAL_BONUS_AMOUNT;
     const newCount = currentCount + 1;
 
+    // increment() adds on the server, so two approvals at the same moment cannot overwrite each other
     await updateDoc(referrerRef, {
-      referralBonusEarned: newBonus,
-      referralCount: newCount,
+      referralBonusEarned: increment(REFERRAL_BONUS_AMOUNT),
+      referralCount: increment(1),
       lastReferralAt: new Date().toISOString(),
     });
 
@@ -235,3 +237,4 @@ export function buildReferralLink(code: string): string {
   const baseUrl = 'https://zeluxe-gallery-web-app.vercel.app';
   return `${baseUrl}/register?ref=${code}`;
 }
+
