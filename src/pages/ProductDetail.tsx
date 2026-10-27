@@ -452,7 +452,7 @@ export default function ProductDetail() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl pb-24 transform-gpu transition-all">
+    <div className="mx-auto max-w-5xl pb-24">
       <Link
         to="/products"
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-zeluxe-gold"
@@ -829,3 +829,4 @@ export default function ProductDetail() {
     </div>
   );
 }
+
