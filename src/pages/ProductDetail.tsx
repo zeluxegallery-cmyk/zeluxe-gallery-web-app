@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import {
   collection,
   doc,
@@ -45,6 +45,13 @@ type Product = {
 export default function ProductDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // পূর্ববর্তী পেজ থেকে আসা ক্যাটাগরি বা সেশন থেকে রিড করা
+  const previousCategory =
+    (location.state as { fromCategory?: string } | null)?.fromCategory ||
+    sessionStorage.getItem('zeluxe_selected_category') ||
+    'All';
 
   const [product, setProduct] = useState<Product | null>(() => {
     // @ts-ignore
@@ -64,8 +71,11 @@ export default function ProductDetail() {
         ? data.colors.filter((c: any) => typeof c === 'string')
         : [];
 
+      // সাইজ অ্যারে থেকে অনাকাঙ্ক্ষিত URL ফিল্টার করা
       const sizes: string[] = Array.isArray(data.sizes)
-        ? data.sizes.filter((s: any) => typeof s === 'string')
+        ? data.sizes
+            .filter((s: any) => typeof s === 'string')
+            .map((s: string) => (s.startsWith('http') ? 'Free Size' : s))
         : [];
 
       return {
@@ -179,10 +189,11 @@ export default function ProductDetail() {
             )
           : [];
 
+        // সাইজ স্যানিটাইজেশন
         const sizes: string[] = Array.isArray(data.sizes)
-          ? data.sizes.filter(
-              (s: unknown): s is string => typeof s === 'string',
-            )
+          ? data.sizes
+              .filter((s: unknown): s is string => typeof s === 'string')
+              .map((s: string) => (s.startsWith('http') ? 'Free Size' : s))
           : [];
 
         const loadedProduct: Product = {
@@ -280,6 +291,17 @@ export default function ProductDetail() {
     };
   }, [id]);
 
+  // স্মার্ট ব্যাক নেভিগেশন যা আগের ক্যাটাগরি বজায় রাখে
+  const handleBackToProducts = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate(`/products?category=${encodeURIComponent(previousCategory)}`, {
+        state: { selectedCategory: previousCategory },
+      });
+    }
+  };
+
   const handleAddToCart = () => {
     if (!product) return;
 
@@ -335,7 +357,6 @@ export default function ProductDetail() {
         if (Array.isArray(parsed)) existingCart = parsed;
       }
 
-      // Check variant by productId + color + size
       const existingIdx = existingCart.findIndex(
         (item: any) =>
           item.productId === newItem.productId &&
@@ -383,7 +404,6 @@ export default function ProductDetail() {
 
     const finalPrice = Number(sellingPrice) || product.suggestedPrice;
 
-    // সরাসরি /orders/new পেজে রিডাইরেক্ট (কোনো ইন-পেজ মডাল পপআপ ছাড়া)
     navigate(`/orders/new?productId=${product.id}`, {
       state: {
         selectedColor,
@@ -441,65 +461,64 @@ export default function ProductDetail() {
       <div className="rounded-lg border border-dashed border-zeluxe-lightgray bg-white p-12 text-center">
         <Package className="mx-auto h-12 w-12 text-gray-300" />
         <p className="mt-4 text-sm text-gray-600">প্রোডাক্ট পাওয়া যায়নি</p>
-        <Link
-          to="/products"
+        <button
+          onClick={handleBackToProducts}
           className="mt-4 inline-block text-sm font-bold text-zeluxe-gold hover:underline"
         >
           ← প্রোডাক্টে ফিরে যান
-        </Link>
+        </button>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-5xl pb-24">
-      <Link
-        to="/products"
+      <button
+        type="button"
+        onClick={handleBackToProducts}
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-gray-500 transition hover:text-zeluxe-gold"
       >
         <ArrowLeft size={16} />
         সব প্রোডাক্ট
-      </Link>
+      </button>
 
       <div className="rounded-lg border border-zeluxe-lightgray bg-white p-5 shadow-sm md:p-6">
         <div className="grid gap-6 md:grid-cols-2 md:gap-8">
-          {/* LEFT — Images */}
+          {/* LEFT — Images (Aspect Ratio ও রেসপনসিভ হাইট ফিক্সড) */}
           <div>
-            <div className="group relative overflow-hidden rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream">
-              <div className="relative aspect-square">
-                {product.imageUrls.length > 0 ? (
-                  <>
-                    <img
-                      src={product.imageUrls[activeImage]}
-                      alt={product.name}
-                      className="h-full w-full object-cover transition-transform duration-300 transform-gpu"
-                    />
+            <div className="group relative aspect-square max-h-[460px] w-full overflow-hidden rounded-lg border border-zeluxe-lightgray bg-zeluxe-cream flex items-center justify-center">
+              {product.imageUrls.length > 0 ? (
+                <>
+                  <img
+                    src={product.imageUrls[activeImage]}
+                    alt={product.name}
+                    className="h-full w-full object-contain md:object-cover transition-transform duration-300 transform-gpu"
+                  />
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void handleDownloadSingle(
-                          product.imageUrls[activeImage],
-                          activeImage,
-                        )
-                      }
-                      disabled={downloadingIdx === activeImage}
-                      className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-zeluxe-black shadow-md backdrop-blur-sm transition hover:bg-white active:scale-95 disabled:opacity-50"
-                      title="এই ছবিটি ডাউনলোড করুন"
-                    >
-                      {downloadingIdx === activeImage ? (
-                        <Loader2 size={20} className="animate-spin" />
-                      ) : (
-                        <Download size={20} />
-                      )}
-                    </button>
-                  </>
-                ) : (
-                  <div className="flex h-full items-center justify-center">
-                    <Package className="h-16 w-16 text-gray-300" />
-                  </div>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void handleDownloadSingle(
+                        product.imageUrls[activeImage],
+                        activeImage,
+                      )
+                    }
+                    disabled={downloadingIdx === activeImage}
+                    className="absolute bottom-3 right-3 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-zeluxe-black shadow-md backdrop-blur-sm transition hover:bg-white active:scale-95 disabled:opacity-50"
+                    title="এই ছবিটি ডাউনলোড করুন"
+                  >
+                    {downloadingIdx === activeImage ? (
+                      <Loader2 size={20} className="animate-spin" />
+                    ) : (
+                      <Download size={20} />
+                    )}
+                  </button>
+                </>
+              ) : (
+                <div className="flex h-full items-center justify-center">
+                  <Package className="h-16 w-16 text-gray-300" />
+                </div>
+              )}
             </div>
 
             {product.imageUrls.length > 1 && (
@@ -757,10 +776,15 @@ export default function ProductDetail() {
 
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
             {relatedProducts.map((rp) => (
-              <Link
+              <button
                 key={rp.id}
-                to={`/products/${rp.id}`}
-                className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white transition hover:border-zeluxe-gold"
+                type="button"
+                onClick={() =>
+                  navigate(`/products/${rp.id}`, {
+                    state: { fromCategory: previousCategory },
+                  })
+                }
+                className="group overflow-hidden rounded-lg border border-zeluxe-lightgray bg-white text-left transition hover:border-zeluxe-gold"
               >
                 <div className="aspect-square bg-zeluxe-cream">
                   {rp.imageUrl ? (
@@ -788,7 +812,7 @@ export default function ProductDetail() {
                     </span>
                   </p>
                 </div>
-              </Link>
+              </button>
             ))}
           </div>
         </div>
@@ -829,4 +853,3 @@ export default function ProductDetail() {
     </div>
   );
 }
-
