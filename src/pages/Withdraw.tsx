@@ -23,10 +23,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { auth, db } from '../firebase';
+import { getOrderProfit } from '../lib/profit';
 
 const MIN_WITHDRAW = 500;
 
-// ইনস্ট্যান্ট পেজ ওপেনিংয়ের জন্য মেমোরি ক্যাশ
+// ইনস্ট্যান্ট পেজ ওপেনিংয়ের জন্য মেমোরি ক্যাশ
 let withdrawCache: { userData: any; orders: any[]; products: any[]; withdrawals: any[]; uid: string } | null = null;
 
 export default function Withdraw() {
@@ -95,28 +96,17 @@ export default function Withdraw() {
     void loadData();
   }, []);
 
-  // Order Profit (only delivered)
-  // Same rule as Dashboard and Earnings: new orders use the prices saved inside items[],
-  // old orders (no items[]) fall back to the product's current reseller price.
-  const orderProfit = orders.reduce((sum, order) => {
-    if (order.status !== 'delivered') return sum;
-    if (Array.isArray(order.items) && order.items.length > 0) {
-      const itemsProfit = order.items.reduce(
-        (itemSum: number, item: { sellingPrice?: number; resellerPrice?: number; quantity?: number }) =>
-          itemSum +
-          ((Number(item.sellingPrice) || 0) - (Number(item.resellerPrice) || 0)) *
-            (Number(item.quantity) || 0),
-        0,
-      );
-      return sum + itemsProfit;
-    }
-    const product = products.find((p) => p.id === order.productId);
-    if (!product) return sum;
-    const resellerPrice = Number(product.resellerPrice) || 0;
-    const sellingPrice = Number(order.sellingPrice) || 0;
-    const qty = Number(order.quantity) || 0;
-    return sum + (sellingPrice - resellerPrice) * qty;
-  }, 0);
+  // Order Profit (only delivered orders) - same rule as Dashboard and Earnings (src/lib/profit.ts)
+  const productPrices: Record<string, number> = {};
+  products.forEach((p) => {
+    productPrices[p.id] = Number(p.resellerPrice) || 0;
+  });
+
+  const orderProfit = orders.reduce(
+    (sum, order) =>
+      order.status === 'delivered' ? sum + getOrderProfit(order, productPrices) : sum,
+    0,
+  );
 
   // Referral Bonus
   const referralBonus = Number(userData?.referralBonusEarned) || 0;
@@ -475,4 +465,3 @@ export default function Withdraw() {
     </div>
   );
 }
-
