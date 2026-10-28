@@ -25,7 +25,7 @@ import { toast } from 'sonner';
 import { auth, db } from '../firebase';
 import { getOrderProfit } from '../lib/profit';
 
-const MIN_WITHDRAW = 500;
+const MIN_WITHDRAW = 100;
 
 // ইনস্ট্যান্ট পেজ ওপেনিংয়ের জন্য মেমোরি ক্যাশ
 let withdrawCache: { userData: any; orders: any[]; products: any[]; withdrawals: any[]; uid: string } | null = null;
