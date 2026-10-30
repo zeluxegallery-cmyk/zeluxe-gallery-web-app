@@ -1,7 +1,9 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'sonner';
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db } from './firebase';
 import ScrollToTop from './components/ScrollToTop';
 
 // মূল পেজগুলো
@@ -40,11 +42,86 @@ const AdminNotifications = lazy(() => import('./pages/admin/AdminNotifications')
 const AdminWithdrawals = lazy(() => import('./pages/admin/AdminWithdrawals'));
 const AdminReports = lazy(() => import('./pages/admin/AdminReports'));
 
-const AdminLoader = () => (
-  <div className="flex h-[50vh] items-center justify-center">
+const PageLoader = () => (
+  <div className="flex min-h-[50vh] items-center justify-center">
     <Loader2 className="h-8 w-8 animate-spin text-zeluxe-gold" />
   </div>
 );
+
+// 🛡️ এডমিন প্রোটেক্টেড রুট: শুধু ভেরিফায়েড এডমিন ঢুকতে পারবে
+function AdminProtectedRoute() {
+  const [status, setStatus] = useState<'loading' | 'admin' | 'reseller' | 'unauth'>('loading');
+
+  useEffect(() => {
+    const checkRole = async () => {
+      await auth.authStateReady();
+      const user = auth.currentUser;
+      if (!user) {
+        setStatus('unauth');
+        return;
+      }
+
+      try {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (adminDoc.exists()) {
+          setStatus('admin');
+        } else {
+          setStatus('reseller');
+        }
+      } catch {
+        setStatus('reseller');
+      }
+    };
+
+    void checkRole();
+  }, []);
+
+  if (status === 'loading') return <PageLoader />;
+  if (status === 'unauth') return <Navigate to="/login" replace />;
+  if (status === 'reseller') return <Navigate to="/reseller-dashboard" replace />;
+
+  return (
+    <Suspense fallback={<PageLoader />}>
+      <AdminLayout />
+    </Suspense>
+  );
+}
+
+// 🛡️ রিসেলার প্রোটেক্টেড রুট: এডমিন ঢুকতে চাইলে অটোমেটিক /admin-dashboard এ চলে যাবে
+function ResellerProtectedRoute() {
+  const [status, setStatus] = useState<'loading' | 'admin' | 'reseller' | 'unauth'>('loading');
+
+  useEffect(() => {
+    const checkRole = async () => {
+      await auth.authStateReady();
+      const user = auth.currentUser;
+      if (!user) {
+        setStatus('unauth');
+        return;
+      }
+
+      try {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (adminDoc.exists()) {
+          setStatus('admin'); // এডমিন আইডি হলে চিহ্নিত করা
+        } else {
+          setStatus('reseller');
+        }
+      } catch {
+        setStatus('reseller');
+      }
+    };
+
+    void checkRole();
+  }, []);
+
+  if (status === 'loading') return <PageLoader />;
+  if (status === 'unauth') return <Navigate to="/login" replace />;
+  // এডমিন একাউন্ট থাকলে রিসেলার ড্যাশবোর্ড নয়, সরাসরি এডমিন ড্যাশবোর্ডে পাঠাবে
+  if (status === 'admin') return <Navigate to="/admin-dashboard" replace />;
+
+  return <Layout />;
+}
 
 export default function App() {
   return (
@@ -63,26 +140,15 @@ export default function App() {
           <Route path="/legal" element={<Legal />} />
           <Route path="/faq" element={<FAQ />} />
 
-          {/* Reseller Routes */}
-          <Route element={<Layout />}>
-            <Route
-              path="/reseller-dashboard"
-              element={<ResellerDashboard />}
-            />
-
+          {/* Reseller Protected Routes */}
+          <Route element={<ResellerProtectedRoute />}>
+            <Route path="/reseller-dashboard" element={<ResellerDashboard />} />
             <Route path="/products" element={<Products />} />
             <Route path="/products/:id" element={<ProductDetail />} />
-
             <Route path="/orders" element={<Orders />} />
-
-            {/* মূল Create Order Route */}
             <Route path="/orders/new" element={<CreateOrder />} />
-
-            {/* Checkout Route Alias */}
             <Route path="/checkout" element={<CreateOrder />} />
-
             <Route path="/orders/:id" element={<OrderDetails />} />
-
             <Route path="/earnings" element={<Earnings />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/withdraw" element={<Withdraw />} />
@@ -90,65 +156,21 @@ export default function App() {
             <Route path="/support" element={<Support />} />
           </Route>
 
-          {/* Admin Routes */}
-          <Route
-            element={
-              <Suspense fallback={<AdminLoader />}>
-                <AdminLayout />
-              </Suspense>
-            }
-          >
-            <Route
-              path="/admin-dashboard"
-              element={<AdminOverview />}
-            />
-
-            <Route
-              path="/admin/memberships"
-              element={<AdminMemberships />}
-            />
-
-            <Route
-              path="/admin/products"
-              element={<AdminProducts />}
-            />
-
-            <Route
-              path="/admin/categories"
-              element={<AdminCategories />}
-            />
-
-            <Route
-              path="/admin/orders"
-              element={<AdminOrders />}
-            />
-
-            <Route
-              path="/admin/resellers"
-              element={<AdminResellers />}
-            />
-
-            <Route
-              path="/admin/notifications"
-              element={<AdminNotifications />}
-            />
-
-            <Route
-              path="/admin/withdrawals"
-              element={<AdminWithdrawals />}
-            />
-
-            <Route
-              path="/admin/reports"
-              element={<AdminReports />}
-            />
+          {/* Admin Protected Routes */}
+          <Route element={<AdminProtectedRoute />}>
+            <Route path="/admin-dashboard" element={<AdminOverview />} />
+            <Route path="/admin/memberships" element={<AdminMemberships />} />
+            <Route path="/admin/products" element={<AdminProducts />} />
+            <Route path="/admin/categories" element={<AdminCategories />} />
+            <Route path="/admin/orders" element={<AdminOrders />} />
+            <Route path="/admin/resellers" element={<AdminResellers />} />
+            <Route path="/admin/notifications" element={<AdminNotifications />} />
+            <Route path="/admin/withdrawals" element={<AdminWithdrawals />} />
+            <Route path="/admin/reports" element={<AdminReports />} />
           </Route>
 
           {/* 404 Redirect */}
-          <Route
-            path="*"
-            element={<Navigate to="/login" replace />}
-          />
+          <Route path="*" element={<Navigate to="/login" replace />} />
         </Routes>
       </BrowserRouter>
 
