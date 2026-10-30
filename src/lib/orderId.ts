@@ -1,10 +1,14 @@
-import { doc, runTransaction } from 'firebase/firestore';
+
+import {
+  doc,
+  runTransaction,
+  serverTimestamp,
+} from 'firebase/firestore';
 import { db } from '../firebase';
 
 /**
  * Zeluxe Order ID Generator
- * Format: ZEL-YYMMDD-NNNN (যেমন: ZEL-261026-0001)
- * Conforms strictly to Firestore Rules: currentMonth must be 6 digits (^[0-9]{6}$)
+ * Format: ZEL-YYMMDD-NNNN
  */
 export async function generateOrderId(): Promise<string> {
   const counterRef = doc(db, 'settings', 'orderCounter');
@@ -14,7 +18,6 @@ export async function generateOrderId(): Promise<string> {
   const month = String(now.getMonth() + 1).padStart(2, '0');
   const day = String(now.getDate()).padStart(2, '0');
 
-  // ঠিক ৬ ডিজিটের তারিখ (যেমন: "261026")
   const dateCode = `${year}${month}${day}`;
 
   return await runTransaction(db, async (transaction) => {
@@ -24,27 +27,24 @@ export async function generateOrderId(): Promise<string> {
 
     if (counterDoc.exists()) {
       const data = counterDoc.data();
-      const storedDate = data.currentMonth || '';
 
-      if (storedDate === dateCode) {
+      if (data.currentMonth === dateCode) {
         sequence = (data.currentSequence || 0) + 1;
-      } else {
-        sequence = 1;
       }
     }
 
-    // Rules: keys().hasOnly(['currentMonth', 'currentSequence', 'updatedAt'])
     transaction.set(
       counterRef,
       {
         currentMonth: dateCode,
         currentSequence: sequence,
-        updatedAt: new Date().toISOString(),
+        updatedAt: serverTimestamp(),
       },
       { merge: true }
     );
 
     const seqStr = String(sequence).padStart(4, '0');
+
     return `ZEL-${dateCode}-${seqStr}`;
   });
 }
