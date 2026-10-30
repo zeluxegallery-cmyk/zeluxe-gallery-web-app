@@ -1,4 +1,3 @@
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   collection,
@@ -367,7 +366,7 @@ export default function AdminProducts() {
     setModalOpen(true);
   };
 
-  // প্রতিটি ছবির জন্য একটি আলাদা প্রোডাক্ট তৈরি করবে।
+  // প্রতিটি ছবির জন্য একটি আলাদা প্রোডাক্ট তৈরি করবে (কালার থাকুক বা না থাকুক)
   const handleSave = async () => {
     if (!form.name.trim() || !form.sku.trim()) {
       toast.error('নাম এবং SKU অবশ্যই দিতে হবে');
@@ -384,11 +383,13 @@ export default function AdminProducts() {
       return;
     }
 
+    // কালার অপশনাল
     const colors = form.colorsInput
       .split(',')
       .map((c) => c.trim())
       .filter(Boolean);
 
+    // সাইজ অপশনাল
     const sizes = form.sizesInput
       .split(',')
       .map((s) => s.trim())
@@ -400,9 +401,10 @@ export default function AdminProducts() {
         return;
       }
 
-      if (colors.length !== form.imageUrls.length) {
+      // যদি কালার দেওয়া হয় এবং ছবির সংখ্যার সাথে না মেলে
+      if (colors.length > 0 && colors.length !== form.imageUrls.length) {
         toast.error(
-          `ছবি ${form.imageUrls.length}টি, তাই কালারের নামও ঠিক ${form.imageUrls.length}টি কমা দিয়ে লিখুন।`,
+          `ছবি ${form.imageUrls.length}টি, কিন্তু কালার লিখেছেন ${colors.length}টি। সব ছবির কালার লিখুন অথবা কালার ফিল্ড খালি রাখুন।`,
         );
         return;
       }
@@ -448,19 +450,17 @@ export default function AdminProducts() {
 
         toast.success('✓ প্রোডাক্ট আপডেট হয়েছে!');
       } else {
-        // Firestore batch একবারে সব ভ্যারিয়েন্ট সেভ করবে।
+        // Firestore batch একবারে সব প্রডাক্ট সেভ করবে
         const batch = writeBatch(db);
-
-        // একই কালার-গ্রুপের সব প্রোডাক্টে একই groupId।
         const groupId = doc(collection(db, 'products')).id;
         const createdAt = serverTimestamp();
         const imageUrls = [...form.imageUrls];
         const skuPrefix = form.sku.trim();
 
+        // কালার থাকুক বা না থাকুক, প্রতিটা ছবির জন্য আলাদা প্রডাক্ট হবে
         imageUrls.forEach((imageUrl, index) => {
-          const color = colors[index];
+          const color = colors[index] || '';
 
-          // প্রতিটি ভ্যারিয়েন্টের SKU আলাদা হবে।
           const productSku =
             imageUrls.length === 1
               ? skuPrefix
@@ -470,10 +470,12 @@ export default function AdminProducts() {
 
           batch.set(productRef, {
             ...commonPayload,
+            // কালার থাকলে নামের সাথে কালার, না থাকলে সংখ্যা যোগ হবে না বা মূল নাম থাকবে
+            name: form.name.trim(),
             sku: productSku,
             groupId,
-            color,
-            colors: [color],
+            color: color || '',
+            colors: color ? [color] : [],
             imageUrl,
             imageUrls: [imageUrl],
             createdAt,
@@ -483,7 +485,7 @@ export default function AdminProducts() {
         await batch.commit();
 
         toast.success(
-          `✓ ${imageUrls.length}টি আলাদা কালারের প্রোডাক্ট তৈরি হয়েছে!`,
+          `✓ ${imageUrls.length}টি আলাদা প্রোডাক্ট সফলভাবে তৈরি হয়েছে!`,
         );
       }
 
@@ -991,7 +993,7 @@ export default function AdminProducts() {
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <Ruler size={14} className="text-zeluxe-gold" />
-                  <span>উপলব্ধ সাইজ</span>
+                  <span>উপলব্ধ সাইজ <span className="text-xs font-normal text-gray-500">(ঐচ্ছিক)</span></span>
                 </label>
                 <input
                   value={form.sizesInput}
@@ -1009,7 +1011,7 @@ export default function AdminProducts() {
               <div>
                 <label className="mb-1.5 flex items-center gap-2 text-sm font-medium text-zeluxe-black">
                   <Palette size={14} className="text-zeluxe-gold" />
-                  <span>কালারের নাম (ছবির একই ক্রমে)</span>
+                  <span>কালারের নাম <span className="text-xs font-normal text-gray-500">(ঐচ্ছিক)</span></span>
                 </label>
                 <input
                   value={form.colorsInput}
@@ -1019,13 +1021,12 @@ export default function AdminProducts() {
                       colorsInput: e.target.value,
                     }))
                   }
-                  placeholder="যেমন: কালো, লাল, নীল"
+                  placeholder="যেমন: কালো, লাল, নীল (খালি রাখলে কালার ছাড়া আলাদা হবে)"
                   className={inputClass}
                 />
                 {!editingId && (
                   <p className="mt-1 text-xs text-gray-500">
-                    নতুন প্রোডাক্টে প্রতিটি ছবির জন্য একটি কালারের নাম লিখবে।
-                    কমা দিয়ে আলাদা করবে।
+                    একাধিক ছবি দিলে প্রতিটি ছবির জন্য আলাদা আলাদা প্রোডাক্ট তৈরি হবে। কালার না দিলেও সমস্যা নেই।
                   </p>
                 )}
               </div>
