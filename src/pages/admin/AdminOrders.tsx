@@ -157,6 +157,7 @@ export default function AdminOrders() {
   /**
    * Delivered হলে transaction-এর মাধ্যমে স্টক কমানো হয়।
    * stockDeducted ফিল্ড একই অর্ডারে দ্বিতীয়বার স্টক কমানো আটকায়।
+   * deliveredAt ফিল্ড প্রথমবার Delivered হওয়ার সময় সংরক্ষণ করে।
    */
   const handleStatusChange = async (
     id: string,
@@ -329,6 +330,10 @@ export default function AdminOrders() {
         // স্টক এবং অর্ডার একই transaction-এ আপডেট হবে।
         transaction.update(orderRef, {
           status: newStatus,
+
+          // প্রথমবার Delivered হওয়ার সার্ভার টাইম।
+          deliveredAt: serverTimestamp(),
+
           stockDeducted: true,
           stockDeductedAt: serverTimestamp(),
         });
