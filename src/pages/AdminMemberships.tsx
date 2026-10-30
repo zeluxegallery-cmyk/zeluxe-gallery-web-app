@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import {
   collection,
@@ -21,7 +22,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { db } from '../firebase';
-import { creditReferrer, REFERRAL_BONUS_AMOUNT } from '../lib/referral';
+import { REFERRAL_BONUS_AMOUNT } from '../lib/referral';
 
 type MembershipRequest = {
   id: string;
@@ -65,7 +66,11 @@ export default function AdminMemberships() {
             const userSnap = await getDoc(doc(db, 'users', uid));
             if (userSnap.exists()) {
               const userData = userSnap.data();
-              if (typeof userData.referredBy === 'string' && userData.referredBy) {
+
+              if (
+                typeof userData.referredBy === 'string' &&
+                userData.referredBy
+              ) {
                 referredBy = userData.referredBy;
                 referredByName =
                   typeof userData.referredByName === 'string'
@@ -74,7 +79,7 @@ export default function AdminMemberships() {
               }
             }
           } catch {
-            // ignore
+            // Ignore referral lookup errors
           }
 
           return {
@@ -83,10 +88,19 @@ export default function AdminMemberships() {
             name: typeof data.name === 'string' ? data.name : 'Unknown',
             email: typeof data.email === 'string' ? data.email : '',
             phone: typeof data.phone === 'string' ? data.phone : '',
-            transactionId: typeof data.transactionId === 'string' ? data.transactionId : '',
-            senderMobile: typeof data.senderMobile === 'string' ? data.senderMobile : '',
+            transactionId:
+              typeof data.transactionId === 'string'
+                ? data.transactionId
+                : '',
+            senderMobile:
+              typeof data.senderMobile === 'string'
+                ? data.senderMobile
+                : '',
             amount: typeof data.amount === 'number' ? data.amount : 99,
-            paymentNumber: typeof data.paymentNumber === 'string' ? data.paymentNumber : '',
+            paymentNumber:
+              typeof data.paymentNumber === 'string'
+                ? data.paymentNumber
+                : '',
             status: typeof data.status === 'string' ? data.status : 'pending',
             createdAt: data.createdAt,
             referredBy,
@@ -116,38 +130,40 @@ export default function AdminMemberships() {
 
   const handleApprove = async (req: MembershipRequest) => {
     if (!window.confirm(`${req.name} এর membership approve করবেন?`)) return;
+
     setProcessingId(req.id);
+
     try {
       const requestRef = doc(db, 'membershipRequests', req.id);
 
-      // Read the latest status first: a second click or a second admin must not approve (and pay the referral bonus) twice
       const freshSnap = await getDoc(requestRef);
+
       if (!freshSnap.exists() || freshSnap.data().status !== 'pending') {
         toast.error('এই রিকোয়েস্ট আগেই প্রসেস করা হয়েছে');
         await loadRequests();
         return;
       }
 
-      // User and request change together, or not at all
+      // Approve user and membership request together
       const batch = writeBatch(db);
+
       batch.update(doc(db, 'users', req.uid), {
         accountStatus: 'active',
         membershipStatus: 'approved',
       });
+
       batch.update(requestRef, {
         status: 'approved',
         approvedAt: serverTimestamp(),
       });
+
       await batch.commit();
 
-      if (req.referredBy) {
-        const credited = await creditReferrer(req.referredBy);
-        if (credited) {
-          console.log(`✓ Referral bonus Tk ${REFERRAL_BONUS_AMOUNT} credited to ${req.referredByName}`);
-        }
-      }
+      // Referral bonus is NOT credited from the browser.
+      // A secure server-side system is required for actual bonus credit.
 
       toast.success(`✓ ${req.name} এর membership approve হয়েছে!`);
+
       await loadRequests();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -158,19 +174,32 @@ export default function AdminMemberships() {
   };
 
   const handleReject = async (req: MembershipRequest) => {
-    const reason = window.prompt('Reject করার কারণ লিখুন:', 'পেমেন্ট verify করা যায়নি');
+    const reason = window.prompt(
+      'Reject করার কারণ লিখুন:',
+      'পেমেন্ট verify করা যায়নি'
+    );
+
     if (!reason) return;
+
     setProcessingId(req.id);
+
     try {
-      await updateDoc(doc(db, 'users', req.uid), {
+      const batch = writeBatch(db);
+
+      batch.update(doc(db, 'users', req.uid), {
         membershipStatus: 'rejected',
       });
-      await updateDoc(doc(db, 'membershipRequests', req.id), {
+
+      batch.update(doc(db, 'membershipRequests', req.id), {
         status: 'rejected',
         reason,
         rejectedAt: serverTimestamp(),
       });
+
+      await batch.commit();
+
       toast.success(`✓ ${req.name} এর membership reject হয়েছে।`);
+
       await loadRequests();
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Unknown error';
@@ -182,8 +211,10 @@ export default function AdminMemberships() {
 
   const formatDate = (ts: any) => {
     if (!ts) return '—';
+
     try {
       const d = ts.toDate ? ts.toDate() : new Date(ts.seconds * 1000);
+
       return d.toLocaleDateString('bn-BD', {
         day: '2-digit',
         month: 'short',
@@ -194,7 +225,6 @@ export default function AdminMemberships() {
     }
   };
 
-  // ═══ <AdminLayout> ট্যাগটি সরিয়ে সরাসরি div দিয়ে শুরু করা হয়েছে ═══
   if (loading) {
     return (
       <div className="flex min-h-40 items-center justify-center">
@@ -208,6 +238,7 @@ export default function AdminMemberships() {
       <h1 className="mb-1 text-xl font-bold text-zeluxe-black md:text-2xl">
         Membership Requests
       </h1>
+
       <p className="mb-6 text-xs text-gray-500 md:text-sm">
         Pending payment verification ({requests.length}টি)
       </p>
@@ -232,6 +263,7 @@ export default function AdminMemberships() {
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zeluxe-gold/10">
                     <User className="text-zeluxe-gold" size={18} />
                   </div>
+
                   <div>
                     <p className="text-sm font-bold text-zeluxe-black">
                       {req.name}
@@ -239,6 +271,7 @@ export default function AdminMemberships() {
                     <p className="text-[11px] text-gray-500">{req.email}</p>
                   </div>
                 </div>
+
                 <span className="inline-flex items-center gap-1 rounded-full border border-yellow-200 bg-yellow-50 px-2 py-1 text-[10px] font-bold text-yellow-700">
                   <Clock size={11} />
                   অপেক্ষমাণ
@@ -250,9 +283,11 @@ export default function AdminMemberships() {
                 <div className="border-b border-zeluxe-lightgray bg-gradient-to-r from-zeluxe-gold/5 to-transparent px-4 py-2.5">
                   <div className="flex items-center gap-2">
                     <Users size={13} className="text-zeluxe-gold" />
+
                     <p className="text-[11px] text-zeluxe-black">
                       <strong>{req.referredByName}</strong> এর মাধ্যমে invited
                     </p>
+
                     <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-zeluxe-gold/20 px-2 py-0.5 text-[10px] font-bold text-zeluxe-black">
                       <Gift size={10} />
                       Tk {REFERRAL_BONUS_AMOUNT}
@@ -272,6 +307,7 @@ export default function AdminMemberships() {
                       {req.transactionId || '—'}
                     </p>
                   </div>
+
                   <div className="rounded-md bg-zeluxe-cream p-3">
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
                       Sender Number
@@ -291,6 +327,7 @@ export default function AdminMemberships() {
                       Tk {req.amount}
                     </p>
                   </div>
+
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
                       Phone
@@ -299,6 +336,7 @@ export default function AdminMemberships() {
                       {req.phone || '—'}
                     </p>
                   </div>
+
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">
                       Date
@@ -323,6 +361,7 @@ export default function AdminMemberships() {
                     )}
                     Approve
                   </button>
+
                   <button
                     onClick={() => handleReject(req)}
                     disabled={processingId === req.id}
