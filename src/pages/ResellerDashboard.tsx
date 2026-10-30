@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -77,6 +78,7 @@ type Order = {
   sellingPrice: number;
   productId: string;
   createdAt?: { seconds?: number };
+  deliveredAt?: { seconds?: number };
   actualProfit: number;
 };
 
@@ -204,6 +206,7 @@ export default function ResellerDashboard() {
   const [bonusAchieved, setBonusAchieved] = useState(false);
   const [bonusDaysLeft, setBonusDaysLeft] = useState(0);
   const [bonusStartDate, setBonusStartDate] = useState<number>(0);
+  const [bonusExpired, setBonusExpired] = useState(false);
 
   const [statsLoading, setStatsLoading] = useState(true);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -218,6 +221,7 @@ export default function ResellerDashboard() {
       try {
         if (!messaging) return;
         const permission = await Notification.requestPermission();
+
         if (permission === 'granted') {
           const uid = auth.currentUser?.uid;
           if (!uid) return;
@@ -250,6 +254,7 @@ export default function ResellerDashboard() {
     const run = async () => {
       await auth.authStateReady();
       const uid = auth.currentUser?.uid;
+
       if (!uid || cancelled) {
         setStatsLoading(false);
         setProductsLoading(false);
@@ -263,6 +268,7 @@ export default function ResellerDashboard() {
       getDocs(query(collection(db, 'notifications'), where('userId', '==', uid)))
         .then((notifSnap) => {
           if (cancelled) return;
+
           const fetchedNotifs: Notification[] = notifSnap.docs.map((d) => {
             const data = d.data();
             return {
@@ -273,7 +279,11 @@ export default function ResellerDashboard() {
               createdAt: data.createdAt,
             };
           });
-          fetchedNotifs.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+
+          fetchedNotifs.sort(
+            (a, b) =>
+              (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+          );
           setNotifications(fetchedNotifs);
         })
         .catch(() => {});
@@ -282,6 +292,7 @@ export default function ResellerDashboard() {
       getDocs(collection(db, 'products'))
         .then((productsSnap) => {
           if (cancelled) return;
+
           const activeProducts: Product[] = productsSnap.docs
             .filter((d) => {
               const data = d.data();
@@ -298,9 +309,13 @@ export default function ResellerDashboard() {
                 id: d.id,
                 name: typeof data.name === 'string' ? data.name : 'Product',
                 imageUrl: typeof data.imageUrl === 'string' ? data.imageUrl : '',
-                resellerPrice: typeof data.resellerPrice === 'number' ? data.resellerPrice : 0,
+                resellerPrice:
+                  typeof data.resellerPrice === 'number'
+                    ? data.resellerPrice
+                    : 0,
               };
             });
+
           setFeaturedProducts(activeProducts);
         })
         .catch(() => {})
@@ -312,25 +327,46 @@ export default function ResellerDashboard() {
       getDoc(doc(db, 'users', uid))
         .then(async (userDoc) => {
           if (!userDoc.exists() || cancelled) return;
+
           const userInfo = userDoc.data();
 
           let refStats: ReferralInfo = {
-            referralCode: typeof userInfo.referralCode === 'string' ? userInfo.referralCode : '',
-            referralCount: typeof userInfo.referralCount === 'number' ? userInfo.referralCount : 0,
-            referralBonusEarned: typeof userInfo.referralBonusEarned === 'number' ? userInfo.referralBonusEarned : 0,
+            referralCode:
+              typeof userInfo.referralCode === 'string'
+                ? userInfo.referralCode
+                : '',
+            referralCount:
+              typeof userInfo.referralCount === 'number'
+                ? userInfo.referralCount
+                : 0,
+            referralBonusEarned:
+              typeof userInfo.referralBonusEarned === 'number'
+                ? userInfo.referralBonusEarned
+                : 0,
           };
 
           if (!refStats.referralCode) {
             try {
               const newCode = await generateUniqueReferralCode();
+
               await updateDoc(doc(db, 'users', uid), {
                 referralCode: newCode,
                 referralCount: 0,
                 referralBonusEarned: 0,
               });
-              const userName = (userInfo.name as string) || auth.currentUser?.email?.split('@')[0] || 'Reseller';
+
+              const userName =
+                (userInfo.name as string) ||
+                auth.currentUser?.email?.split('@')[0] ||
+                'Reseller';
+
               await publishReferralCode(uid, userName, newCode);
-              refStats = { referralCode: newCode, referralCount: 0, referralBonusEarned: 0 };
+
+              refStats = {
+                referralCode: newCode,
+                referralCount: 0,
+                referralBonusEarned: 0,
+              };
             } catch (err) {
               console.error('Failed to generate referral code:', err);
             }
@@ -343,58 +379,91 @@ export default function ResellerDashboard() {
           if (!cancelled) setRefLoading(false);
         });
 
-      // ৪. ব্যালেন্স ও প্রফিট হিসাব (Withdraw পেজের সাথে ১০০% মিল রাখা হলো)
+      // ৪. ব্যালেন্স ও প্রফিট হিসাব
       try {
-        const userDocSnap = await getDoc(doc(db, 'users', uid)).catch(() => null);
-        const userInfo = userDocSnap && userDocSnap.exists() ? userDocSnap.data() : null;
+        const userDocSnap = await getDoc(doc(db, 'users', uid)).catch(
+          () => null,
+        );
+
+        const userInfo =
+          userDocSnap && userDocSnap.exists() ? userDocSnap.data() : null;
 
         const [ordersSnapshot, withdrawSnap] = await Promise.all([
-          getDocs(query(collection(db, 'orders'), where('resellerId', '==', uid))),
-          getDocs(query(collection(db, 'withdrawRequests'), where('resellerId', '==', uid))).catch(() => ({ docs: [] } as any)),
+          getDocs(
+            query(collection(db, 'orders'), where('resellerId', '==', uid)),
+          ),
+          getDocs(
+            query(
+              collection(db, 'withdrawRequests'),
+              where('resellerId', '==', uid),
+            ),
+          ).catch(() => ({ docs: [] }) as any),
         ]);
 
-        const fetchedOrders: Order[] = ordersSnapshot.docs.map((orderDocument) => {
-          const data = orderDocument.data();
-          const quantity = Number(data.quantity) || 1;
-          const sellingPrice = Number(data.sellingPrice) || 0;
-          const actualProfit = calculateProfit(data);
+        const fetchedOrders: Order[] = ordersSnapshot.docs.map(
+          (orderDocument) => {
+            const data = orderDocument.data();
+            const quantity = Number(data.quantity) || 1;
+            const sellingPrice = Number(data.sellingPrice) || 0;
+            const actualProfit = calculateProfit(data);
 
-          return {
-            id: orderDocument.id,
-            orderId: typeof data.orderId === 'string' ? data.orderId : orderDocument.id,
-            productName: typeof data.productName === 'string' ? data.productName : (data.items?.[0]?.name || 'Product'),
-            status: typeof data.status === 'string' ? data.status : 'pending',
-            total: Number(data.total) || 0,
-            quantity,
-            sellingPrice,
-            productId: typeof data.productId === 'string' ? data.productId : '',
-            createdAt: data.createdAt,
-            actualProfit,
-          };
-        });
+            return {
+              id: orderDocument.id,
+              orderId:
+                typeof data.orderId === 'string'
+                  ? data.orderId
+                  : orderDocument.id,
+              productName:
+                typeof data.productName === 'string'
+                  ? data.productName
+                  : data.items?.[0]?.name || 'Product',
+              status: typeof data.status === 'string' ? data.status : 'pending',
+              total: Number(data.total) || 0,
+              quantity,
+              sellingPrice,
+              productId:
+                typeof data.productId === 'string' ? data.productId : '',
+              createdAt: data.createdAt,
+              deliveredAt: data.deliveredAt,
+              actualProfit,
+            };
+          },
+        );
 
         // মোট উত্তোলন বা পেন্ডিং উত্তোলন
         const totalWithdrawn = withdrawSnap.docs
           .map((d: any) => d.data())
-          .filter((d: any) => ['pending', 'approved', 'paid'].includes(d.status))
-          .reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+          .filter((d: any) =>
+            ['pending', 'approved', 'paid'].includes(d.status),
+          )
+          .reduce(
+            (sum: number, d: any) => sum + (Number(d.amount) || 0),
+            0,
+          );
 
-        const totalSales = fetchedOrders.reduce((sum, order) => sum + order.total, 0);
+        const totalSales = fetchedOrders.reduce(
+          (sum, order) => sum + order.total,
+          0,
+        );
+
         const pendingOrders = fetchedOrders.filter((order) =>
-          PENDING_STATUSES.includes(order.status.toLowerCase())
-        ).length;
-        const deliveredOrders = fetchedOrders.filter(
-          (order) => order.status.toLowerCase() === 'delivered'
+          PENDING_STATUSES.includes(order.status.toLowerCase()),
         ).length;
 
-        // ✅ শুধুমাত্র সফলভাবে ডেলিভার্ড হওয়া অর্ডারের লাভ (Withdraw পেজের মতো)
+        const deliveredOrders = fetchedOrders.filter(
+          (order) => order.status.toLowerCase() === 'delivered',
+        ).length;
+
+        // শুধুমাত্র Delivered অর্ডারের লাভ
         const deliveredProfit = fetchedOrders
           .filter((order) => order.status.toLowerCase() === 'delivered')
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
-        // অপেক্ষমাণ (পেন্ডিং/শিপড) অর্ডারের লাভ
+        // অপেক্ষমাণ অর্ডারের লাভ
         const pendingProfit = fetchedOrders
-          .filter((order) => PENDING_STATUSES.includes(order.status.toLowerCase()))
+          .filter((order) =>
+            PENDING_STATUSES.includes(order.status.toLowerCase()),
+          )
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
         // সব অর্ডারের মোট লাভ
@@ -402,20 +471,36 @@ export default function ResellerDashboard() {
           .filter(
             (order) =>
               order.status.toLowerCase() !== 'cancelled' &&
-              order.status.toLowerCase() !== 'returned'
+              order.status.toLowerCase() !== 'returned',
           )
           .reduce((sum, order) => sum + order.actualProfit, 0);
 
         const referralBonus = Number(userInfo?.referralBonusEarned) || 0;
 
-        // ✅ Available Balance = ডেলিভার্ড প্রফিট + রেফারেল বোনাস - মোট উইথড্র
-        const computedBalance = deliveredProfit + referralBonus - totalWithdrawn;
+        // Available Balance = Delivered Profit + Referral Bonus - Withdrawals
+        // Welcome Bonus এখানে যোগ করা হচ্ছে না।
+        const computedBalance =
+          deliveredProfit + referralBonus - totalWithdrawn;
+
         const availableBalance = Math.max(0, computedBalance);
 
         const now = new Date();
-        const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 1000;
-        const todayOrders = fetchedOrders.filter((o) => (o.createdAt?.seconds || 0) >= todayStart);
-        const todaySales = todayOrders.reduce((sum, o) => sum + o.total, 0);
+
+        const todayStart =
+          new Date(
+            now.getFullYear(),
+            now.getMonth(),
+            now.getDate(),
+          ).getTime() / 1000;
+
+        const todayOrders = fetchedOrders.filter(
+          (o) => (o.createdAt?.seconds || 0) >= todayStart,
+        );
+
+        const todaySales = todayOrders.reduce(
+          (sum, o) => sum + o.total,
+          0,
+        );
 
         const newStats: Stats = {
           totalOrders: fetchedOrders.length,
@@ -425,26 +510,64 @@ export default function ResellerDashboard() {
           deliveredProfit,
           pendingProfit,
           totalProfit,
-          availableBalance, // এখন Withdraw পেজের মতো সমান দেখাবে
+          availableBalance,
           todayOrders: todayOrders.length,
           todaySales,
           referralBonus,
         };
 
+        // ৫. Welcome Bonus হিসাব
         const userCreatedAt = userInfo?.createdAt?.seconds || 0;
         const nowSec = Math.floor(Date.now() / 1000);
-        const bonusDeadline = userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
-        const daysLeft = Math.max(0, Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)));
-        const progress = Math.min(deliveredOrders, WELCOME_BONUS_TARGET);
-        const achieved = deliveredOrders >= WELCOME_BONUS_TARGET;
+
+        const bonusDeadline =
+          userCreatedAt + WELCOME_BONUS_DAYS * 24 * 60 * 60;
+
+        const daysLeft =
+          userCreatedAt > 0 && nowSec < bonusDeadline
+            ? Math.max(
+                0,
+                Math.ceil((bonusDeadline - nowSec) / (24 * 60 * 60)),
+              )
+            : 0;
+
+        // অ্যাকাউন্ট তৈরির সময় থেকে ৩০ দিনের মধ্যে Delivered হওয়া অর্ডার
+        const eligibleDeliveredOrders = fetchedOrders.filter((order) => {
+          const deliveredAt = order.deliveredAt?.seconds || 0;
+
+          return (
+            order.status.toLowerCase() === 'delivered' &&
+            userCreatedAt > 0 &&
+            deliveredAt >= userCreatedAt &&
+            deliveredAt <= bonusDeadline
+          );
+        }).length;
+
+        const progress = Math.min(
+          eligibleDeliveredOrders,
+          WELCOME_BONUS_TARGET,
+        );
+
+        // ৫টি যোগ্য অর্ডার হলে শর্ত পূরণ হয়েছে।
+        // ৩০ দিন শেষ হওয়ার পরেও অর্জিত শর্ত বজায় থাকবে।
+        const achieved =
+          userCreatedAt > 0 &&
+          eligibleDeliveredOrders >= WELCOME_BONUS_TARGET;
+
+        const expired =
+          userCreatedAt > 0 &&
+          nowSec >= bonusDeadline &&
+          !achieved;
 
         if (cancelled) return;
+
         setOrders(fetchedOrders);
         setStats(newStats);
         setBonusStartDate(userCreatedAt);
         setBonusDaysLeft(daysLeft);
         setBonusProgress(progress);
         setBonusAchieved(achieved);
+        setBonusExpired(expired);
       } catch (error) {
         console.error('Stats computation failed:', error);
         if (!cancelled) setLoadError(true);
@@ -454,6 +577,7 @@ export default function ResellerDashboard() {
     };
 
     void run();
+
     return () => {
       cancelled = true;
     };
@@ -461,23 +585,32 @@ export default function ResellerDashboard() {
 
   const handleOpenNotifications = async () => {
     setIsNotifOpen(true);
+
     const unreadNotifs = notifications.filter((n) => !n.read);
     if (unreadNotifs.length === 0) return;
 
     try {
       const batch = writeBatch(db);
+
       unreadNotifs.forEach((n) => {
         batch.update(doc(db, 'notifications', n.id), { read: true });
       });
+
       await batch.commit();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+
+      setNotifications((prev) =>
+        prev.map((n) => ({ ...n, read: true })),
+      );
     } catch (err) {
       console.error('Failed to mark notifications as read', err);
     }
   };
 
   const recentOrders = [...orders]
-    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))
+    .sort(
+      (a, b) =>
+        (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0),
+    )
     .slice(0, 5);
 
   const resellerName =
@@ -486,8 +619,9 @@ export default function ResellerDashboard() {
     'Reseller';
 
   const bonusPercent = Math.round(
-    (bonusProgress / WELCOME_BONUS_TARGET) * 100
+    (bonusProgress / WELCOME_BONUS_TARGET) * 100,
   );
+
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
@@ -542,7 +676,9 @@ export default function ResellerDashboard() {
             </span>
           </div>
           <div className="flex items-center gap-3 text-xs font-number">
-            <span className="text-gray-500">{stats.todayOrders}টি অর্ডার</span>
+            <span className="text-gray-500">
+              {stats.todayOrders}টি অর্ডার
+            </span>
             <span className="font-bold text-zeluxe-black">
               Tk {stats.todaySales.toLocaleString()}
             </span>
@@ -563,20 +699,22 @@ export default function ResellerDashboard() {
                 Welcome Bonus Unlocked
               </p>
               <p className="mt-1 text-lg font-bold text-green-900 font-number">
-                Tk {WELCOME_BONUS_AMOUNT} বোনাস পেয়েছেন
+                Tk {WELCOME_BONUS_AMOUNT} বোনাসের শর্ত পূরণ হয়েছে
               </p>
               <p className="mt-0.5 text-xs text-green-700">
-                প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার সফলভাবে ডেলিভার হয়েছে
+                ৩০ দিনের মধ্যে প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার ডেলিভার হয়েছে।
+                বোনাস এখনো ব্যালেন্সে যোগ হয়নি।
               </p>
             </div>
           </div>
         </div>
-      ) : bonusDaysLeft > 0 && bonusStartDate > 0 ? (
+      ) : bonusStartDate > 0 ? (
         <div className="mb-5 rounded-2xl bg-zeluxe-black p-5 text-white shadow-card">
           <div className="flex items-start gap-4">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold/20">
               <Gift className="text-zeluxe-gold" size={22} />
             </span>
+
             <div className="flex-1">
               <div className="flex items-start justify-between">
                 <div>
@@ -587,6 +725,7 @@ export default function ResellerDashboard() {
                     প্রথম {WELCOME_BONUS_TARGET}টি অর্ডার ডেলিভার করলেই বোনাস
                   </p>
                 </div>
+
                 <p className="shrink-0 text-xl font-bold text-zeluxe-gold font-number">
                   Tk {WELCOME_BONUS_AMOUNT}
                 </p>
@@ -601,6 +740,7 @@ export default function ResellerDashboard() {
                     {bonusPercent}%
                   </span>
                 </div>
+
                 <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full bg-zeluxe-gold transition-all duration-500"
@@ -613,16 +753,29 @@ export default function ResellerDashboard() {
                 <span className="text-gray-400">
                   শুরু: {formatDate(bonusStartDate)}
                 </span>
-                <span className="text-zeluxe-gold">
-                  বাকি <strong>{bonusDaysLeft} দিন</strong>
-                </span>
+
+                {bonusExpired ? (
+                  <span className="font-bold text-red-300">
+                    সময় শেষ
+                  </span>
+                ) : (
+                  <span className="text-zeluxe-gold">
+                    বাকি <strong>{bonusDaysLeft} দিন</strong>
+                  </span>
+                )}
               </div>
+
+              {bonusExpired && (
+                <p className="mt-2 text-xs text-red-300">
+                  ৩০ দিনের সময়সীমা শেষ হয়েছে। এই অফারের শর্ত আর পূরণ করা যাবে না।
+                </p>
+              )}
             </div>
           </div>
         </div>
       ) : null}
 
-      {/* ═══ AVAILABLE BALANCE CARD ═══ */}
+      {/* AVAILABLE BALANCE CARD */}
       {statsLoading ? (
         <SkeletonBlock className="mb-5 h-32" />
       ) : (
@@ -637,6 +790,7 @@ export default function ResellerDashboard() {
                   Available Balance
                 </p>
               </div>
+
               <p className="mt-2 text-3xl font-bold tracking-tight text-zeluxe-black font-number">
                 Tk {stats.availableBalance.toLocaleString()}
               </p>
@@ -668,6 +822,7 @@ export default function ResellerDashboard() {
                 )}
               </div>
             </div>
+
             <Link
               to="/withdraw"
               className="flex shrink-0 items-center gap-1 rounded-xl bg-zeluxe-black px-3 py-2 text-[11px] font-bold text-white transition hover:bg-gray-800"
@@ -684,6 +839,7 @@ export default function ResellerDashboard() {
         <p className="mb-2 text-[10px] font-bold uppercase tracking-widest text-gray-500">
           Quick Actions
         </p>
+
         <div className="grid grid-cols-4 gap-2.5">
           {[
             { label: 'প্রোডাক্ট', path: '/products', icon: Package },
@@ -716,6 +872,7 @@ export default function ResellerDashboard() {
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
               My Progress
             </p>
+
             <Link
               to="/earnings"
               className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline"
@@ -732,9 +889,11 @@ export default function ResellerDashboard() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-blue-600 mb-2">
                 <ShoppingBag size={16} />
               </div>
+
               <p className="text-lg font-bold tracking-tight text-zeluxe-black font-number">
                 {stats.totalOrders}
               </p>
+
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
                 Orders
               </p>
@@ -744,12 +903,14 @@ export default function ResellerDashboard() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-50 text-green-600 mb-2">
                 <TrendingUp size={16} />
               </div>
+
               <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
                 Tk{' '}
                 {stats.totalSales > 9999
                   ? (stats.totalSales / 1000).toFixed(1) + 'k'
                   : stats.totalSales.toLocaleString()}
               </p>
+
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
                 Sales
               </p>
@@ -759,12 +920,14 @@ export default function ResellerDashboard() {
               <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zeluxe-gold/10 text-zeluxe-gold mb-2">
                 <Wallet size={16} />
               </div>
+
               <p className="text-sm sm:text-base font-bold tracking-tight text-zeluxe-black font-number w-full truncate px-1">
                 Tk{' '}
                 {stats.totalProfit > 9999
                   ? (stats.totalProfit / 1000).toFixed(1) + 'k'
                   : stats.totalProfit.toLocaleString()}
               </p>
+
               <p className="text-[9px] font-bold uppercase tracking-wider text-gray-500 mt-0.5">
                 Total Profit
               </p>
@@ -783,6 +946,7 @@ export default function ResellerDashboard() {
               <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
                 Featured Products
               </p>
+
               <Link
                 to="/products"
                 className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline"
@@ -813,10 +977,12 @@ export default function ResellerDashboard() {
                       className="h-full w-full object-cover"
                     />
                   </div>
+
                   <div className="p-2.5">
                     <p className="line-clamp-2 text-[11px] font-bold text-zeluxe-black leading-tight">
                       {product.name}
                     </p>
+
                     <p className="mt-1 text-[12px] font-bold text-zeluxe-gold font-number">
                       Tk {product.resellerPrice.toLocaleString()}
                     </p>
@@ -841,22 +1007,27 @@ export default function ResellerDashboard() {
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-zeluxe-gold shadow-sm">
               <Users className="text-zeluxe-black" size={18} />
             </span>
+
             <div className="flex-1">
               <p className="text-[10px] font-bold uppercase tracking-widest text-zeluxe-gold">
                 Refer &amp; Earn
               </p>
+
               <p className="mt-0.5 text-xs font-bold text-zeluxe-black">
                 বন্ধুকে রিসেলার বানান, Tk {REFERRAL_BONUS_AMOUNT} পান
               </p>
+
               <div className="mt-1 flex items-center gap-2 text-[10px] font-number">
                 <span className="text-gray-600">
                   {referralInfo.referralCount}টি referral
                 </span>
+
                 <span className="font-bold text-green-600">
                   Tk {referralInfo.referralBonusEarned.toLocaleString()} earned
                 </span>
               </div>
             </div>
+
             <ArrowRight size={16} className="shrink-0 text-zeluxe-gold" />
           </Link>
         )
@@ -868,6 +1039,7 @@ export default function ResellerDashboard() {
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-500">
             Recent Orders
           </p>
+
           <Link
             to="/orders"
             className="flex items-center gap-0.5 text-[11px] font-bold text-zeluxe-gold hover:underline"
@@ -895,9 +1067,11 @@ export default function ResellerDashboard() {
                     <p className="font-mono text-[11px] font-bold text-zeluxe-black">
                       {order.orderId}
                     </p>
+
                     <p className="mt-0.5 truncate text-xs font-medium text-gray-700">
                       {order.productName}
                     </p>
+
                     <div className="mt-1.5 flex items-center gap-2">
                       <span
                         className={`inline-block rounded-full px-1.5 py-0.5 text-[9px] font-bold ${getStatusBadgeClass(
@@ -906,11 +1080,13 @@ export default function ResellerDashboard() {
                       >
                         {getStatusLabel(order.status)}
                       </span>
+
                       <span className="text-[9px] font-medium text-gray-400">
                         {formatDate(order.createdAt?.seconds)}
                       </span>
                     </div>
                   </div>
+
                   <p className="shrink-0 text-sm font-bold text-zeluxe-gold font-number">
                     Tk {order.total.toLocaleString()}
                   </p>
@@ -923,12 +1099,15 @@ export default function ResellerDashboard() {
             <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zeluxe-cream">
               <Package className="h-6 w-6 text-zeluxe-gold" />
             </div>
+
             <p className="mt-3 text-sm font-bold text-zeluxe-black">
               এখনো কোনো অর্ডার নেই
             </p>
+
             <p className="mt-1 text-xs text-gray-500">
               প্রথম অর্ডার দিলেই Welcome Bonus-এর পথে এগোবেন
             </p>
+
             <Link
               to="/products"
               className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-zeluxe-black px-4 py-2 text-xs font-bold text-white transition hover:bg-gray-800"
@@ -951,6 +1130,7 @@ export default function ResellerDashboard() {
                   নোটিফিকেশন
                 </h2>
               </div>
+
               <button
                 onClick={() => setIsNotifOpen(false)}
                 className="rounded-full p-2 bg-gray-50 text-gray-500 hover:bg-gray-100 transition"
@@ -965,9 +1145,11 @@ export default function ResellerDashboard() {
                   <div className="flex h-16 w-16 items-center justify-center rounded-full bg-gray-50 mb-4">
                     <BellOff size={28} className="text-gray-400" />
                   </div>
+
                   <p className="text-sm font-bold text-zeluxe-black">
                     কোনো নোটিফিকেশন নেই
                   </p>
+
                   <p className="mt-1 text-xs text-gray-500">
                     নতুন অফার বা আপডেট এখানে দেখা যাবে
                   </p>
@@ -992,6 +1174,7 @@ export default function ResellerDashboard() {
                       >
                         <Sparkles size={14} />
                       </div>
+
                       <div>
                         <p
                           className={`text-sm ${
@@ -1002,9 +1185,11 @@ export default function ResellerDashboard() {
                         >
                           {notif.title}
                         </p>
+
                         <p className="mt-1 text-xs text-gray-600 leading-relaxed">
                           {notif.message}
                         </p>
+
                         <p className="mt-2 text-[10px] font-medium text-gray-400">
                           {formatDate(notif.createdAt?.seconds)}
                         </p>
